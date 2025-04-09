@@ -6,9 +6,14 @@ import {
   IPage,
   IPageInput,
   SidebarPagesParams,
+  IAddPageMember,
+  IPageMember,
+  IRemovePageMember,
+  IChangePageMemberRole,
 } from "@/features/page/types/page.types";
-import { IAttachment, IPagination } from "@/lib/types.ts";
+import { IAttachment, IPagination, QueryParams } from "@/lib/types.ts";
 import { saveAs } from "file-saver";
+import { IChangePassword } from "@/features/auth/types/auth.types";
 
 export async function createPage(data: Partial<IPage>): Promise<IPage> {
   const req = await api.post<IPage>("/pages/create", data);
@@ -105,4 +110,26 @@ export async function uploadFile(
   });
 
   return req as unknown as IAttachment;
+}
+
+export async function addPageMember(data: IAddPageMember): Promise<void> {
+  await api.post("/pages/members/add", data);
+}
+
+export async function getPageMembers(
+  pageId: string,
+  params?: QueryParams,
+): Promise<IPagination<IPageMember>> {
+  const req = await api.post<any>("/pages/members", { pageId, ...params });
+  return req.data;
+}
+
+export async function removePageMember(data: IRemovePageMember): Promise<void> {
+  await api.post("/pages/members/remove", data);
+}
+
+export async function changeMemberRole(
+  data: IChangePageMemberRole,
+): Promise<void> {
+  await api.post("/pages/members/change-role", data);
 }

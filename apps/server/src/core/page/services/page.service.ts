@@ -21,12 +21,15 @@ import { DB } from '@docmost/db/types/db';
 import { generateSlugId } from '../../../common/helpers';
 import { executeTx } from '@docmost/db/utils';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
+import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
+import { SpaceRole } from 'src/common/helpers/types/permission';
 
 @Injectable()
 export class PageService {
   constructor(
     private pageRepo: PageRepo,
     private attachmentRepo: AttachmentRepo,
+    private pageMemberRepo: PageMemberRepo,
     @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
@@ -63,19 +66,33 @@ export class PageService {
       parentPageId = parentPage.id;
     }
 
-    const createdPage = await this.pageRepo.insertPage({
-      slugId: generateSlugId(),
-      title: createPageDto.title,
-      position: await this.nextPagePosition(
-        createPageDto.spaceId,
-        parentPageId,
-      ),
-      icon: createPageDto.icon,
-      parentPageId: parentPageId,
-      spaceId: createPageDto.spaceId,
-      creatorId: userId,
-      workspaceId: workspaceId,
-      lastUpdatedById: userId,
+    const createdPage = await executeTx<Page>(this.db, async (trx) => {
+      const createdpage = await this.pageRepo.insertPage(
+        {
+          slugId: generateSlugId(),
+          title: createPageDto.title,
+          position: pagePosition,
+          icon: createPageDto.icon,
+          parentPageId: parentPageId,
+          spaceId: createPageDto.spaceId,
+          creatorId: userId,
+          workspaceId: workspaceId,
+          lastUpdatedById: userId,
+        },
+        trx,
+      );
+
+      await this.pageMemberRepo.insertPageMember(
+        {
+          userId: userId,
+          pageId: createdpage.id,
+          role: SpaceRole.ADMIN,
+          addedById: userId,
+        },
+        trx,
+      );
+
+      return createdpage;
     });
 
     return createdPage;

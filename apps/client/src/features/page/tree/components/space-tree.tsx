@@ -22,6 +22,7 @@ import {
   IconPlus,
   IconPointFilled,
   IconTrash,
+  IconUsers,
 } from "@tabler/icons-react";
 import { treeDataAtom } from "@/features/page/tree/atoms/tree-data-atom.ts";
 import clsx from "clsx";
@@ -58,6 +59,7 @@ import { useDeletePageModal } from "@/features/page/hooks/use-delete-page-modal.
 import { useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
 import MovePageModal from "../../components/move-page-modal.tsx";
+import PageShareModal from "../../components/share-modal";
 
 interface SpaceTreeProps {
   spaceId: string;
@@ -435,12 +437,15 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
   const clipboard = useClipboard({ timeout: 500 });
   const { spaceSlug } = useParams();
   const { openDeleteModal } = useDeletePageModal();
+
   const [exportOpened, { open: openExportModal, close: closeExportModal }] =
     useDisclosure(false);
   const [
     movePageModalOpened,
     { open: openMovePageModal, close: closeMoveSpaceModal },
   ] = useDisclosure(false);
+  const [shareOpened, { open: openShareModal, close: closeShareModal }] =
+    useDisclosure(false);
 
   const handleCopyLink = () => {
     const pageUrl =
@@ -491,6 +496,17 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
             {t("Export page")}
           </Menu.Item>
 
+          <Menu.Item
+            leftSection={<IconUsers size={16} />}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openShareModal();
+            }}
+          >
+            {t("Share")}
+          </Menu.Item>
+
           {!(treeApi.props.disableEdit as boolean) && (
             <>
               <Menu.Item
@@ -534,6 +550,12 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
         id={node.id}
         open={exportOpened}
         onClose={closeExportModal}
+      />
+
+      <PageShareModal
+        pageId={node.id}
+        opened={shareOpened}
+        onClose={closeShareModal}
       />
     </>
   );
