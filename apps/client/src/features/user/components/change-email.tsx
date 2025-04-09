@@ -70,6 +70,7 @@ function ChangeEmailForm() {
 
   function handleSubmit(data: FormValues) {
     setIsLoading(true);
+    console.log(data);
   }
 
   return (

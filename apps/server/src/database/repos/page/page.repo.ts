@@ -96,19 +96,18 @@ export class PageRepo {
     pageId: string,
     trx?: KyselyTransaction,
   ) {
-    return this.updatePages(updatablePage, [pageId], trx);
-  }
-
-  async updatePages(
-    updatePageData: UpdatablePage,
-    pageIds: string[],
-    trx?: KyselyTransaction,
-  ) {
-    return dbOrTx(this.db, trx)
+    const db = dbOrTx(this.db, trx);
+    let query = db
       .updateTable('pages')
-      .set({ ...updatePageData, updatedAt: new Date() })
-      .where(pageIds.some(pageId => !isValidUUID(pageId)) ? "slugId" : "id", "in", pageIds)
-      .executeTakeFirst();
+      .set({ ...updatablePage, updatedAt: new Date() });
+
+    if (isValidUUID(pageId)) {
+      query = query.where('id', '=', pageId);
+    } else {
+      query = query.where('slugId', '=', pageId);
+    }
+
+    return query.executeTakeFirst();
   }
 
   async insertPage(

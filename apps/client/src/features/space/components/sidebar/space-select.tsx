@@ -6,33 +6,21 @@ import { ISpace } from "../../types/space.types";
 import { useTranslation } from "react-i18next";
 
 interface SpaceSelectProps {
-  onChange: (value: ISpace) => void;
+  onChange: (value: string) => void;
   value?: string;
   label?: string;
-  width?: number;
-  opened?: boolean;
-  clearable?: boolean;
 }
 
 const renderSelectOption: SelectProps["renderOption"] = ({ option }) => (
   <Group gap="sm" wrap="nowrap">
     <Avatar color="initials" variant="filled" name={option.label} size={20} />
     <div>
-      <Text size="sm" lineClamp={1}>
-        {option.label}
-      </Text>
+      <Text size="sm" lineClamp={1}>{option.label}</Text>
     </div>
   </Group>
 );
 
-export function SpaceSelect({
-  onChange,
-  label,
-  value,
-  width,
-  opened,
-  clearable,
-}: SpaceSelectProps) {
+export function SpaceSelect({ onChange, label, value }: SpaceSelectProps) {
   const { t } = useTranslation();
   const [searchValue, setSearchValue] = useState("");
   const [debouncedQuery] = useDebouncedValue(searchValue, 500);
@@ -54,8 +42,8 @@ export function SpaceSelect({
         });
 
       const filteredSpaceData = spaceData.filter(
-        (space) =>
-          !data.find((existingSpace) => existingSpace.value === space.value),
+        (user) =>
+          !data.find((existingUser) => existingUser.value === user.value),
       );
       setData((prevData) => [...prevData, ...filteredSpaceData]);
     }
@@ -71,18 +59,14 @@ export function SpaceSelect({
       searchable
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      clearable={clearable}
+      clearable
       variant="filled"
-      onChange={(slug) =>
-        onChange(spaces.items?.find((item) => item.slug === slug))
-      }
-      // duct tape
-      onClick={(e) => e.stopPropagation()}
+      onChange={onChange}
       nothingFoundMessage={t("No space found")}
       limit={50}
       checkIconPosition="right"
-      comboboxProps={{ width, withinPortal: false }}
-      dropdownOpened={opened}
+      comboboxProps={{ width: 300, withinPortal: false }}
+      dropdownOpened
     />
   );
 }

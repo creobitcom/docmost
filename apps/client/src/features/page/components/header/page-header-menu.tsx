@@ -1,6 +1,5 @@
 import { ActionIcon, Group, Menu, Text, Tooltip } from "@mantine/core";
 import {
-  IconArrowRight,
   IconArrowsHorizontal,
   IconDots,
   IconFileExport,
@@ -32,13 +31,11 @@ import {
   yjsConnectionStatusAtom,
 } from "@/features/editor/atoms/editor-atoms.ts";
 import { formattedDate, timeAgo } from "@/lib/time.ts";
-import MovePageModal from "@/features/page/components/move-page-modal.tsx";
 
 interface PageHeaderMenuProps {
   readOnly?: boolean;
 }
 export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
-  const { t } = useTranslation();
   const toggleAside = useToggleAside();
   const [yjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
 
@@ -46,7 +43,7 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
     <>
       {yjsConnectionStatus === "disconnected" && (
         <Tooltip
-          label={t("Real-time editor connection lost. Retrying...")}
+          label="Real-time editor connection lost. Retrying..."
           openDelay={250}
           withArrow
         >
@@ -86,10 +83,6 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
   const [tree] = useAtom(treeApiAtom);
   const [exportOpened, { open: openExportModal, close: closeExportModal }] =
     useDisclosure(false);
-  const [
-    movePageModalOpened,
-    { open: openMovePageModal, close: closeMoveSpaceModal },
-  ] = useDisclosure(false);
   const [pageEditor] = useAtom(pageEditorAtom);
 
   const handleCopyLink = () => {
@@ -153,15 +146,6 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
           </Menu.Item>
 
           <Menu.Divider />
-
-          {!readOnly && (
-            <Menu.Item
-              leftSection={<IconArrowRight size={16} />}
-              onClick={openMovePageModal}
-            >
-              {t("Move")}
-            </Menu.Item>
-          )}
 
           <Menu.Item
             leftSection={<IconFileExport size={16} />}
@@ -232,14 +216,6 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
         id={page.id}
         open={exportOpened}
         onClose={closeExportModal}
-      />
-
-      <MovePageModal
-        pageId={page.id}
-        slugId={page.slugId}
-        currentSpaceSlug={spaceSlug}
-        onClose={closeMoveSpaceModal}
-        open={movePageModalOpened}
       />
     </>
   );

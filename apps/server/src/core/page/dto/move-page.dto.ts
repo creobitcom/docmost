@@ -13,11 +13,3 @@ export class MovePageDto {
   @IsString()
   parentPageId?: string | null;
 }
-
-export class MovePageToSpaceDto {
-  @IsString()
-  pageId: string;
-
-  @IsString()
-  spaceId: string;
-}
