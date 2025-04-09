@@ -84,7 +84,6 @@ export class SearchService {
         .select(['id', 'name', 'avatarUrl'])
         .where((eb) => eb(sql`LOWER(users.name)`, 'like', `%${query}%`))
         .where('workspaceId', '=', workspaceId)
-        .where('deletedAt', 'is', null)
         .limit(limit)
         .execute();
     }

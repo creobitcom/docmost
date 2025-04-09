@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { EnvironmentService } from '../../../integrations/environment/environment.service';
 import {
@@ -21,10 +17,6 @@ export class TokenService {
   ) {}
 
   async generateAccessToken(user: User): Promise<string> {
-    if (user.deletedAt) {
-      throw new ForbiddenException();
-    }
-
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,

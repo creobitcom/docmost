@@ -281,42 +281,10 @@ export class AttachmentService {
         }),
       );
 
-      if (failedDeletions.length === attachments.length) {
-        throw new Error(
-          `Failed to delete any attachments for spaceId: ${spaceId}`,
-        );
-      }
-    } catch (err) {
-      throw err;
-    }
-  }
-
-  async handleDeleteUserAvatars(userId: string) {
-    try {
-      const userAvatars = await this.db
-        .selectFrom('attachments')
-        .select(['id', 'filePath'])
-        .where('creatorId', '=', userId)
-        .where('type', '=', AttachmentType.Avatar)
-        .execute();
-
-      if (!userAvatars || userAvatars.length === 0) {
-        return;
+      if(failedDeletions.length === attachments.length){
+        throw new Error(`Failed to delete any attachments for spaceId: ${spaceId}`);
       }
 
-      await Promise.all(
-        userAvatars.map(async (attachment) => {
-          try {
-            await this.storageService.delete(attachment.filePath);
-            await this.attachmentRepo.deleteAttachmentById(attachment.id);
-          } catch (err) {
-            this.logger.log(
-              `DeleteUserAvatar: failed to delete user avatar ${attachment.id}:`,
-              err,
-            );
-          }
-        }),
-      );
     } catch (err) {
       throw err;
     }

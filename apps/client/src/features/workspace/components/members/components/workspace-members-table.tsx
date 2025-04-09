@@ -17,8 +17,6 @@ import Paginate from "@/components/common/paginate.tsx";
 import { SearchInput } from "@/components/common/search-input.tsx";
 import NoTableResults from "@/components/common/no-table-results.tsx";
 import { usePaginateAndSearch } from "@/hooks/use-paginate-and-search.tsx";
-import InviteActionMenu from "@/features/workspace/components/members/components/invite-action-menu.tsx";
-import MemberActionMenu from "@/features/workspace/components/members/components/members-action-menu.tsx";
 
 export default function WorkspaceMembersTable() {
   const { t } = useTranslation();
@@ -97,9 +95,6 @@ export default function WorkspaceMembersTable() {
                       }
                       disabled={!isAdmin}
                     />
-                  </Table.Td>
-                  <Table.Td>
-                    {isAdmin && <MemberActionMenu userId={user.id} />}
                   </Table.Td>
                 </Table.Tr>
               ))
