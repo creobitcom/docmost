@@ -21,7 +21,7 @@ export default function Paginate({
   }
 
   return (
-    <Group mt="md" justify="flex-end">
+    <Group mt="md">
       <Button
         variant="default"
         size="compact-sm"
