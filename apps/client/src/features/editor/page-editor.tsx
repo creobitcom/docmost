@@ -273,8 +273,6 @@ export default function PageEditor({
         collabRetryCount.current > 2 ? 3000 : 0,
       );
 
-      setIsCollabReady(true);
-
       return () => clearTimeout(reconnectTimeout);
     }
   }, [isIdle, documentState, remoteProvider?.status]);
