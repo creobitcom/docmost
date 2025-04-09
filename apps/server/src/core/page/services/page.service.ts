@@ -112,32 +112,21 @@ export class PageService {
   }
 
   async update(
-    page: Page,
+    pageId: string,
     updatePageDto: UpdatePageDto,
     userId: string,
   ): Promise<Page> {
-    const contributors = new Set<string>(page.contributorIds);
-    contributors.add(userId);
-    const contributorIds = Array.from(contributors);
-
     await this.pageRepo.updatePage(
       {
         title: updatePageDto.title,
         icon: updatePageDto.icon,
         lastUpdatedById: userId,
         updatedAt: new Date(),
-        contributorIds: contributorIds,
       },
-      page.id,
+      pageId,
     );
 
-    return await this.pageRepo.findById(page.id, {
-      includeSpace: true,
-      includeContent: true,
-      includeCreator: true,
-      includeLastUpdatedBy: true,
-      includeContributors: true,
-    });
+    return await this.pageRepo.findById(pageId);
   }
 
   withHasChildren(eb: ExpressionBuilder<DB, 'pages'>) {
