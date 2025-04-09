@@ -6,7 +6,6 @@ import {
   IconFileExport,
   IconHistory,
   IconLink,
-  IconList,
   IconMessage,
   IconPrinter,
   IconTrash,
@@ -57,23 +56,13 @@ export default function PageHeaderMenu({ readOnly }: PageHeaderMenuProps) {
         </Tooltip>
       )}
 
-      <Tooltip label={t("Comments")} openDelay={250} withArrow>
+      <Tooltip label="Comments" openDelay={250} withArrow>
         <ActionIcon
           variant="default"
           style={{ border: "none" }}
           onClick={() => toggleAside("comments")}
         >
           <IconMessage size={20} stroke={2} />
-        </ActionIcon>
-      </Tooltip>
-
-      <Tooltip label={t("Table of contents")} openDelay={250} withArrow>
-        <ActionIcon
-          variant="default"
-          style={{ border: "none" }}
-          onClick={() => toggleAside("toc")}
-        >
-          <IconList size={20} stroke={2} />
         </ActionIcon>
       </Tooltip>
 
