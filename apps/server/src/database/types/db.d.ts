@@ -142,6 +142,13 @@ export interface GroupUsers {
   userId: string;
 }
 
+export interface MemberPermissions {
+  groupId: string | null;
+  id: Generated<string>;
+  permissionId: string | null;
+  userId: string | null;
+}
+
 export interface PageHistory {
   content: Json | null;
   coverPhoto: string | null;
@@ -173,6 +180,7 @@ export interface PageMembers {
 
 export interface Pages {
   content: Json | null;
+  contributorIds: Generated<string[] | null>;
   coverPhoto: string | null;
   createdAt: Generated<Timestamp>;
   creatorId: string | null;
@@ -192,6 +200,17 @@ export interface Pages {
   updatedAt: Generated<Timestamp>;
   workspaceId: string;
   ydoc: Buffer | null;
+}
+
+export interface Permissions {
+  addedById: string | null;
+  createdAt: Generated<Timestamp>;
+  deletedAt: Timestamp | null;
+  id: Generated<string>;
+  name: string;
+  pageId: string | null;
+  spaceId: string | null;
+  updatedAt: Generated<Timestamp>;
 }
 
 export interface SpaceMembers {
@@ -297,9 +316,11 @@ export interface DB {
   comments: Comments;
   groups: Groups;
   groupUsers: GroupUsers;
+  memberPermissions: MemberPermissions;
   pageHistory: PageHistory;
   pageMembers: PageMembers;
   pages: Pages;
+  permissions: Permissions;
   spaceMembers: SpaceMembers;
   spaces: Spaces;
   users: Users;

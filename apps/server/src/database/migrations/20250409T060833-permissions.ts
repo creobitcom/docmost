@@ -33,26 +33,12 @@ export async function up(db: Kysely<any>): Promise<void> {
     .execute();
 
   await db.schema
-    .createTable('group_permissions')
+    .createTable('member_permissions')
     .addColumn('id', 'uuid', (col) =>
       col.primaryKey().defaultTo(sql`gen_uuid_v7()`),
     )
     .addColumn('group_id', 'uuid', (col) =>
       col.references('groups.id').onDelete('cascade'),
-    )
-    .addColumn('permission_id', 'uuid', (col) =>
-      col.references('permissions.id').onDelete('cascade'),
-    )
-    .addUniqueConstraint('group_permissions_group_id_permission_id_unique', [
-      'group_id',
-      'permission_id',
-    ])
-    .execute();
-
-  await db.schema
-    .createTable('user_permissions')
-    .addColumn('id', 'uuid', (col) =>
-      col.primaryKey().defaultTo(sql`gen_uuid_v7()`),
     )
     .addColumn('user_id', 'uuid', (col) =>
       col.references('users.id').onDelete('cascade'),
@@ -60,15 +46,22 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('permission_id', 'uuid', (col) =>
       col.references('permissions.id').onDelete('cascade'),
     )
-    .addUniqueConstraint('user_permissions_user_id_permission_id_unique', [
+    .addUniqueConstraint('member_permissions_user_id_permission_id_unique', [
       'user_id',
       'permission_id',
     ])
+    .addUniqueConstraint('member_permissions_group_id_permission_id_unique', [
+      'group_id',
+      'permission_id',
+    ])
+    .addCheckConstraint(
+      'allow_either_user_id_or_group_id_check',
+      sql`(("user_id" IS NOT NULL AND "group_id" IS NULL) OR ("user_id" IS NULL AND "group_id" IS NOT NULL))`,
+    )
     .execute();
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
   await db.schema.dropTable('user_permissions').execute();
-  await db.schema.dropTable('group_permissions').execute();
-  await db.schema.dropTable('permissions').execute();
+  await db.schema.dropTable('member_permissions').execute();
 }
