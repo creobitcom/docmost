@@ -41,6 +41,7 @@ import { findHighestUserSpaceRole } from '@docmost/db/repos/space/utils';
 import { RemovePageMemberDto } from './dto/remove-page-member.dto';
 import { UpdatePageMemberRoleDto } from './dto/update-page-member-role.dto';
 import { SpaceRole } from 'src/common/helpers/types/permission';
+import { PermissionAbilityFactory } from '../casl/abilities/permission-ability.factory';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -53,6 +54,7 @@ export class PageController {
     private readonly pageHistoryService: PageHistoryService,
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly pageAbility: PageAbilityFactory,
+    private readonly permissionAbility: PermissionAbilityFactory,
   ) {}
 
   @HttpCode(HttpStatus.OK)
@@ -69,24 +71,21 @@ export class PageController {
       throw new NotFoundException('Page not found');
     }
 
-    const pageAbility = await this.pageAbility.createForUser(user, page.id);
+    const pageAbility = await this.permissionAbility.createForUserPage(
+      user,
+      page.id,
+    );
 
     if (pageAbility.cannot(PageCaslAction.Read, PageCaslSubject.Page)) {
       throw new ForbiddenException();
     }
 
-    const userPageRoles = await this.pageMemberRepo.getUserPageRoles(
-      user.id,
-      page.id,
-    );
-
-    const userPageRole = findHighestUserSpaceRole(userPageRoles);
-
     const membership = {
       userId: user.id,
-      role: userPageRole,
       permissions: pageAbility.rules,
     };
+
+    Logger.debug(`User membership: $JSON.stringify({membership}`);
 
     return { ...page, membership };
   }
@@ -312,7 +311,7 @@ export class PageController {
       items: await Promise.all(
         pagesInSpace.items.map(async (page) => {
           try {
-            const pageAbility = await this.pageAbility.createForUser(
+            const pageAbility = await this.permissionAbility.createForUserPage(
               user,
               page.id,
             );
