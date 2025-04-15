@@ -3,29 +3,30 @@ import {
   createMongoAbility,
   MongoAbility,
 } from '@casl/ability';
-import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
+import { Injectable } from '@nestjs/common';
+
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
-import { findHighestUserPageRole } from '@docmost/db/repos/page/utils';
 import { PermissionRepo } from '@docmost/db/repos/permissions/permissions.repo';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
+import { findHighestUserPageRole } from '@docmost/db/repos/page/utils';
 import { Permission, User } from '@docmost/db/types/entity.types';
-import { Injectable, Logger } from '@nestjs/common';
+
 import { SpaceRole, UserRole } from 'src/common/helpers/types/permission';
 import {
+  IPageAbility,
   PageCaslAction,
   PageCaslSubject,
 } from '../interfaces/page-ability.type';
 import {
   IPermissionAbility,
-  SpaceCaslAction,
-  CaslSubject,
+  CaslObject,
   CaslAction,
 } from '../interfaces/permission-ability.type';
 import {
   ISpaceAbility,
+  SpaceCaslAction,
   SpaceCaslSubject,
 } from '../interfaces/space-ability.type';
-import { ID } from 'yjs';
 
 @Injectable()
 export class PermissionAbilityFactory {
@@ -37,90 +38,77 @@ export class PermissionAbilityFactory {
 
   async createForUserPage(user: User, pageId: string) {
     const spaceId = (await this.pageRepo.findById(pageId)).spaceId;
-    const userSpaceRoles = await this.spaceMemberRepo.getUserSpaceRoles(
-      user.id,
-      spaceId,
-    );
+    const role = await this.getUserSpaceRole(user.id, spaceId);
 
-    const userSpaceRole = findHighestUserPageRole(
-      userSpaceRoles ? userSpaceRoles : [],
-    );
-
-    if (userSpaceRole == SpaceRole.ADMIN) {
+    if (role === SpaceRole.ADMIN) {
       return buildPageAdminAbility();
     }
 
-    const userPagePermissions = await this.permissionRepo.findByPageUserId(
+    const permissions = await this.permissionRepo.findByPageUserId(
       pageId,
       user.id,
     );
-    Logger.debug(userPagePermissions);
-
-    Logger.debug(
-      `User permissions: ${JSON.stringify(userPagePermissions)}`,
-      'Permissions-ability',
-    );
-
-    return buildAbilityFromPermissions(userPagePermissions);
+    return buildAbilityFromPermissions(permissions);
   }
 
   async createForUserSpace(user: User, spaceId: string) {
-    const userSpaceRoles = await this.spaceMemberRepo.getUserSpaceRoles(
-      user.id,
-      spaceId,
-    );
+    const role = await this.getUserSpaceRole(user.id, spaceId);
 
-    const userSpaceRole = findHighestUserPageRole(
-      userSpaceRoles ? userSpaceRoles : [],
-    );
-
-    if (userSpaceRole == SpaceRole.ADMIN) {
+    if (role === SpaceRole.ADMIN) {
       return buildSpaceAdminAbility();
     }
 
-    const spacePremissions = await this.permissionRepo.findByPageUserId(
+    const allPermissions = await this.permissionRepo.findByPageUserId(
       spaceId,
       user.id,
     );
-    Logger.debug(spacePremissions);
-
-    const userSpacePermissons = [];
-
-    for (const permission of spacePremissions) {
-      if (this.permissionRepo.isUserHasPermission(user.id, permission.id)) {
-        userSpacePermissons.push(permission);
-      }
-    }
-
-    Logger.debug(
-      `User permissions: ${JSON.stringify(userSpacePermissons)}`,
-      'Permissions-ability',
+    const filteredPermissions = await this.filterUserPermissions(
+      user.id,
+      allPermissions,
     );
 
-    return buildAbilityFromPermissions(userSpacePermissons);
+    return buildAbilityFromPermissions(filteredPermissions);
   }
 
   async createForUserWorkspace(user: User) {
-    Logger.debug(`User workspace role: ${user.role}`);
-
     return buildWorkspaceAbility(user.role);
+  }
+
+  private async getUserSpaceRole(
+    userId: string,
+    spaceId: string,
+  ): Promise<string> {
+    const roles = await this.spaceMemberRepo.getUserSpaceRoles(userId, spaceId);
+    return findHighestUserPageRole(roles ?? []);
+  }
+
+  private async filterUserPermissions(
+    userId: string,
+    permissions: Permission[],
+  ) {
+    const checks = await Promise.all(
+      permissions.map(async (perm) => {
+        const has = await this.permissionRepo.isUserHasPermission(
+          userId,
+          perm.id,
+        );
+        return has ? perm : null;
+      }),
+    );
+    return checks.filter(Boolean) as Permission[];
   }
 }
 
-function buildAbilityFromPermissions(userPagePermissions: Permission[]) {
+function buildAbilityFromPermissions(permissions: Permission[]) {
   const { can, build } = new AbilityBuilder<MongoAbility<IPermissionAbility>>(
     createMongoAbility,
   );
-
-  for (const permission of userPagePermissions) {
-    can(permission.action, permission.object);
-  }
-
+  permissions.forEach((perm) => can(perm.action, perm.object));
   return build();
 }
 
 function buildPageAdminAbility() {
-  const { can, build } = new AbilityBuilder<MongoAbility<IPermissionAbility>>(
+  const { can, build } = new AbilityBuilder<MongoAbility<IPageAbility>>(
     createMongoAbility,
   );
   can(PageCaslAction.Manage, PageCaslSubject.Member);
@@ -129,7 +117,7 @@ function buildPageAdminAbility() {
 }
 
 function buildSpaceAdminAbility() {
-  const { can, build } = new AbilityBuilder<MongoAbility<IPermissionAbility>>(
+  const { can, build } = new AbilityBuilder<MongoAbility<ISpaceAbility>>(
     createMongoAbility,
   );
   can(SpaceCaslAction.Manage, SpaceCaslSubject.Settings);
@@ -142,10 +130,8 @@ function buildWorkspaceAbility(role: string) {
   const { can, build } = new AbilityBuilder<MongoAbility<IPermissionAbility>>(
     createMongoAbility,
   );
-
-  if (role == UserRole.OWNER) {
-    can(CaslAction.Manage, CaslSubject.Permission);
+  if (role === UserRole.OWNER) {
+    can(CaslAction.Manage, CaslObject.Permission);
   }
-
   return build();
 }

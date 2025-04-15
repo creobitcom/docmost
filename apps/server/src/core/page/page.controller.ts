@@ -85,8 +85,6 @@ export class PageController {
       permissions: pageAbility.rules,
     };
 
-    Logger.debug(`User membership: $JSON.stringify({membership}`);
-
     return { ...page, membership };
   }
 

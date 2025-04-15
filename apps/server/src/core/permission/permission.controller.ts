@@ -1,12 +1,14 @@
-import { Permission, User, Workspace } from '@docmost/db/types/entity.types';
+import { User, Workspace } from '@docmost/db/types/entity.types';
 import {
   BadRequestException,
   Body,
+  Query,
   Controller,
+  Delete,
   ForbiddenException,
+  Get,
   HttpCode,
   HttpStatus,
-  Logger,
   NotFoundException,
   Post,
   UseGuards,
@@ -18,16 +20,19 @@ import { PermissionService } from './services/permission.service';
 import { PermissionAbilityFactory } from '../casl/abilities/permission-ability.factory';
 import {
   CaslAction,
-  CaslSubject,
+  CaslObject,
 } from '../casl/interfaces/permission-ability.type';
 import { AuthWorkspace } from 'src/common/decorators/auth-workspace.decorator';
-import { PermissionDto, PermissionIdDto } from './dto/permission.dto';
+import {
+  GetPermissionDto,
+  PermissionDto,
+  PermissionIdDto,
+} from './dto/permission.dto';
 import { PageIdDto } from '../comment/dto/comments.input';
-import { SpaceService } from '../space/services/space.service';
-import { PageService } from '../page/services/page.service';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { UserRepo } from '@docmost/db/repos/user/user.repo';
 import { GroupRepo } from '@docmost/db/repos/group/group.repo';
+import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
 
 @UseGuards(JwtAuthGuard)
 @Controller('permission')
@@ -36,146 +41,129 @@ export class PermissionController {
     private readonly permissionService: PermissionService,
     private readonly permissionAbility: PermissionAbilityFactory,
     private readonly pageRepo: PageRepo,
+    private readonly spaceRepo: SpaceRepo,
     private readonly userRepo: UserRepo,
     private readonly groupRepo: GroupRepo,
   ) {}
 
   @HttpCode(HttpStatus.OK)
-  @Post('/create')
+  @Post()
   async create(
-    @Body() createPermissionDto: CreatePermissionDto,
+    @Body() dto: CreatePermissionDto,
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    if (
-      (!createPermissionDto.pageId || createPermissionDto.pageId.length == 0) &&
-      (!createPermissionDto.spaceId || createPermissionDto.spaceId.length == 0)
-    ) {
-      throw new BadRequestException('pageId or spaceId is required');
-    }
+    const ability = await this.permissionAbility.createForUserWorkspace(user);
+    this.ensurePermission(ability, CaslAction.Manage, CaslObject.Permission);
 
-    if (
-      (!createPermissionDto.userId || createPermissionDto.userId.length == 0) &&
-      (!createPermissionDto.groupId || createPermissionDto.groupId.length == 0)
-    ) {
-      throw new BadRequestException('userId or groupId is required');
-    }
-
-    const permissionsAbility =
-      await this.permissionAbility.createForUserWorkspace(user);
-
-    if (permissionsAbility.cannot(CaslAction.Manage, CaslSubject.Permission)) {
-      throw new ForbiddenException();
-    }
-
-    return await this.permissionService.create(
-      createPermissionDto,
-      user,
-      workspace.id,
-    );
+    return this.permissionService.create(dto, user, workspace.id);
   }
 
   @HttpCode(HttpStatus.OK)
-  @Post('/page')
-  async findByPageId(
-    @Body() pageIdDto: PageIdDto,
+  @Get()
+  async findByTargetId(
+    @Query() dto: GetPermissionDto,
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const page = await this.pageRepo.findById(pageIdDto.pageId);
-    if (!page) {
-      throw new NotFoundException('Page not found');
-    }
+    await this.ensureTargetExists(dto, workspace);
 
-    const permissionsAbility = await this.permissionAbility.createForUserPage(
-      user,
-      pageIdDto.pageId,
-    );
+    const ability =
+      dto.type === CaslObject.Page
+        ? await this.permissionAbility.createForUserPage(user, dto.targetId)
+        : await this.permissionAbility.createForUserSpace(user, dto.targetId);
 
-    if (permissionsAbility.cannot(CaslAction.Read, CaslSubject.Page)) {
+    this.ensurePermission(ability, CaslAction.Read, CaslObject.Page);
+
+    const permissions =
+      dto.type === CaslObject.Page
+        ? await this.permissionService.findByPageId(dto.targetId)
+        : await this.permissionService.findBySpaceId(dto.targetId);
+
+    return this.groupPermissionsByMember(permissions, workspace.id);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Delete()
+  async delete(@Body() dto: PermissionIdDto, @AuthUser() user: User) {
+    const permission = await this.permissionService.findById(dto.id);
+    if (!permission) throw new NotFoundException('Permission not found');
+
+    const ability = await this.permissionAbility.createForUserWorkspace(user);
+    this.ensurePermission(ability, CaslAction.Manage, CaslObject.Permission);
+
+    return this.permissionService.delete(dto.id);
+  }
+
+  private ensurePermission(ability: any, action: string, subject: string) {
+    if (ability.cannot(action, subject)) {
       throw new ForbiddenException();
     }
+  }
 
-    const pagePermissons = await this.permissionService.findByPageId(
-      pageIdDto.pageId,
-    );
+  private async ensureTargetExists(
+    dto: GetPermissionDto,
+    workspace: Workspace,
+  ) {
+    if (dto.type === CaslObject.Page) {
+      const page = await this.pageRepo.findById(dto.targetId);
+      if (!page) throw new NotFoundException('Page not found');
+    } else {
+      const space = await this.spaceRepo.findById(dto.targetId, workspace.id);
+      if (!space) throw new NotFoundException('Space not found');
+    }
+  }
 
-    const permissionsByMembers: Map<
-      string,
-      {
-        type: 'user' | 'group';
-        name: string;
-        userId?: string;
-        userAvatarUrl?: string;
-        userEmail?: string;
-        groupId?: string;
-        memberCount?: number;
-        permissions: PermissionDto[];
-      }
-    > = new Map();
+  private async groupPermissionsByMember(
+    permissions: PermissionDto[],
+    workspaceId: string,
+  ) {
+    const grouped = new Map<string, any>();
 
-    for (const permission of pagePermissons) {
+    for (const permission of permissions) {
       if (permission.userId) {
         const user = await this.userRepo.findById(
           permission.userId,
-          workspace.id,
+          workspaceId,
         );
-        if (!user) {
-          continue;
-        }
-        if (!permissionsByMembers.has(user.id)) {
-          permissionsByMembers.set(user.id, {
+        if (!user) continue;
+
+        if (!grouped.has(user.id)) {
+          grouped.set(user.id, {
             type: 'user',
-            name: user.name,
             userId: user.id,
+            name: user.name,
             userAvatarUrl: user.avatarUrl,
             userEmail: user.email,
             permissions: [permission],
           });
         } else {
-          permissionsByMembers.get(user.id).permissions.push(permission);
+          grouped.get(user.id).permissions.push(permission);
         }
-      } else {
-        const group = await this.groupRepo.findById(
+      } else if (permission.groupId) {
+        const group: any = await this.groupRepo.findById(
           permission.groupId,
-          workspace.id,
-          { includeMemberCount: true },
+          workspaceId,
+          {
+            includeMemberCount: true,
+          },
         );
-        if (!group) {
-          continue;
-        }
-        if (!permissionsByMembers.has(group.id)) {
-          permissionsByMembers.set(group.id, {
+        if (!group) continue;
+
+        if (!grouped.has(group.id)) {
+          grouped.set(group.id, {
             type: 'group',
             groupId: group.id,
             name: group.name,
+            memberCount: group.memberCount,
             permissions: [permission],
-            ...group,
           });
         } else {
-          permissionsByMembers.get(group.id).permissions.push(permission);
+          grouped.get(group.id).permissions.push(permission);
         }
       }
     }
 
-    return Array.from(permissionsByMembers.values());
-  }
-
-  @HttpCode(HttpStatus.OK)
-  @Post('/delete')
-  async delete(@Body() dto: PermissionIdDto, @AuthUser() user: User) {
-    const permission = await this.permissionService.findById(dto.id);
-    if (!permission) {
-      throw new NotFoundException('Permission not found');
-    }
-
-    const permissionsAbility =
-      await this.permissionAbility.createForUserWorkspace(user);
-
-    if (permissionsAbility.cannot(CaslAction.Manage, CaslSubject.Permission)) {
-      throw new ForbiddenException();
-    }
-
-    return await this.permissionService.delete(dto.id);
+    return Array.from(grouped.values());
   }
 }

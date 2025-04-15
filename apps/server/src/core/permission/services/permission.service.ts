@@ -47,6 +47,12 @@ export class PermissionService {
     return allPagePermissions;
   }
 
+  async findBySpaceId(spaceId: string): Promise<PermissionDto[]> {
+    const allSpacePermissions =
+      await this.permissionRepo.findBySpaceId(spaceId);
+    return allSpacePermissions;
+  }
+
   async delete(id: string) {
     await this.permissionRepo.hardDelete(id);
   }
