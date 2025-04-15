@@ -1,37 +1,6 @@
 import { sql, type Kysely } from 'kysely';
 
 export async function up(db: Kysely<any>): Promise<void> {
-  // await db.schema
-  //   .createTable('permissions')
-  //   .addColumn('id', 'uuid', (col) =>
-  //     col.primaryKey().defaultTo(sql`gen_uuid_v7()`),
-  //   )
-  //   .addColumn('space_id', 'uuid', (col) =>
-  //     col.references('spaces.id').onDelete('cascade'),
-  //   )
-  //   .addColumn('page_id', 'uuid', (col) =>
-  //     col.references('pages.id').onDelete('cascade'),
-  //   )
-  //   .addColumn('name', 'varchar', (col) => col.notNull())
-  //   .addColumn('added_by_id', 'uuid', (col) => col.references('users.id'))
-  //   .addColumn('created_at', 'timestamptz', (col) =>
-  //     col.notNull().defaultTo(sql`now()`),
-  //   )
-  //   .addColumn('updated_at', 'timestamptz', (col) =>
-  //     col.notNull().defaultTo(sql`now()`),
-  //   )
-  //   .addColumn('deleted_at', 'timestamptz', (col) => col)
-  //   .addUniqueConstraint('permissions_space_id_name_unique', [
-  //     'name',
-  //     'space_id',
-  //   ])
-  //   .addUniqueConstraint('permissions_page_id_name_unique', ['name', 'page_id'])
-  //   .addCheckConstraint(
-  //     'allow_either_user_id_or_group_id_check',
-  //     sql`(("page_id" IS NOT NULL AND "space_id" IS NULL) OR ("space_id" IS NULL AND "page_id" IS NOT NULL))`,
-  //   )
-  //   .execute();
-
   await db.schema
     .createTable('permissions')
     .addColumn('id', 'uuid', (col) =>
@@ -49,18 +18,20 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('page_id', 'uuid', (col) =>
       col.references('pages.id').onDelete('cascade'),
     )
-    .addColumn('name', 'varchar', (col) => col.notNull())
+    .addColumn('action', 'varchar', (col) => col.notNull())
+    .addColumn('object', 'varchar', (col) => col.notNull())
     .addColumn('added_by_id', 'uuid', (col) => col.references('users.id'))
     .addColumn('created_at', 'timestamptz', (col) =>
       col.notNull().defaultTo(sql`now()`),
     )
-    .addColumn('updated_at', 'timestamptz', (col) =>
-      col.notNull().defaultTo(sql`now()`),
-    )
     .addColumn('deleted_at', 'timestamptz', (col) => col)
-    .addUniqueConstraint('permissions_space_id_name_unique', [
-      'name',
+    .addUniqueConstraint('permissions_member_action_object_unique', [
+      'user_id',
+      'group_id',
       'space_id',
+      'page_id',
+      'action',
+      'object',
     ])
     .addCheckConstraint(
       'allow_either_user_id_or_group_id_check',
@@ -71,6 +42,26 @@ export async function up(db: Kysely<any>): Promise<void> {
       sql`(("page_id" IS NOT NULL AND "space_id" IS NULL) OR ("space_id" IS NULL AND "page_id" IS NOT NULL))`,
     )
     .execute();
+
+  db.schema
+    .createIndex('permissions_user_id_idx')
+    .on('permissions')
+    .column('user_id');
+
+  db.schema
+    .createIndex('permissions_group_id_idx')
+    .on('permissions')
+    .column('group_id');
+
+  db.schema
+    .createIndex('permissions_space_id_idx')
+    .on('permissions')
+    .column('space_id');
+
+  db.schema
+    .createIndex('permissions_page_id_idx')
+    .on('permissions')
+    .column('page_id');
 }
 
 export async function down(db: Kysely<any>): Promise<void> {

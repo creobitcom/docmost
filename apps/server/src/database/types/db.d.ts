@@ -196,15 +196,15 @@ export interface Pages {
 }
 
 export interface Permissions {
+  action: string;
   addedById: string | null;
   createdAt: Generated<Timestamp>;
   deletedAt: Timestamp | null;
   groupId: string | null;
   id: Generated<string>;
-  name: string;
+  object: string;
   pageId: string | null;
   spaceId: string | null;
-  updatedAt: Generated<Timestamp>;
   userId: string | null;
 }
 
