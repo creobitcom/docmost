@@ -25,11 +25,27 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().defaultTo(sql`now()`),
     )
     .addColumn('deleted_at', 'timestamptz', (col) => col)
-    .addUniqueConstraint('permissions_member_action_object_unique', [
+    .addUniqueConstraint('permissions_user_page_unique', [
       'user_id',
+      'page_id',
+      'action',
+      'object',
+    ])
+    .addUniqueConstraint('permissions_user_space_unique', [
+      'user_id',
+      'space_id',
+      'action',
+      'object',
+    ])
+    .addUniqueConstraint('permissions_group_page_unique', [
+      'group_id',
+      'page_id',
+      'action',
+      'object',
+    ])
+    .addUniqueConstraint('permissions_group_space_unique', [
       'group_id',
       'space_id',
-      'page_id',
       'action',
       'object',
     ])
