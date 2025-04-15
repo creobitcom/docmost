@@ -55,7 +55,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     )
     .addCheckConstraint(
       'allow_either_page_id_or_space_id_check',
-      sql`(("page_id" IS NOT NULL AND "space_id" IS NULL) OR ("space_id" IS NULL AND "page_id" IS NOT NULL))`,
+      sql`(("page_id" IS NOT NULL AND "space_id" IS NULL) OR ("page_id" IS NULL AND "space_id" IS NOT NULL))`,
     )
     .execute();
 

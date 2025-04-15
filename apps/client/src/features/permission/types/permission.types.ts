@@ -8,7 +8,7 @@ export type Permission = {
   spaceId?: string;
 };
 
-export type MemberPagePermissions = {
+export type MemberPermissions = {
   type: "user" | "group";
   name: string;
   userId?: string;
@@ -19,10 +19,4 @@ export type MemberPagePermissions = {
   permissions: Permission[];
 };
 
-export type NewPagePermission = {
-  userId?: string;
-  groupId?: string;
-  action: string;
-  object: string;
-  pageId: string;
-};
+export type NewPermission = Omit<Permission, "id">;

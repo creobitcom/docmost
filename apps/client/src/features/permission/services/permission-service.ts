@@ -1,25 +1,24 @@
 import api from "@/lib/api-client";
-import {
-  MemberPagePermissions,
-  NewPagePermission,
-} from "../types/permission.types";
-import { QueryParams } from "@/lib/types";
+import { MemberPermissions, NewPermission } from "../types/permission.types";
 
-export async function getPagePermissions(
-  pageId: string,
-): Promise<MemberPagePermissions[]> {
-  const res = await api.post("/permission/page", { pageId: pageId });
+type PermissionTargetType = "page" | "space";
+
+export async function getPermissions(
+  targetId: string,
+  type: PermissionTargetType,
+): Promise<MemberPermissions[]> {
+  const res = await api.get("/permission", {
+    params: { targetId: targetId, type: type },
+  });
   return res.data;
 }
 
-export async function createPagePermission(
-  newPagePermission: NewPagePermission,
+export async function createPermission(
+  newPermission: NewPermission,
 ): Promise<void> {
-  await api.post("/permission/create", { ...newPagePermission });
+  await api.post("/permission", { ...newPermission });
 }
 
-export async function deletePagePermission(
-  permissionsId: string,
-): Promise<void> {
-  await api.post("/permission/delete", { id: permissionsId });
+export async function deletePermission(permissionsId: string): Promise<void> {
+  await api.delete("/permission", { data: { id: permissionsId } });
 }

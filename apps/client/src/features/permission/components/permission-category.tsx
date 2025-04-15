@@ -1,12 +1,12 @@
 import { Stack, Group, Text, Checkbox } from "@mantine/core";
 import { PermissionItem, PERMISSION_LIST } from "../constants/permission-items";
-import { MemberPagePermissions } from "../types/permission.types";
+import { MemberPermissions } from "../types/permission.types";
 
 interface PermissionCategoryProps {
-  member: MemberPagePermissions;
+  member: MemberPermissions;
   onPermissionChange: (
     checked: boolean,
-    member: MemberPagePermissions,
+    member: MemberPermissions,
     permissionItem: PermissionItem,
   ) => void;
   readOnly: boolean;

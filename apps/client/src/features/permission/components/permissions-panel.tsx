@@ -11,39 +11,44 @@ import {
 } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import {
-  useCreatePagePermissionMutation,
-  useDeletePagePermissionMutation,
-  usePagePermissionQuery,
-} from "@/features/permission/queries/page-permission-query";
-import { MemberPagePermissions } from "@/features/permission/types/permission.types";
+  useCreatePermissionMutation,
+  useDeletePermissionMutation,
+  usePermissionQuery,
+} from "@/features/permission/queries/permission-query";
+import { MemberPermissions } from "@/features/permission/types/permission.types";
 import { MultiMemberSelect } from "@/features/space/components/multi-member-select";
 import { useDisclosure } from "@mantine/hooks";
 import { PermissionItem } from "@/features/permission/constants/permission-items";
 import { MemberPermissionCard } from "./member-permission-card";
+import { MemberType } from "../constants/member-type";
+import { PageCaslSubject } from "@/features/page/permissions/permissions.type";
+import { CaslAction, CaslObject } from "../constants/casl";
 
-interface PagePermissionsPanelProps {
-  pageId: string;
+interface PermissionsPanelProps {
+  targetId: string;
+  type: "page" | "space";
   readOnly?: boolean;
 }
 
-export default function PagePermissionsPanel({
-  pageId,
+export default function PermissionsPanel({
+  targetId,
+  type,
   readOnly = false,
-}: PagePermissionsPanelProps) {
+}: PermissionsPanelProps) {
   const { t } = useTranslation();
-  const { data, isLoading, refetch } = usePagePermissionQuery(pageId);
-  const [members, setMembers] = useState<MemberPagePermissions[]>([]);
+  const { data, isLoading, refetch } = usePermissionQuery(targetId, type);
+  const [members, setMembers] = useState<MemberPermissions[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [deleteConfirmModal, deleteConfirmModalHandlers] = useDisclosure(false);
   const [memberToDelete, setMemberToDelete] =
-    useState<MemberPagePermissions | null>(null);
+    useState<MemberPermissions | null>(null);
 
-  const createPermission = useCreatePagePermissionMutation({
+  const createPermission = useCreatePermissionMutation({
     onSuccess: async () => {
       await refetch();
     },
   });
-  const deletePermission = useDeletePagePermissionMutation({
+  const deletePermission = useDeletePermissionMutation({
     onSuccess: async () => {
       await refetch();
     },
@@ -59,7 +64,7 @@ export default function PagePermissionsPanel({
 
   const handlePermissionChange = async (
     checked: boolean,
-    member: MemberPagePermissions,
+    member: MemberPermissions,
     permissionItem: PermissionItem,
   ) => {
     const targetId = member.userId ?? member.groupId;
@@ -68,9 +73,9 @@ export default function PagePermissionsPanel({
 
     if (checked) {
       createPermission.mutate({
-        pageId,
-        userId: member.type === "user" ? targetId : undefined,
-        groupId: member.type === "group" ? targetId : undefined,
+        pageId: targetId,
+        userId: member.type === MemberType.User ? targetId : undefined,
+        groupId: member.type === MemberType.Group ? targetId : undefined,
         action: permissionItem.action,
         object: permissionItem.object,
       });
@@ -87,7 +92,7 @@ export default function PagePermissionsPanel({
     }
   };
 
-  const handleDeleteMember = (member: MemberPagePermissions) => {
+  const handleDeleteMember = (member: MemberPermissions) => {
     setMemberToDelete(member);
     deleteConfirmModalHandlers.open();
   };
@@ -118,11 +123,10 @@ export default function PagePermissionsPanel({
       { userIds: [], groupIds: [] },
     );
 
-    const basePermission = {
-      pageId,
-      action: "read",
-      object: "page",
-    };
+    const basePermission =
+      type === "page"
+        ? { pageId: targetId, action: CaslAction.Read, object: "page" }
+        : { spaceId: targetId, action: CaslAction.Read, object: "space" };
 
     groupIds.forEach((groupId) => {
       createPermission.mutate({
@@ -193,10 +197,7 @@ export default function PagePermissionsPanel({
         <Divider size="xs" mb="xs" />
 
         <Stack>
-          <MultiMemberSelect
-            onChange={setSelectedMemberIds}
-            // value={selectedMemberIds}
-          />
+          <MultiMemberSelect onChange={setSelectedMemberIds} />
         </Stack>
 
         <Group justify="flex-end" mt="md">

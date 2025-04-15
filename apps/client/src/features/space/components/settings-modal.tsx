@@ -1,15 +1,15 @@
-import {Modal, Tabs, rem, Group, ScrollArea, Text} from "@mantine/core";
+import { Modal, Tabs, rem, Group, Text } from "@mantine/core";
 import SpaceMembersList from "@/features/space/components/space-members.tsx";
 import AddSpaceMembersModal from "@/features/space/components/add-space-members-modal.tsx";
-import React, {useMemo} from "react";
 import SpaceDetails from "@/features/space/components/space-details.tsx";
-import {useSpaceQuery} from "@/features/space/queries/space-query.ts";
-import {useSpaceAbility} from "@/features/space/permissions/use-space-ability.ts";
+import { useSpaceQuery } from "@/features/space/queries/space-query.ts";
+import { useSpaceAbility } from "@/features/space/permissions/use-space-ability.ts";
 import {
   SpaceCaslAction,
   SpaceCaslSubject,
 } from "@/features/space/permissions/permissions.type.ts";
 import { useTranslation } from "react-i18next";
+import PermissionsPanel from "@/features/permission/components/permissions-panel";
 
 interface SpaceSettingsModalProps {
   spaceId: string;
@@ -39,16 +39,18 @@ export default function SpaceSettingsModal({
         xOffset={0}
         mah={400}
       >
-        <Modal.Overlay/>
-        <Modal.Content style={{overflow: "hidden"}}>
+        <Modal.Overlay />
+        <Modal.Content style={{ overflow: "hidden" }}>
           <Modal.Header py={0}>
             <Modal.Title>
-              <Text fw={500} lineClamp={1}>{space?.name}</Text>
+              <Text fw={500} lineClamp={1}>
+                {space?.name}
+              </Text>
             </Modal.Title>
-            <Modal.CloseButton/>
+            <Modal.CloseButton />
           </Modal.Header>
           <Modal.Body>
-            <div style={{height: rem(600)}}>
+            <div style={{ height: rem(600) }}>
               <Tabs defaultValue="members">
                 <Tabs.List>
                   <Tabs.Tab fw={500} value="general">
@@ -56,6 +58,9 @@ export default function SpaceSettingsModal({
                   </Tabs.Tab>
                   <Tabs.Tab fw={500} value="members">
                     {t("Members")}
+                  </Tabs.Tab>
+                  <Tabs.Tab fw={500} value="permissions">
+                    {t("Permissions")}
                   </Tabs.Tab>
                 </Tabs.List>
 
@@ -74,7 +79,7 @@ export default function SpaceSettingsModal({
                     {spaceAbility.can(
                       SpaceCaslAction.Manage,
                       SpaceCaslSubject.Member,
-                    ) && <AddSpaceMembersModal spaceId={space?.id}/>}
+                    ) && <AddSpaceMembersModal spaceId={space?.id} />}
                   </Group>
 
                   <SpaceMembersList
@@ -84,6 +89,16 @@ export default function SpaceSettingsModal({
                       SpaceCaslSubject.Member,
                     )}
                   />
+                </Tabs.Panel>
+
+                <Tabs.Panel my="md" value="permissions">
+                  {space && (
+                    <PermissionsPanel
+                      type="space"
+                      targetId={space.id}
+                      readOnly={false}
+                    />
+                  )}
                 </Tabs.Panel>
               </Tabs>
             </div>

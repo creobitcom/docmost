@@ -28,7 +28,7 @@ export class PermissionService {
     );
 
     if (!page && !space) {
-      throw new NotFoundException();
+      throw new NotFoundException('Page or space not found');
     }
 
     return this.permissionRepo.createPermission({

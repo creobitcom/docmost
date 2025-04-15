@@ -9,7 +9,7 @@ import {
 } from "@mantine/core";
 import { IconChevronDown, IconChevronUp, IconTrash } from "@tabler/icons-react";
 import { useTranslation } from "react-i18next";
-import { MemberPagePermissions } from "@/features/permission/types/permission.types";
+import { MemberPermissions } from "@/features/permission/types/permission.types";
 import { CustomAvatar } from "@/components/ui/custom-avatar";
 import { IconGroupCircle } from "@/components/icons/icon-people-circle";
 import { formatMemberCount } from "@/lib";
@@ -18,7 +18,7 @@ import { PermissionCategory } from "./permission-category";
 interface PagePermissionsPanelProps {
   pageId: string;
   readOnly?: boolean;
-  onPermissionsChange?: (permissions: MemberPagePermissions[]) => void;
+  onPermissionsChange?: (permissions: MemberPermissions[]) => void;
 }
 
 export function MemberPermissionCard({

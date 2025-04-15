@@ -8,7 +8,7 @@ import { usePageQuery } from "../queries/page-query";
 import { usePageAbility } from "../permissions/use-page-ability";
 import PageMembersList from "./page-members";
 import AddPageMembersModal from "./add-page-members-modal";
-import PagePermissionsPanel from "@/features/permission/components/permissions-panel";
+import PermissionsPanel from "@/features/permission/components/permissions-panel";
 
 interface PageShareModalParams {
   pageId: string;
@@ -22,7 +22,7 @@ export default function PageShareModal({
   onClose,
 }: PageShareModalParams) {
   const { t } = useTranslation();
-  const { data: page, isLoading } = usePageQuery({ pageId });
+  const { data: page } = usePageQuery({ pageId });
 
   const pageRules = page?.membership?.permissions;
   const pageAbility = usePageAbility(pageRules);
@@ -62,6 +62,7 @@ export default function PageShareModal({
                     {t("Permissions")}
                   </Tabs.Tab>
                 </Tabs.List>
+
                 <Tabs.Panel value="members">
                   <Group my="md" justify="flex-end">
                     {canManageMembers && (
@@ -73,10 +74,12 @@ export default function PageShareModal({
                     readOnly={!canManageMembers}
                   />
                 </Tabs.Panel>
+
                 <Tabs.Panel my="md" value="permissions">
                   {page && (
-                    <PagePermissionsPanel
-                      pageId={page.id}
+                    <PermissionsPanel
+                      targetId={page.id}
+                      type="page"
                       readOnly={!canManageMembers}
                     />
                   )}

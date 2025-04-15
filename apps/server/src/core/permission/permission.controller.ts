@@ -12,6 +12,7 @@ import {
   NotFoundException,
   Post,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { AuthUser } from 'src/common/decorators/auth-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -53,6 +54,20 @@ export class PermissionController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
+    if (
+      (!dto.pageId || dto.pageId.length === 0) &&
+      (!dto.spaceId || dto.spaceId.length === 0)
+    ) {
+      throw new BadRequestException('spaceId or pageId is required');
+    }
+
+    if (
+      (!dto.groupId || dto.groupId.length === 0) &&
+      (!dto.userId || dto.userId.length === 0)
+    ) {
+      throw new BadRequestException('groupId or userId is required');
+    }
+
     const ability = await this.permissionAbility.createForUserWorkspace(user);
     this.ensurePermission(ability, CaslAction.Manage, CaslObject.Permission);
 
@@ -60,7 +75,7 @@ export class PermissionController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @Get()
+  @Get('')
   async findByTargetId(
     @Query() dto: GetPermissionDto,
     @AuthUser() user: User,
