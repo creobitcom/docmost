@@ -1,4 +1,4 @@
-import { Modal, rem, Group, Text } from "@mantine/core";
+import { Modal, rem, Group, Text, Tabs } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import {
   PageCaslAction,
@@ -8,6 +8,7 @@ import { usePageQuery } from "../queries/page-query";
 import { usePageAbility } from "../permissions/use-page-ability";
 import PageMembersList from "./page-members";
 import AddPageMembersModal from "./add-page-members-modal";
+import PagePermissionsPanel from "@/features/permission/components/permissions-panel";
 
 interface PageShareModalParams {
   pageId: string;
@@ -52,10 +53,35 @@ export default function PageShareModal({
           </Modal.Header>
           <Modal.Body>
             <div style={{ height: rem(600) }}>
-              <Group my="md" justify="flex-end">
-                {canManageMembers && <AddPageMembersModal pageId={page?.id} />}
-              </Group>
-              <PageMembersList pageId={page?.id} readOnly={!canManageMembers} />
+              <Tabs defaultValue="members">
+                <Tabs.List>
+                  <Tabs.Tab fw={500} value="members">
+                    {t("Members")}
+                  </Tabs.Tab>
+                  <Tabs.Tab fw={500} value="permissions">
+                    {t("Permissions")}
+                  </Tabs.Tab>
+                </Tabs.List>
+                <Tabs.Panel value="members">
+                  <Group my="md" justify="flex-end">
+                    {canManageMembers && (
+                      <AddPageMembersModal pageId={page?.id} />
+                    )}
+                  </Group>
+                  <PageMembersList
+                    pageId={page?.id}
+                    readOnly={!canManageMembers}
+                  />
+                </Tabs.Panel>
+                <Tabs.Panel my="md" value="permissions">
+                  {page && (
+                    <PagePermissionsPanel
+                      pageId={page.id}
+                      readOnly={!canManageMembers}
+                    />
+                  )}
+                </Tabs.Panel>
+              </Tabs>
             </div>
           </Modal.Body>
         </Modal.Content>
