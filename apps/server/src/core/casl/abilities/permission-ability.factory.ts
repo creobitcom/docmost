@@ -113,7 +113,7 @@ function buildAbilityFromPermissions(userPagePermissions: Permission[]) {
   );
 
   for (const permission of userPagePermissions) {
-    can(permission.name, CaslSubject.Page);
+    can(permission.action, permission.object);
   }
 
   return build();

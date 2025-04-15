@@ -2,7 +2,12 @@ import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreatePermissionDto {
   @IsString()
-  name: string;
+  @IsNotEmpty()
+  action: string;
+
+  @IsString()
+  @IsNotEmpty()
+  object: string;
 
   @IsString()
   @IsOptional()

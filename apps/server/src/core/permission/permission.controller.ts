@@ -1,4 +1,4 @@
-import { User, Workspace } from '@docmost/db/types/entity.types';
+import { Permission, User, Workspace } from '@docmost/db/types/entity.types';
 import {
   BadRequestException,
   Body,
@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   HttpCode,
   HttpStatus,
+  Logger,
   NotFoundException,
   Post,
   UseGuards,
@@ -20,7 +21,13 @@ import {
   CaslSubject,
 } from '../casl/interfaces/permission-ability.type';
 import { AuthWorkspace } from 'src/common/decorators/auth-workspace.decorator';
-import { PermissionIdDto } from './dto/permission.dto';
+import { PermissionDto, PermissionIdDto } from './dto/permission.dto';
+import { PageIdDto } from '../comment/dto/comments.input';
+import { SpaceService } from '../space/services/space.service';
+import { PageService } from '../page/services/page.service';
+import { PageRepo } from '@docmost/db/repos/page/page.repo';
+import { UserRepo } from '@docmost/db/repos/user/user.repo';
+import { GroupRepo } from '@docmost/db/repos/group/group.repo';
 
 @UseGuards(JwtAuthGuard)
 @Controller('permission')
@@ -28,6 +35,9 @@ export class PermissionController {
   constructor(
     private readonly permissionService: PermissionService,
     private readonly permissionAbility: PermissionAbilityFactory,
+    private readonly pageRepo: PageRepo,
+    private readonly userRepo: UserRepo,
+    private readonly groupRepo: GroupRepo,
   ) {}
 
   @HttpCode(HttpStatus.OK)
@@ -63,6 +73,92 @@ export class PermissionController {
       user,
       workspace.id,
     );
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('/page')
+  async findByPageId(
+    @Body() pageIdDto: PageIdDto,
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const page = await this.pageRepo.findById(pageIdDto.pageId);
+    if (!page) {
+      throw new NotFoundException('Page not found');
+    }
+
+    const permissionsAbility = await this.permissionAbility.createForUserPage(
+      user,
+      pageIdDto.pageId,
+    );
+
+    if (permissionsAbility.cannot(CaslAction.Read, CaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    const pagePermissons = await this.permissionService.findByPageId(
+      pageIdDto.pageId,
+    );
+
+    const permissionsByMembers: Map<
+      string,
+      {
+        type: 'user' | 'group';
+        name: string;
+        userId?: string;
+        userAvatarUrl?: string;
+        userEmail?: string;
+        groupId?: string;
+        memberCount?: number;
+        permissions: PermissionDto[];
+      }
+    > = new Map();
+
+    for (const permission of pagePermissons) {
+      if (permission.userId) {
+        const user = await this.userRepo.findById(
+          permission.userId,
+          workspace.id,
+        );
+        if (!user) {
+          continue;
+        }
+        if (!permissionsByMembers.has(user.id)) {
+          permissionsByMembers.set(user.id, {
+            type: 'user',
+            name: user.name,
+            userId: user.id,
+            userAvatarUrl: user.avatarUrl,
+            userEmail: user.email,
+            permissions: [permission],
+          });
+        } else {
+          permissionsByMembers.get(user.id).permissions.push(permission);
+        }
+      } else {
+        const group = await this.groupRepo.findById(
+          permission.groupId,
+          workspace.id,
+          { includeMemberCount: true },
+        );
+        if (!group) {
+          continue;
+        }
+        if (!permissionsByMembers.has(group.id)) {
+          permissionsByMembers.set(group.id, {
+            type: 'group',
+            groupId: group.id,
+            name: group.name,
+            permissions: [permission],
+            ...group,
+          });
+        } else {
+          permissionsByMembers.get(group.id).permissions.push(permission);
+        }
+      }
+    }
+
+    return Array.from(permissionsByMembers.values());
   }
 
   @HttpCode(HttpStatus.OK)

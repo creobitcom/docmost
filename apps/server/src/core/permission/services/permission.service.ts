@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CreatePermissionDto } from '../dto/create.dto';
 import { Permission, User } from '@docmost/db/types/entity.types';
 import { PermissionRepo } from '@docmost/db/repos/permissions/permissions.repo';
 import { PermissionAbilityFactory } from 'src/core/casl/abilities/permission-ability.factory';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
+import { PermissionDto } from '../dto/permission.dto';
 
 @Injectable()
 export class PermissionService {
@@ -32,12 +33,18 @@ export class PermissionService {
 
     return this.permissionRepo.createPermission({
       addedById: user.id,
-      name: permission.name,
+      action: permission.action,
+      object: permission.object,
       userId: permission?.userId,
       groupId: permission?.groupId,
       pageId: page?.id,
       spaceId: space?.id,
     });
+  }
+
+  async findByPageId(pageId: string): Promise<PermissionDto[]> {
+    const allPagePermissions = await this.permissionRepo.findByPageId(pageId);
+    return allPagePermissions;
   }
 
   async delete(id: string) {
