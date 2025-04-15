@@ -13,7 +13,7 @@ export const PERMISSION_LIST: PermissionItem[] = [
     description: "Can view the page",
   },
   {
-    action: "write",
+    action: "edit",
     object: "page",
     name: "Write",
     description: "Can edit the page",

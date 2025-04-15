@@ -1,5 +1,5 @@
-import { Checkbox, Group, Stack, Text } from "@mantine/core";
-import { PERMISSION_LIST, PermissionItem } from "../constants/permission-items";
+import { Stack, Group, Text, Checkbox } from "@mantine/core";
+import { PermissionItem, PERMISSION_LIST } from "../constants/permission-items";
 import { MemberPagePermissions } from "../types/permission.types";
 
 interface PermissionCategoryProps {

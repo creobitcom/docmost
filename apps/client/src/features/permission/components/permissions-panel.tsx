@@ -54,11 +54,8 @@ export default function PagePermissionsPanel({
   useEffect(() => {
     if (data) {
       setMembers(data);
-      if (onPermissionsChange) {
-        onPermissionsChange(data);
-      }
     }
-  }, [data, onPermissionsChange]);
+  }, [data]);
 
   const handlePermissionChange = async (
     checked: boolean,
