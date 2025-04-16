@@ -1,3 +1,8 @@
+init:
+	-npm install -g pnpm
+	-pnpm install
+	-pnpm nx run @docmost/editor-ext:build
+
 start:
 	docker compose -f docker-compose.dev.yaml up -d
 

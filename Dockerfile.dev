@@ -47,7 +47,4 @@ VOLUME ["/app/data/storage"]
 
 EXPOSE 3000
 
-# RUN pnpm nx run client:dev
-# RUN pnpm nx run server:start:dev
-# CMD ["pnpm", "start"]
-CMD ["pnpm nx run client:dev && pnpm nx run server:start:dev"]
+CMD ["sh -c", "pnpm run '/^(client:dev-local|server:dev)$/'"]
