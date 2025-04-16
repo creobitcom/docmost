@@ -38,6 +38,7 @@ import PageImportModal from "@/features/page/components/page-import-modal.tsx";
 import { useTranslation } from "react-i18next";
 import { SwitchSpace } from "./switch-space";
 import ExportModal from "@/components/common/export-modal";
+import { CaslAction, CaslObject } from "@/features/permission/constants/casl";
 
 export function SpaceSidebar() {
   const { t } = useTranslation();
@@ -169,8 +170,8 @@ export function SpaceSidebar() {
             <SpaceTree
               spaceId={space.id}
               readOnly={spaceAbility.cannot(
-                SpaceCaslAction.Manage,
-                SpaceCaslSubject.Page,
+                CaslAction.Manage,
+                CaslObject.Space,
               )}
             />
           </div>

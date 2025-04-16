@@ -12,7 +12,6 @@ import {
   NotFoundException,
   Post,
   UseGuards,
-  Logger,
 } from '@nestjs/common';
 import { AuthUser } from 'src/common/decorators/auth-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -22,6 +21,10 @@ import { PermissionAbilityFactory } from '../casl/abilities/permission-ability.f
 import {
   CaslAction,
   CaslObject,
+  PageCaslObject,
+  SpaceCaslObject,
+  WorkspaceCaslAction,
+  WorkspaceCaslObject,
 } from '../casl/interfaces/permission-ability.type';
 import { AuthWorkspace } from 'src/common/decorators/auth-workspace.decorator';
 import {
@@ -29,11 +32,12 @@ import {
   PermissionDto,
   PermissionIdDto,
 } from './dto/permission.dto';
-import { PageIdDto } from '../comment/dto/comments.input';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { UserRepo } from '@docmost/db/repos/user/user.repo';
 import { GroupRepo } from '@docmost/db/repos/group/group.repo';
 import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
+import { PageCaslAction } from '../casl/interfaces/page-ability.type';
+import { SpaceCaslAction } from '../casl/interfaces/space-ability.type';
 
 @UseGuards(JwtAuthGuard)
 @Controller('permission')
@@ -69,7 +73,11 @@ export class PermissionController {
     }
 
     const ability = await this.permissionAbility.createForUserWorkspace(user);
-    this.ensurePermission(ability, CaslAction.Manage, CaslObject.Permission);
+    this.ensurePermission(
+      ability,
+      WorkspaceCaslAction.Manage,
+      WorkspaceCaslObject.Permission,
+    );
 
     return this.permissionService.create(dto, user, workspace.id);
   }
@@ -88,7 +96,14 @@ export class PermissionController {
         ? await this.permissionAbility.createForUserPage(user, dto.targetId)
         : await this.permissionAbility.createForUserSpace(user, dto.targetId);
 
-    this.ensurePermission(ability, CaslAction.Read, CaslObject.Page);
+    if (
+      ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission) &&
+      ability.cannot(SpaceCaslAction.Manage, SpaceCaslObject.Permission)
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to manage permissions',
+      );
+    }
 
     const permissions =
       dto.type === CaslObject.Page
@@ -105,7 +120,11 @@ export class PermissionController {
     if (!permission) throw new NotFoundException('Permission not found');
 
     const ability = await this.permissionAbility.createForUserWorkspace(user);
-    this.ensurePermission(ability, CaslAction.Manage, CaslObject.Permission);
+    this.ensurePermission(
+      ability,
+      WorkspaceCaslAction.Manage,
+      CaslObject.Permission,
+    );
 
     return this.permissionService.delete(dto.id);
   }

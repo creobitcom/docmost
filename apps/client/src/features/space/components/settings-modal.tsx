@@ -4,13 +4,12 @@ import AddSpaceMembersModal from "@/features/space/components/add-space-members-
 import SpaceDetails from "@/features/space/components/space-details.tsx";
 import { useSpaceQuery } from "@/features/space/queries/space-query.ts";
 import { useSpaceAbility } from "@/features/space/permissions/use-space-ability.ts";
-import {
-  SpaceCaslAction,
-  SpaceCaslSubject,
-} from "@/features/space/permissions/permissions.type.ts";
 import { useTranslation } from "react-i18next";
 import PermissionsPanel from "@/features/permission/components/permissions-panel";
-import { CaslAction, CaslObject } from "@/features/permission/constants/casl";
+import {
+  SpaceCaslAction,
+  SpaceCaslObject,
+} from "@/features/permission/constants/casl";
 
 interface SpaceSettingsModalProps {
   spaceId: string;
@@ -70,7 +69,7 @@ export default function SpaceSettingsModal({
                     spaceId={space?.id}
                     readOnly={spaceAbility.cannot(
                       SpaceCaslAction.Manage,
-                      SpaceCaslSubject.Settings,
+                      SpaceCaslObject.Space,
                     )}
                   />
                 </Tabs.Panel>
@@ -79,7 +78,7 @@ export default function SpaceSettingsModal({
                   <Group my="md" justify="flex-end">
                     {spaceAbility.can(
                       SpaceCaslAction.Manage,
-                      SpaceCaslSubject.Member,
+                      SpaceCaslObject.Permission,
                     ) && <AddSpaceMembersModal spaceId={space?.id} />}
                   </Group>
 
@@ -87,7 +86,7 @@ export default function SpaceSettingsModal({
                     spaceId={space?.id}
                     readOnly={spaceAbility.cannot(
                       SpaceCaslAction.Manage,
-                      SpaceCaslSubject.Member,
+                      SpaceCaslObject.Permission,
                     )}
                   />
                 </Tabs.Panel>
@@ -98,8 +97,8 @@ export default function SpaceSettingsModal({
                       type="space"
                       targetId={space.id}
                       readOnly={spaceAbility.cannot(
-                        CaslAction.Manage,
-                        CaslObject.Members,
+                        SpaceCaslAction.Manage,
+                        SpaceCaslObject.Permission,
                       )}
                     />
                   )}

@@ -1,62 +1,81 @@
-import { CaslAction, CaslObject } from "./casl";
+import { PageCaslAction } from "@/features/page/permissions/permissions.type";
+import {
+  CaslAction,
+  CaslObject,
+  PageCaslObject,
+  SpaceCaslAction,
+  SpaceCaslObject,
+} from "./casl";
 
 export interface PermissionItem {
-  action: CaslAction;
-  object: CaslObject;
+  action: PageCaslAction | SpaceCaslAction;
+  object: PageCaslObject | SpaceCaslObject;
   name: string;
   description: string;
 }
 
 export const PERMISSION_LIST_PAGE: PermissionItem[] = [
   {
-    action: CaslAction.Read,
-    object: CaslObject.Page,
+    action: PageCaslAction.Read,
+    object: PageCaslObject.Content,
     name: "Read",
-    description: "Can view the page",
+    description: "Can read content of the page",
   },
   {
-    action: CaslAction.Edit,
-    object: CaslObject.Page,
-    name: "Write",
-    description: "Can edit the page",
+    action: PageCaslAction.Edit,
+    object: PageCaslObject.Content,
+    name: "Edit",
+    description: "Can edit content of the page",
   },
   {
-    action: CaslAction.Delete,
-    object: CaslObject.Page,
+    action: PageCaslAction.Delete,
+    object: PageCaslObject.Content,
     name: "Delete",
     description: "Can delete the page",
   },
   {
-    action: CaslAction.Manage,
-    object: CaslObject.Members,
-    name: "Manage Members",
-    description: "Can manage members",
+    action: PageCaslAction.Manage,
+    object: PageCaslObject.Permission,
+    name: "Manage Permissions",
+    description: "Can manage permissions",
+  },
+  {
+    action: PageCaslAction.Manage,
+    object: PageCaslObject.Page,
+    name: "Manage Page",
+    description: "Can manage page",
   },
 ];
 
 export const PERMISSION_LIST_SPACE: PermissionItem[] = [
   {
-    action: CaslAction.Read,
-    object: CaslObject.Space,
-    name: "Read",
+    action: SpaceCaslAction.View,
+    object: SpaceCaslObject.Space,
+    name: "View",
     description: "Can view the space",
   },
   {
-    action: CaslAction.Edit,
-    object: CaslObject.Space,
-    name: "Write",
-    description: "Can edit the space",
+    action: SpaceCaslAction.Manage,
+    object: SpaceCaslObject.Space,
+    name: "Manage",
+    description: "Can manage the space",
   },
   {
-    action: CaslAction.Delete,
-    object: CaslObject.Space,
+    action: SpaceCaslAction.Delete,
+    object: SpaceCaslObject.Space,
     name: "Delete",
     description: "Can delete the space",
   },
   {
-    action: CaslAction.Manage,
-    object: CaslObject.Members,
-    name: "Manage Members",
-    description: "Can manage members",
+    action: SpaceCaslAction.Manage,
+    object: SpaceCaslObject.Permission,
+    name: "Manage Permissions",
+    description: "Can manage permissions",
+  },
+  {
+    action: SpaceCaslAction.Create,
+    object: SpaceCaslObject.Page,
+    name: "Create Page",
+    description: "Can create page",
   },
 ];

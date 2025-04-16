@@ -10,8 +10,8 @@ import { useTranslation } from "react-i18next";
 import { usePageAbility } from "@/features/page/permissions/use-page-ability";
 import {
   PageCaslAction,
-  PageCaslSubject,
-} from "@/features/page/permissions/permissions.type";
+  PageCaslObject,
+} from "@/features/permission/constants/casl";
 
 export default function Page() {
   const { t } = useTranslation();
@@ -51,7 +51,7 @@ export default function Page() {
         <PageHeader
           readOnly={pageAbility.cannot(
             PageCaslAction.Manage,
-            PageCaslSubject.Page,
+            PageCaslObject.Page,
           )}
         />
 
@@ -62,7 +62,10 @@ export default function Page() {
           content={page.content}
           slugId={page.slugId}
           spaceSlug={page?.space?.slug}
-          editable={pageAbility.can(PageCaslAction.Edit, PageCaslSubject.Page)}
+          editable={pageAbility.can(
+            PageCaslAction.Edit,
+            PageCaslObject.Content,
+          )}
         />
         <HistoryModal pageId={page.id} />
       </div>

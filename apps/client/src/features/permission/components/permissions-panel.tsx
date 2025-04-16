@@ -21,7 +21,12 @@ import { useDisclosure } from "@mantine/hooks";
 import { PermissionItem } from "@/features/permission/constants/permission-items";
 import { MemberPermissionCard } from "./member-permission-card";
 import { MemberType } from "../constants/member-type";
-import { CaslAction, CaslObject } from "../constants/casl";
+import {
+  SpaceCaslAction,
+  PageCaslAction,
+  PageCaslObject,
+  SpaceCaslObject,
+} from "../constants/casl";
 
 interface PermissionsPanelProps {
   targetId: string;
@@ -66,15 +71,17 @@ export default function PermissionsPanel({
     member: MemberPermissions,
     permissionItem: PermissionItem,
   ) => {
-    const targetId = member.userId ?? member.groupId;
+    const memberId = member.userId ?? member.groupId;
 
-    if (!targetId) return;
+    if (!memberId) return;
 
     if (checked) {
+      console.log("TargetType", type);
       createPermission.mutate({
-        pageId: targetId,
-        userId: member.type === MemberType.User ? targetId : undefined,
-        groupId: member.type === MemberType.Group ? targetId : undefined,
+        pageId: type === "page" ? targetId : undefined,
+        spaceId: type === "space" ? targetId : undefined,
+        userId: member.type === MemberType.User ? memberId : undefined,
+        groupId: member.type === MemberType.Group ? memberId : undefined,
         action: permissionItem.action,
         object: permissionItem.object,
       });
@@ -124,8 +131,16 @@ export default function PermissionsPanel({
 
     const basePermission =
       type === "page"
-        ? { pageId: targetId, action: CaslAction.Read, object: "page" }
-        : { spaceId: targetId, action: CaslAction.Read, object: "space" };
+        ? {
+            pageId: targetId,
+            action: PageCaslAction.Read,
+            object: PageCaslObject.Content,
+          }
+        : {
+            spaceId: targetId,
+            action: SpaceCaslAction.View,
+            object: SpaceCaslObject.Space,
+          };
 
     groupIds.forEach((groupId) => {
       createPermission.mutate({

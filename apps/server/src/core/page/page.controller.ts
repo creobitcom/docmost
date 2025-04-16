@@ -8,6 +8,7 @@ import {
   ForbiddenException,
   NotFoundException,
   BadRequestException,
+  Delete,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -19,21 +20,20 @@ import { AuthUser } from '../../common/decorators/auth-user.decorator';
 import { AuthWorkspace } from '../../common/decorators/auth-workspace.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
-import { SpaceMember, User, Workspace } from '@docmost/db/types/entity.types';
+import { User, Workspace } from '@docmost/db/types/entity.types';
 import { SidebarPageDto } from './dto/sidebar-page.dto';
-import SpaceAbilityFactory from '../casl/abilities/space-ability.factory';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { RecentPageDto } from './dto/recent-page.dto';
-import PageAbilityFactory from '../casl/abilities/page-ability.factory';
 import { AddPageMembersDto } from './dto/add-page-member.dto';
 import { PageMemberService } from './services/page-member.service';
 import { RemovePageMemberDto } from './dto/remove-page-member.dto';
 import { UpdatePageMemberRoleDto } from './dto/update-page-member-role.dto';
-import { SpaceRole } from 'src/common/helpers/types/permission';
 import { PermissionAbilityFactory } from '../casl/abilities/permission-ability.factory';
 import {
-  CaslAction,
-  CaslObject,
+  PageCaslAction,
+  PageCaslObject,
+  SpaceCaslAction,
+  SpaceCaslObject,
 } from '../casl/interfaces/permission-ability.type';
 import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
 
@@ -68,7 +68,7 @@ export class PageController {
       page.id,
     );
 
-    if (pageAbility.cannot(CaslAction.Read, CaslObject.Page)) {
+    if (pageAbility.cannot(PageCaslAction.Read, PageCaslObject.Content)) {
       throw new ForbiddenException();
     }
 
@@ -100,7 +100,7 @@ export class PageController {
       space.id,
     );
 
-    if (ability.cannot(CaslAction.Create, CaslObject.Page)) {
+    if (ability.cannot(SpaceCaslAction.Create, SpaceCaslObject.Page)) {
       throw new ForbiddenException();
     }
 
@@ -121,7 +121,7 @@ export class PageController {
       updatePageDto.pageId,
     );
 
-    if (pageAbility.cannot(CaslAction.Edit, CaslObject.Page)) {
+    if (pageAbility.cannot(PageCaslAction.Edit, PageCaslObject.Page)) {
       throw new ForbiddenException();
     }
 
@@ -146,7 +146,7 @@ export class PageController {
       page.id,
     );
 
-    if (ability.cannot(CaslAction.Delete, CaslObject.Page)) {
+    if (ability.cannot(PageCaslAction.Delete, PageCaslObject.Page)) {
       throw new ForbiddenException();
     }
 
@@ -172,7 +172,7 @@ export class PageController {
       pageIdDto.pageId,
     );
 
-    if (ability.cannot(CaslAction.Read, CaslObject.Members)) {
+    if (ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -198,7 +198,7 @@ export class PageController {
       dto.pageId,
     );
 
-    if (ability.cannot(CaslAction.Manage, CaslObject.Members)) {
+    if (ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -222,15 +222,13 @@ export class PageController {
     return {
       items: await Promise.all(
         recentPages.items.map(async (page) => {
-          try {
-            const ability = await this.permissionAbility.createForUserPage(
-              user,
-              page.id,
-            );
-            return ability.can(CaslAction.Read, CaslObject.Page) ? page : null;
-          } catch (err) {
-            return null;
-          }
+          const ability = await this.permissionAbility.createForUserPage(
+            user,
+            page.id,
+          );
+          return ability.can(PageCaslAction.Read, PageCaslObject.Content)
+            ? page
+            : null;
         }),
       ).then((items) => items.filter(Boolean)),
       meta: recentPages.meta,
@@ -252,7 +250,7 @@ export class PageController {
       dto.pageId,
     );
 
-    if (ability.cannot(CaslAction.Read, CaslObject.Page)) {
+    if (ability.cannot(PageCaslAction.Read, PageCaslObject.Content)) {
       throw new ForbiddenException();
     }
 
@@ -275,7 +273,7 @@ export class PageController {
       history.pageId,
     );
 
-    if (ability.cannot(CaslAction.Read, CaslObject.Page)) {
+    if (ability.cannot(PageCaslAction.Read, PageCaslObject.Page)) {
       throw new ForbiddenException();
     }
 
@@ -294,7 +292,7 @@ export class PageController {
       dto.spaceId,
     );
 
-    if (ability.cannot(CaslAction.Read, CaslObject.Space)) {
+    if (ability.cannot(SpaceCaslAction.View, SpaceCaslObject.Space)) {
       throw new ForbiddenException();
     }
 
@@ -302,7 +300,7 @@ export class PageController {
     if (dto.pageId) {
       const page = await this.pageRepo.findById(dto.pageId);
       if (page.spaceId !== dto.spaceId) {
-        throw new ForbiddenException();
+        throw new BadRequestException('Page does not belong to the space');
       }
       pageId = page.id;
     }
@@ -320,17 +318,13 @@ export class PageController {
     return {
       items: await Promise.all(
         pagesInSpace.items.map(async (page: { id: string }) => {
-          try {
-            const pageAbility = await this.permissionAbility.createForUserPage(
-              user,
-              page.id,
-            );
-            return pageAbility.can(CaslAction.Read, CaslObject.Page)
-              ? page
-              : null;
-          } catch (err) {
-            return null;
-          }
+          const pageAbility = await this.permissionAbility.createForUserPage(
+            user,
+            page.id,
+          );
+          return pageAbility.can(PageCaslAction.Read, PageCaslObject.Content)
+            ? page
+            : null;
         }),
       ).then((items) => items.filter(Boolean)),
       meta: pagesInSpace.meta,
@@ -350,7 +344,7 @@ export class PageController {
       movedPage.spaceId,
     );
 
-    if (ability.cannot(CaslAction.Edit, CaslObject.Page)) {
+    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslObject.Page)) {
       throw new ForbiddenException();
     }
 
@@ -370,7 +364,7 @@ export class PageController {
       dto.pageId,
     );
 
-    if (ability.cannot(CaslAction.Read, CaslObject.Page)) {
+    if (ability.cannot(PageCaslAction.Read, PageCaslObject.Content)) {
       throw new ForbiddenException();
     }
 
@@ -391,7 +385,7 @@ export class PageController {
       dto.pageId,
     );
 
-    if (ability.cannot(CaslAction.Manage, CaslObject.Members)) {
+    if (ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -411,7 +405,7 @@ export class PageController {
       dto.pageId,
     );
 
-    if (ability.cannot(CaslAction.Manage, CaslObject.Members)) {
+    if (ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 

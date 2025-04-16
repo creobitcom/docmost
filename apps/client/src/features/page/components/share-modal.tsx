@@ -5,7 +5,10 @@ import { usePageAbility } from "../permissions/use-page-ability";
 import PageMembersList from "./page-members";
 import AddPageMembersModal from "./add-page-members-modal";
 import PermissionsPanel from "@/features/permission/components/permissions-panel";
-import { CaslAction, CaslObject } from "@/features/permission/constants/casl";
+import {
+  PageCaslAction,
+  PageCaslObject,
+} from "@/features/permission/constants/casl";
 
 interface PageShareModalParams {
   pageId: string;
@@ -24,8 +27,8 @@ export default function PageShareModal({
   const pageRules = page?.membership?.permissions;
   const pageAbility = usePageAbility(pageRules);
 
-  const canManageMembers =
-    page && pageAbility.can(CaslAction.Manage, CaslObject.Members);
+  const canManagePermission =
+    page && pageAbility.can(PageCaslAction.Manage, PageCaslObject.Permission);
 
   return (
     <>
@@ -62,13 +65,13 @@ export default function PageShareModal({
 
                 <Tabs.Panel value="members">
                   <Group my="md" justify="flex-end">
-                    {canManageMembers && (
+                    {canManagePermission && (
                       <AddPageMembersModal pageId={page?.id} />
                     )}
                   </Group>
                   <PageMembersList
                     pageId={page?.id}
-                    readOnly={!canManageMembers}
+                    readOnly={!canManagePermission}
                   />
                 </Tabs.Panel>
 
@@ -77,7 +80,7 @@ export default function PageShareModal({
                     <PermissionsPanel
                       targetId={page.id}
                       type="page"
-                      readOnly={!canManageMembers}
+                      readOnly={!canManagePermission}
                     />
                   )}
                 </Tabs.Panel>
