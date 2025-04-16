@@ -14,11 +14,18 @@ import { CustomAvatar } from "@/components/ui/custom-avatar";
 import { IconGroupCircle } from "@/components/icons/icon-people-circle";
 import { formatMemberCount } from "@/lib";
 import { PermissionCategory } from "./permission-category";
+import { PermissionItem } from "../constants/permission-items";
 
-interface PagePermissionsPanelProps {
-  pageId: string;
-  readOnly?: boolean;
-  onPermissionsChange?: (permissions: MemberPermissions[]) => void;
+interface MemberPermissionCardProps {
+  member: MemberPermissions;
+  onPermissionChange: (
+    checked: boolean,
+    member: MemberPermissions,
+    permissionItem: PermissionItem,
+  ) => void;
+  readOnly: boolean;
+  onDelete: (member: MemberPermissions) => void;
+  type: "page" | "space";
 }
 
 export function MemberPermissionCard({
@@ -26,7 +33,8 @@ export function MemberPermissionCard({
   onPermissionChange,
   readOnly,
   onDelete,
-}) {
+  type,
+}: MemberPermissionCardProps) {
   const { t } = useTranslation();
   const [opened, setOpened] = useState(false);
 
@@ -74,6 +82,7 @@ export function MemberPermissionCard({
 
       <Collapse in={opened}>
         <PermissionCategory
+          type={type}
           member={member}
           onPermissionChange={onPermissionChange}
           readOnly={readOnly}

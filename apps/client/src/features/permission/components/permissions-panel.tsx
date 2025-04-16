@@ -21,7 +21,6 @@ import { useDisclosure } from "@mantine/hooks";
 import { PermissionItem } from "@/features/permission/constants/permission-items";
 import { MemberPermissionCard } from "./member-permission-card";
 import { MemberType } from "../constants/member-type";
-import { PageCaslSubject } from "@/features/page/permissions/permissions.type";
 import { CaslAction, CaslObject } from "../constants/casl";
 
 interface PermissionsPanelProps {
@@ -171,6 +170,7 @@ export default function PermissionsPanel({
           ) : (
             members?.map((member) => (
               <MemberPermissionCard
+                type={type}
                 key={member.userId ?? member.groupId}
                 member={member}
                 onPermissionChange={handlePermissionChange}

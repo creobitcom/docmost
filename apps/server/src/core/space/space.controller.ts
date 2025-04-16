@@ -34,6 +34,11 @@ import {
 } from '../casl/interfaces/workspace-ability.type';
 import WorkspaceAbilityFactory from '../casl/abilities/workspace-ability.factory';
 import { CreateSpaceDto } from './dto/create-space.dto';
+import { PermissionAbilityFactory } from '../casl/abilities/permission-ability.factory';
+import {
+  CaslAction,
+  CaslObject,
+} from '../casl/interfaces/permission-ability.type';
 
 @UseGuards(JwtAuthGuard)
 @Controller('spaces')
@@ -42,8 +47,7 @@ export class SpaceController {
     private readonly spaceService: SpaceService,
     private readonly spaceMemberService: SpaceMemberService,
     private readonly spaceMemberRepo: SpaceMemberRepo,
-    private readonly spaceAbility: SpaceAbilityFactory,
-    private readonly workspaceAbility: WorkspaceAbilityFactory,
+    private readonly permissionAbility: PermissionAbilityFactory,
   ) {}
 
   @HttpCode(HttpStatus.OK)
@@ -72,8 +76,12 @@ export class SpaceController {
       throw new NotFoundException('Space not found');
     }
 
-    const ability = await this.spaceAbility.createForUser(user, space.id);
-    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Settings)) {
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      space.id,
+    );
+
+    if (ability.cannot(CaslAction.Read, CaslObject.Space)) {
       throw new ForbiddenException();
     }
 
@@ -95,15 +103,14 @@ export class SpaceController {
 
   @HttpCode(HttpStatus.OK)
   @Post('create')
-  createSpace(
+  async createSpace(
     @Body() createSpaceDto: CreateSpaceDto,
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = this.workspaceAbility.createForUser(user, workspace);
-    if (
-      ability.cannot(WorkspaceCaslAction.Manage, WorkspaceCaslSubject.Space)
-    ) {
+    const ability = await this.permissionAbility.createForUserWorkspace(user);
+
+    if (ability.cannot(CaslAction.Manage, CaslObject.Space)) {
       throw new ForbiddenException();
     }
     return this.spaceService.createSpace(user, workspace.id, createSpaceDto);
@@ -116,13 +123,15 @@ export class SpaceController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = await this.spaceAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserSpace(
       user,
       updateSpaceDto.spaceId,
     );
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Settings)) {
+
+    if (ability.cannot(CaslAction.Manage, CaslObject.Settings)) {
       throw new ForbiddenException();
     }
+
     return this.spaceService.updateSpace(updateSpaceDto, workspace.id);
   }
 
@@ -133,13 +142,15 @@ export class SpaceController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = await this.spaceAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserSpace(
       user,
       spaceIdDto.spaceId,
     );
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Settings)) {
+
+    if (ability.cannot(CaslAction.Manage, CaslObject.Settings)) {
       throw new ForbiddenException();
     }
+
     return this.spaceService.deleteSpace(spaceIdDto.spaceId, workspace.id);
   }
 
@@ -152,12 +163,12 @@ export class SpaceController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = await this.spaceAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserSpace(
       user,
       spaceIdDto.spaceId,
     );
 
-    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Member)) {
+    if (ability.cannot(CaslAction.Read, CaslObject.Members)) {
       throw new ForbiddenException();
     }
 
@@ -182,8 +193,12 @@ export class SpaceController {
       throw new BadRequestException('userIds or groupIds is required');
     }
 
-    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Member)) {
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      dto.spaceId,
+    );
+
+    if (ability.cannot(CaslAction.Manage, CaslObject.Members)) {
       throw new ForbiddenException();
     }
 
@@ -203,8 +218,12 @@ export class SpaceController {
   ) {
     this.validateIds(dto);
 
-    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Member)) {
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      dto.spaceId,
+    );
+
+    if (ability.cannot(CaslAction.Manage, CaslObject.Members)) {
       throw new ForbiddenException();
     }
 
@@ -220,7 +239,11 @@ export class SpaceController {
   ) {
     this.validateIds(dto);
 
-    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      dto.spaceId,
+    );
+
     if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Member)) {
       throw new ForbiddenException();
     }

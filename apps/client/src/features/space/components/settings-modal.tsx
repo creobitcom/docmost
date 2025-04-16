@@ -10,6 +10,7 @@ import {
 } from "@/features/space/permissions/permissions.type.ts";
 import { useTranslation } from "react-i18next";
 import PermissionsPanel from "@/features/permission/components/permissions-panel";
+import { CaslAction, CaslObject } from "@/features/permission/constants/casl";
 
 interface SpaceSettingsModalProps {
   spaceId: string;
@@ -96,7 +97,10 @@ export default function SpaceSettingsModal({
                     <PermissionsPanel
                       type="space"
                       targetId={space.id}
-                      readOnly={false}
+                      readOnly={spaceAbility.cannot(
+                        CaslAction.Manage,
+                        CaslObject.Members,
+                      )}
                     />
                   )}
                 </Tabs.Panel>

@@ -1,14 +1,11 @@
 import { Modal, rem, Group, Text, Tabs } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import {
-  PageCaslAction,
-  PageCaslSubject,
-} from "../permissions/permissions.type";
 import { usePageQuery } from "../queries/page-query";
 import { usePageAbility } from "../permissions/use-page-ability";
 import PageMembersList from "./page-members";
 import AddPageMembersModal from "./add-page-members-modal";
 import PermissionsPanel from "@/features/permission/components/permissions-panel";
+import { CaslAction, CaslObject } from "@/features/permission/constants/casl";
 
 interface PageShareModalParams {
   pageId: string;
@@ -28,7 +25,7 @@ export default function PageShareModal({
   const pageAbility = usePageAbility(pageRules);
 
   const canManageMembers =
-    page && pageAbility.can(PageCaslAction.Manage, PageCaslSubject.Member);
+    page && pageAbility.can(CaslAction.Manage, CaslObject.Members);
 
   return (
     <>

@@ -3,7 +3,7 @@ import {
   createMongoAbility,
   MongoAbility,
 } from '@casl/ability';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { PermissionRepo } from '@docmost/db/repos/permissions/permissions.repo';
@@ -27,6 +27,8 @@ import {
   SpaceCaslAction,
   SpaceCaslSubject,
 } from '../interfaces/space-ability.type';
+import { ALL } from 'dns';
+import { CaseNode } from 'kysely';
 
 @Injectable()
 export class PermissionAbilityFactory {
@@ -53,21 +55,18 @@ export class PermissionAbilityFactory {
 
   async createForUserSpace(user: User, spaceId: string) {
     const role = await this.getUserSpaceRole(user.id, spaceId);
+    Logger.debug(`User role ${role}`);
 
     if (role === SpaceRole.ADMIN) {
       return buildSpaceAdminAbility();
     }
 
-    const allPermissions = await this.permissionRepo.findByPageUserId(
+    const permissions = await this.permissionRepo.findBySpaceUserId(
       spaceId,
       user.id,
     );
-    const filteredPermissions = await this.filterUserPermissions(
-      user.id,
-      allPermissions,
-    );
 
-    return buildAbilityFromPermissions(filteredPermissions);
+    return buildAbilityFromPermissions(permissions);
   }
 
   async createForUserWorkspace(user: User) {
@@ -108,21 +107,22 @@ function buildAbilityFromPermissions(permissions: Permission[]) {
 }
 
 function buildPageAdminAbility() {
-  const { can, build } = new AbilityBuilder<MongoAbility<IPageAbility>>(
+  const { can, build } = new AbilityBuilder<MongoAbility<IPermissionAbility>>(
     createMongoAbility,
   );
-  can(PageCaslAction.Manage, PageCaslSubject.Member);
-  can(PageCaslAction.Manage, PageCaslSubject.Page);
+  can(CaslAction.Manage, CaslObject.Members);
+  can(CaslAction.Manage, CaslObject.Page);
   return build();
 }
 
 function buildSpaceAdminAbility() {
-  const { can, build } = new AbilityBuilder<MongoAbility<ISpaceAbility>>(
+  const { can, build } = new AbilityBuilder<MongoAbility<IPermissionAbility>>(
     createMongoAbility,
   );
-  can(SpaceCaslAction.Manage, SpaceCaslSubject.Settings);
-  can(SpaceCaslAction.Manage, SpaceCaslSubject.Member);
-  can(SpaceCaslAction.Manage, SpaceCaslSubject.Page);
+  can(CaslAction.Manage, CaslObject.Settings);
+  can(CaslAction.Manage, CaslObject.Members);
+  can(CaslAction.Manage, CaslObject.Page);
+  can(CaslAction.Read, CaslObject.Space);
   return build();
 }
 

@@ -2,6 +2,8 @@ export enum CaslObject {
   Page = 'page',
   Space = 'space',
   Permission = 'permission',
+  Members = 'members',
+  Settings = 'settings',
 }
 
 export enum CaslAction {

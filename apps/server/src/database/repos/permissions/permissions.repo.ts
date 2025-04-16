@@ -66,6 +66,17 @@ export class PermissionRepo {
       .execute();
   }
 
+  async findBySpaceUserId(
+    spaceId: string,
+    userId: string,
+  ): Promise<Permission[]> {
+    return await this.db
+      .selectFrom('permissions')
+      .where('spaceId', '=', spaceId)
+      .where('userId', '=', userId)
+      .selectAll()
+      .execute();
+  }
   async findByPageId(pageId: string) {
     return await this.db
       .selectFrom('permissions')
