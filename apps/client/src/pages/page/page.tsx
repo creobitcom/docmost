@@ -6,17 +6,12 @@ import { Helmet } from "react-helmet-async";
 import PageHeader from "@/features/page/components/header/page-header.tsx";
 import { extractPageSlugId } from "@/lib";
 import { useGetSpaceBySlugQuery } from "@/features/space/queries/space-query.ts";
-import { useSpaceAbility } from "@/features/space/permissions/use-space-ability.ts";
-import {
-  SpaceCaslAction,
-  SpaceCaslSubject,
-} from "@/features/space/permissions/permissions.type.ts";
 import { useTranslation } from "react-i18next";
 import { usePageAbility } from "@/features/page/permissions/use-page-ability";
 import {
   PageCaslAction,
-  PageCaslSubject,
-} from "@/features/page/permissions/permissions.type";
+  PageCaslObject,
+} from "@/features/permission/constants/casl";
 
 export default function Page() {
   const { t } = useTranslation();
@@ -56,7 +51,7 @@ export default function Page() {
         <PageHeader
           readOnly={pageAbility.cannot(
             PageCaslAction.Manage,
-            PageCaslSubject.Page,
+            PageCaslObject.Page,
           )}
         />
 
@@ -67,7 +62,10 @@ export default function Page() {
           content={page.content}
           slugId={page.slugId}
           spaceSlug={page?.space?.slug}
-          editable={pageAbility.can(PageCaslAction.Edit, PageCaslSubject.Page)}
+          editable={pageAbility.can(
+            PageCaslAction.Edit,
+            PageCaslObject.Content,
+          )}
         />
         <HistoryModal pageId={page.id} />
       </div>

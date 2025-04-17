@@ -17,6 +17,7 @@ import {
   AuthProviders,
   AuthAccounts,
   PageMembers,
+  Permissions,
 } from './db';
 
 // Workspace
@@ -107,3 +108,8 @@ export type UpdatableAuthProvider = Updateable<Omit<AuthProviders, 'id'>>;
 export type AuthAccount = Selectable<AuthAccounts>;
 export type InsertableAuthAccount = Insertable<AuthAccounts>;
 export type UpdatableAuthAccount = Updateable<Omit<AuthAccounts, 'id'>>;
+
+// Permission
+export type Permission = Selectable<Permissions>;
+export type InsertablePermission = Insertable<Permissions>;
+export type UpdatablePermission = Updateable<Omit<Permissions, 'id'>>;

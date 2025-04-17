@@ -15,6 +15,7 @@ import { SpaceModule } from './space/space.module';
 import { GroupModule } from './group/group.module';
 import { CaslModule } from './casl/casl.module';
 import { DomainMiddleware } from '../common/middlewares/domain.middleware';
+import { PermissionModule } from './permission/permission.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { DomainMiddleware } from '../common/middlewares/domain.middleware';
     SpaceModule,
     GroupModule,
     CaslModule,
+    PermissionModule,
   ],
 })
 export class CoreModule implements NestModule {

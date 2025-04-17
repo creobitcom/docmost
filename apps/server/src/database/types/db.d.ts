@@ -195,6 +195,19 @@ export interface Pages {
   ydoc: Buffer | null;
 }
 
+export interface Permissions {
+  action: string;
+  addedById: string | null;
+  createdAt: Generated<Timestamp>;
+  deletedAt: Timestamp | null;
+  groupId: string | null;
+  id: Generated<string>;
+  object: string;
+  pageId: string | null;
+  spaceId: string | null;
+  userId: string | null;
+}
+
 export interface SpaceMembers {
   addedById: string | null;
   createdAt: Generated<Timestamp>;
@@ -301,6 +314,7 @@ export interface DB {
   pageHistory: PageHistory;
   pageMembers: PageMembers;
   pages: Pages;
+  permissions: Permissions;
   spaceMembers: SpaceMembers;
   spaces: Spaces;
   users: Users;

@@ -1,13 +1,14 @@
-import { Modal, rem, Group, Text } from "@mantine/core";
+import { Modal, rem, Group, Text, Tabs } from "@mantine/core";
 import { useTranslation } from "react-i18next";
-import {
-  PageCaslAction,
-  PageCaslSubject,
-} from "../permissions/permissions.type";
 import { usePageQuery } from "../queries/page-query";
 import { usePageAbility } from "../permissions/use-page-ability";
 import PageMembersList from "./page-members";
 import AddPageMembersModal from "./add-page-members-modal";
+import PermissionsPanel from "@/features/permission/components/permissions-panel";
+import {
+  PageCaslAction,
+  PageCaslObject,
+} from "@/features/permission/constants/casl";
 
 interface PageShareModalParams {
   pageId: string;
@@ -21,13 +22,13 @@ export default function PageShareModal({
   onClose,
 }: PageShareModalParams) {
   const { t } = useTranslation();
-  const { data: page, isLoading } = usePageQuery({ pageId });
+  const { data: page } = usePageQuery({ pageId });
 
   const pageRules = page?.membership?.permissions;
   const pageAbility = usePageAbility(pageRules);
 
-  const canManageMembers =
-    page && pageAbility.can(PageCaslAction.Manage, PageCaslSubject.Member);
+  const canManagePermission =
+    page && pageAbility.can(PageCaslAction.Manage, PageCaslObject.Permission);
 
   return (
     <>
@@ -52,10 +53,38 @@ export default function PageShareModal({
           </Modal.Header>
           <Modal.Body>
             <div style={{ height: rem(600) }}>
-              <Group my="md" justify="flex-end">
-                {canManageMembers && <AddPageMembersModal pageId={page?.id} />}
-              </Group>
-              <PageMembersList pageId={page?.id} readOnly={!canManageMembers} />
+              <Tabs defaultValue="members">
+                <Tabs.List>
+                  <Tabs.Tab fw={500} value="members">
+                    {t("Members")}
+                  </Tabs.Tab>
+                  <Tabs.Tab fw={500} value="permissions">
+                    {t("Permissions")}
+                  </Tabs.Tab>
+                </Tabs.List>
+
+                <Tabs.Panel value="members">
+                  <Group my="md" justify="flex-end">
+                    {canManagePermission && (
+                      <AddPageMembersModal pageId={page?.id} />
+                    )}
+                  </Group>
+                  <PageMembersList
+                    pageId={page?.id}
+                    readOnly={!canManagePermission}
+                  />
+                </Tabs.Panel>
+
+                <Tabs.Panel my="md" value="permissions">
+                  {page && (
+                    <PermissionsPanel
+                      targetId={page.id}
+                      type="page"
+                      readOnly={!canManagePermission}
+                    />
+                  )}
+                </Tabs.Panel>
+              </Tabs>
             </div>
           </Modal.Body>
         </Modal.Content>

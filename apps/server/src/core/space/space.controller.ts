@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   HttpCode,
   HttpStatus,
+  Logger,
   NotFoundException,
   Post,
   UseGuards,
@@ -20,20 +21,18 @@ import { User, Workspace } from '@docmost/db/types/entity.types';
 import { AddSpaceMembersDto } from './dto/add-space-members.dto';
 import { RemoveSpaceMemberDto } from './dto/remove-space-member.dto';
 import { UpdateSpaceMemberRoleDto } from './dto/update-space-member-role.dto';
-import SpaceAbilityFactory from '../casl/abilities/space-ability.factory';
-import {
-  SpaceCaslAction,
-  SpaceCaslSubject,
-} from '../casl/interfaces/space-ability.type';
 import { UpdateSpaceDto } from './dto/update-space.dto';
 import { findHighestUserSpaceRole } from '@docmost/db/repos/space/utils';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
-import {
-  WorkspaceCaslAction,
-  WorkspaceCaslSubject,
-} from '../casl/interfaces/workspace-ability.type';
-import WorkspaceAbilityFactory from '../casl/abilities/workspace-ability.factory';
 import { CreateSpaceDto } from './dto/create-space.dto';
+import { PermissionAbilityFactory } from '../casl/abilities/permission-ability.factory';
+import {
+  SpaceCaslAction,
+  SpaceCaslObject,
+  WorkspaceCaslAction,
+  WorkspaceCaslObject,
+} from '../casl/interfaces/permission-ability.type';
+import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
 
 @UseGuards(JwtAuthGuard)
 @Controller('spaces')
@@ -42,8 +41,7 @@ export class SpaceController {
     private readonly spaceService: SpaceService,
     private readonly spaceMemberService: SpaceMemberService,
     private readonly spaceMemberRepo: SpaceMemberRepo,
-    private readonly spaceAbility: SpaceAbilityFactory,
-    private readonly workspaceAbility: WorkspaceAbilityFactory,
+    private readonly permissionAbility: PermissionAbilityFactory,
   ) {}
 
   @HttpCode(HttpStatus.OK)
@@ -72,8 +70,12 @@ export class SpaceController {
       throw new NotFoundException('Space not found');
     }
 
-    const ability = await this.spaceAbility.createForUser(user, space.id);
-    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Settings)) {
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      space.id,
+    );
+
+    if (ability.cannot(SpaceCaslAction.View, SpaceCaslObject.Space)) {
       throw new ForbiddenException();
     }
 
@@ -95,15 +97,14 @@ export class SpaceController {
 
   @HttpCode(HttpStatus.OK)
   @Post('create')
-  createSpace(
+  async createSpace(
     @Body() createSpaceDto: CreateSpaceDto,
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = this.workspaceAbility.createForUser(user, workspace);
-    if (
-      ability.cannot(WorkspaceCaslAction.Manage, WorkspaceCaslSubject.Space)
-    ) {
+    const ability = await this.permissionAbility.createForUserWorkspace(user);
+
+    if (ability.cannot(WorkspaceCaslAction.Create, WorkspaceCaslObject.Space)) {
       throw new ForbiddenException();
     }
     return this.spaceService.createSpace(user, workspace.id, createSpaceDto);
@@ -116,13 +117,15 @@ export class SpaceController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = await this.spaceAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserSpace(
       user,
       updateSpaceDto.spaceId,
     );
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Settings)) {
+
+    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslObject.Space)) {
       throw new ForbiddenException();
     }
+
     return this.spaceService.updateSpace(updateSpaceDto, workspace.id);
   }
 
@@ -133,13 +136,15 @@ export class SpaceController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = await this.spaceAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserSpace(
       user,
       spaceIdDto.spaceId,
     );
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Settings)) {
+
+    if (ability.cannot(SpaceCaslAction.Delete, SpaceCaslObject.Space)) {
       throw new ForbiddenException();
     }
+
     return this.spaceService.deleteSpace(spaceIdDto.spaceId, workspace.id);
   }
 
@@ -152,12 +157,12 @@ export class SpaceController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = await this.spaceAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserSpace(
       user,
       spaceIdDto.spaceId,
     );
 
-    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Member)) {
+    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -182,8 +187,12 @@ export class SpaceController {
       throw new BadRequestException('userIds or groupIds is required');
     }
 
-    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Member)) {
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      dto.spaceId,
+    );
+
+    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -203,8 +212,12 @@ export class SpaceController {
   ) {
     this.validateIds(dto);
 
-    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Member)) {
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      dto.spaceId,
+    );
+
+    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -220,8 +233,12 @@ export class SpaceController {
   ) {
     this.validateIds(dto);
 
-    const ability = await this.spaceAbility.createForUser(user, dto.spaceId);
-    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslSubject.Member)) {
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      dto.spaceId,
+    );
+
+    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 

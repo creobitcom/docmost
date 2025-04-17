@@ -8,6 +8,7 @@ import {
   ForbiddenException,
   NotFoundException,
   BadRequestException,
+  Delete,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -19,27 +20,22 @@ import { AuthUser } from '../../common/decorators/auth-user.decorator';
 import { AuthWorkspace } from '../../common/decorators/auth-workspace.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
-import { SpaceMember, User, Workspace } from '@docmost/db/types/entity.types';
+import { User, Workspace } from '@docmost/db/types/entity.types';
 import { SidebarPageDto } from './dto/sidebar-page.dto';
-import {
-  SpaceCaslAction,
-  SpaceCaslSubject,
-} from '../casl/interfaces/space-ability.type';
-import SpaceAbilityFactory from '../casl/abilities/space-ability.factory';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { RecentPageDto } from './dto/recent-page.dto';
-import PageAbilityFactory from '../casl/abilities/page-ability.factory';
-import {
-  PageCaslAction,
-  PageCaslSubject,
-} from '../casl/interfaces/page-ability.type';
 import { AddPageMembersDto } from './dto/add-page-member.dto';
 import { PageMemberService } from './services/page-member.service';
-import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
-import { findHighestUserSpaceRole } from '@docmost/db/repos/space/utils';
 import { RemovePageMemberDto } from './dto/remove-page-member.dto';
 import { UpdatePageMemberRoleDto } from './dto/update-page-member-role.dto';
-import { SpaceRole } from 'src/common/helpers/types/permission';
+import { PermissionAbilityFactory } from '../casl/abilities/permission-ability.factory';
+import {
+  PageCaslAction,
+  PageCaslObject,
+  SpaceCaslAction,
+  SpaceCaslObject,
+} from '../casl/interfaces/permission-ability.type';
+import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -47,11 +43,10 @@ export class PageController {
   constructor(
     private readonly pageService: PageService,
     private readonly pageMemberService: PageMemberService,
-    private readonly pageMemberRepo: PageMemberRepo,
     private readonly pageRepo: PageRepo,
+    private readonly spaceRepo: SpaceRepo,
     private readonly pageHistoryService: PageHistoryService,
-    private readonly spaceAbility: SpaceAbilityFactory,
-    private readonly pageAbility: PageAbilityFactory,
+    private readonly permissionAbility: PermissionAbilityFactory,
   ) {}
 
   @HttpCode(HttpStatus.OK)
@@ -69,22 +64,17 @@ export class PageController {
       throw new NotFoundException('Page not found');
     }
 
-    const pageAbility = await this.pageAbility.createForUser(user, page.id);
-
-    if (pageAbility.cannot(PageCaslAction.Read, PageCaslSubject.Page)) {
-      throw new ForbiddenException();
-    }
-
-    const userPageRoles = await this.pageMemberRepo.getUserPageRoles(
-      user.id,
+    const pageAbility = await this.permissionAbility.createForUserPage(
+      user,
       page.id,
     );
 
-    const userPageRole = findHighestUserSpaceRole(userPageRoles);
+    if (pageAbility.cannot(PageCaslAction.Read, PageCaslObject.Content)) {
+      throw new ForbiddenException();
+    }
 
     const membership = {
       userId: user.id,
-      role: userPageRole,
       permissions: pageAbility.rules,
     };
 
@@ -98,11 +88,20 @@ export class PageController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    const ability = await this.spaceAbility.createForUser(
-      user,
+    const space = await this.spaceRepo.findById(
       createPageDto.spaceId,
+      workspace.id,
     );
-    if (ability.cannot(SpaceCaslAction.Create, SpaceCaslSubject.Page)) {
+    if (!space) {
+      throw new NotFoundException('Space not found');
+    }
+
+    const ability = await this.permissionAbility.createForUserSpace(
+      user,
+      space.id,
+    );
+
+    if (ability.cannot(SpaceCaslAction.Create, SpaceCaslObject.Page)) {
       throw new ForbiddenException();
     }
 
@@ -118,12 +117,12 @@ export class PageController {
       throw new NotFoundException('Page not found');
     }
 
-    const pageAbility = await this.pageAbility.createForUser(
+    const pageAbility = await this.permissionAbility.createForUserPage(
       user,
       updatePageDto.pageId,
     );
 
-    if (pageAbility.cannot(PageCaslAction.Edit, PageCaslSubject.Page)) {
+    if (pageAbility.cannot(PageCaslAction.Edit, PageCaslObject.Page)) {
       throw new ForbiddenException();
     }
 
@@ -139,11 +138,15 @@ export class PageController {
       throw new NotFoundException('Page not found');
     }
 
-    const pageAbility = await this.pageAbility.createForUser(user, page.id);
+    const ability = await this.permissionAbility.createForUserPage(
+      user,
+      page.id,
+    );
 
-    if (pageAbility.cannot(PageCaslAction.Delete, PageCaslSubject.Page)) {
+    if (ability.cannot(PageCaslAction.Delete, PageCaslObject.Page)) {
       throw new ForbiddenException();
     }
+
     await this.pageService.forceDelete(pageIdDto.pageId);
   }
 
@@ -161,12 +164,12 @@ export class PageController {
     pagination: PaginationOptions,
     @AuthUser() user: User,
   ) {
-    const ability = await this.pageAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserPage(
       user,
       pageIdDto.pageId,
     );
 
-    if (ability.cannot(PageCaslAction.Read, PageCaslSubject.Member)) {
+    if (ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -187,8 +190,12 @@ export class PageController {
       throw new BadRequestException('userIds or groupIds is required');
     }
 
-    const ability = await this.pageAbility.createForUser(user, dto.pageId);
-    if (ability.cannot(PageCaslAction.Manage, PageCaslSubject.Member)) {
+    const ability = await this.permissionAbility.createForUserPage(
+      user,
+      dto.pageId,
+    );
+
+    if (ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -212,17 +219,13 @@ export class PageController {
     return {
       items: await Promise.all(
         recentPages.items.map(async (page) => {
-          try {
-            const pageAbility = await this.pageAbility.createForUser(
-              user,
-              page.id,
-            );
-            return pageAbility.can(PageCaslAction.Read, PageCaslSubject.Page)
-              ? page
-              : null;
-          } catch (err) {
-            return null;
-          }
+          const ability = await this.permissionAbility.createForUserPage(
+            user,
+            page.id,
+          );
+          return ability.can(PageCaslAction.Read, PageCaslObject.Content)
+            ? page
+            : null;
         }),
       ).then((items) => items.filter(Boolean)),
       meta: recentPages.meta,
@@ -239,9 +242,12 @@ export class PageController {
   ) {
     const page = await this.pageRepo.findById(dto.pageId);
 
-    const pageAbility = await this.pageAbility.createForUser(user, page.id);
+    const ability = await this.permissionAbility.createForUserPage(
+      user,
+      dto.pageId,
+    );
 
-    if (pageAbility.cannot(PageCaslAction.Read, PageCaslSubject.Page)) {
+    if (ability.cannot(PageCaslAction.Read, PageCaslObject.Content)) {
       throw new ForbiddenException();
     }
 
@@ -259,14 +265,15 @@ export class PageController {
       throw new NotFoundException('Page history not found');
     }
 
-    const pageAbility = await this.pageAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserPage(
       user,
       history.pageId,
     );
 
-    if (pageAbility.cannot(PageCaslAction.Read, PageCaslSubject.Page)) {
+    if (ability.cannot(PageCaslAction.Read, PageCaslObject.Page)) {
       throw new ForbiddenException();
     }
+
     return history;
   }
 
@@ -277,11 +284,12 @@ export class PageController {
     @Body() pagination: PaginationOptions,
     @AuthUser() user: User,
   ) {
-    const spaceAbility = await this.spaceAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserSpace(
       user,
       dto.spaceId,
     );
-    if (spaceAbility.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Page)) {
+
+    if (ability.cannot(SpaceCaslAction.View, SpaceCaslObject.Space)) {
       throw new ForbiddenException();
     }
 
@@ -289,7 +297,7 @@ export class PageController {
     if (dto.pageId) {
       const page = await this.pageRepo.findById(dto.pageId);
       if (page.spaceId !== dto.spaceId) {
-        throw new ForbiddenException();
+        throw new BadRequestException('Page does not belong to the space');
       }
       pageId = page.id;
     }
@@ -306,18 +314,14 @@ export class PageController {
 
     return {
       items: await Promise.all(
-        pagesInSpace.items.map(async (page) => {
-          try {
-            const pageAbility = await this.pageAbility.createForUser(
-              user,
-              page.id,
-            );
-            return pageAbility.can(PageCaslAction.Read, PageCaslSubject.Page)
-              ? page
-              : null;
-          } catch (err) {
-            return null;
-          }
+        pagesInSpace.items.map(async (page: { id: string }) => {
+          const pageAbility = await this.permissionAbility.createForUserPage(
+            user,
+            page.id,
+          );
+          return pageAbility.can(PageCaslAction.Read, PageCaslObject.Content)
+            ? page
+            : null;
         }),
       ).then((items) => items.filter(Boolean)),
       meta: pagesInSpace.meta,
@@ -362,12 +366,12 @@ export class PageController {
       throw new NotFoundException('Moved page not found');
     }
 
-    const spaceAbility = await this.spaceAbility.createForUser(
+    const ability = await this.permissionAbility.createForUserSpace(
       user,
       movedPage.spaceId,
     );
 
-    if (spaceAbility.cannot(SpaceCaslAction.Edit, SpaceCaslSubject.Page)) {
+    if (ability.cannot(SpaceCaslAction.Manage, SpaceCaslObject.Page)) {
       throw new ForbiddenException();
     }
 
@@ -382,10 +386,15 @@ export class PageController {
       throw new NotFoundException('Page not found');
     }
 
-    const pageAbility = await this.pageAbility.createForUser(user, page.id);
-    if (pageAbility.cannot(PageCaslAction.Read, PageCaslSubject.Page)) {
+    const ability = await this.permissionAbility.createForUserPage(
+      user,
+      dto.pageId,
+    );
+
+    if (ability.cannot(PageCaslAction.Read, PageCaslObject.Content)) {
       throw new ForbiddenException();
     }
+
     return this.pageService.getPageBreadCrumbs(page.id);
   }
 
@@ -396,10 +405,14 @@ export class PageController {
     @AuthUser() user: User,
     @AuthWorkspace() workspace: Workspace,
   ) {
-    this.validateIds(dto);
+    this.validateUserGroupIds(dto);
 
-    const ability = await this.pageAbility.createForUser(user, dto.pageId);
-    if (ability.cannot(PageCaslAction.Manage, PageCaslSubject.Member)) {
+    const ability = await this.permissionAbility.createForUserPage(
+      user,
+      dto.pageId,
+    );
+
+    if (ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
@@ -412,17 +425,23 @@ export class PageController {
     @Body() dto: UpdatePageMemberRoleDto,
     @AuthUser() user: User,
   ) {
-    this.validateIds(dto);
+    this.validateUserGroupIds(dto);
 
-    const ability = await this.pageAbility.createForUser(user, dto.pageId);
-    if (ability.cannot(PageCaslAction.Manage, PageCaslSubject.Member)) {
+    const ability = await this.permissionAbility.createForUserPage(
+      user,
+      dto.pageId,
+    );
+
+    if (ability.cannot(PageCaslAction.Manage, PageCaslObject.Permission)) {
       throw new ForbiddenException();
     }
 
     return this.pageMemberService.updateSpaceMemberRole(dto);
   }
 
-  validateIds(dto: RemovePageMemberDto | UpdatePageMemberRoleDto) {
+  private validateUserGroupIds(
+    dto: RemovePageMemberDto | UpdatePageMemberRoleDto,
+  ) {
     if (!dto.userId && !dto.groupId) {
       throw new BadRequestException('userId or groupId is required');
     }
