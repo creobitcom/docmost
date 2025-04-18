@@ -40,6 +40,8 @@ import { findHighestUserSpaceRole } from '@docmost/db/repos/space/utils';
 import { RemovePageMemberDto } from './dto/remove-page-member.dto';
 import { UpdatePageMemberRoleDto } from './dto/update-page-member-role.dto';
 import { SpaceRole } from 'src/common/helpers/types/permission';
+import { CreateSyncPageDto } from './dto/create-sync-page.dto';
+import { SynchronizedPageService } from './services/synchronized-page.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -52,6 +54,7 @@ export class PageController {
     private readonly pageHistoryService: PageHistoryService,
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly pageAbility: PageAbilityFactory,
+    private readonly syncPageService: SynchronizedPageService,
   ) {}
 
   @HttpCode(HttpStatus.OK)
@@ -420,6 +423,27 @@ export class PageController {
     }
 
     return this.pageMemberService.updateSpaceMemberRole(dto);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('/sync-page')
+  async createSyncPage(
+    @Body() dto: CreateSyncPageDto,
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const originPage = await this.pageService.findById(dto.originPageId);
+    if (!originPage) {
+      throw new NotFoundException('Origin page not found');
+    }
+
+    if (dto.parentPageId && dto.parentPageId === originPage.parentPageId) {
+      throw new BadRequestException(
+        'Cannot create a sync page with the same parent page as the origin page',
+      );
+    }
+
+    return this.syncPageService.create(dto, user.id, workspace.id);
   }
 
   validateIds(dto: RemovePageMemberDto | UpdatePageMemberRoleDto) {
