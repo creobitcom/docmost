@@ -222,6 +222,12 @@ export interface Spaces {
   workspaceId: string;
 }
 
+export interface SynchronizedPages {
+  id: Generated<string>;
+  originPageId: string;
+  referencePageId: string;
+}
+
 export interface Users {
   avatarUrl: string | null;
   createdAt: Generated<Timestamp>;
@@ -303,6 +309,7 @@ export interface DB {
   pages: Pages;
   spaceMembers: SpaceMembers;
   spaces: Spaces;
+  synchronizedPages: SynchronizedPages;
   users: Users;
   userTokens: UserTokens;
   workspaceInvitations: WorkspaceInvitations;
