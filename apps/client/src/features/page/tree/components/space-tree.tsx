@@ -15,9 +15,11 @@ import {
   IconArrowRight,
   IconChevronDown,
   IconChevronRight,
+  IconCopy,
   IconDotsVertical,
   IconFileDescription,
   IconFileExport,
+  IconFileSymlink,
   IconLink,
   IconPlus,
   IconPointFilled,
@@ -60,6 +62,7 @@ import { useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
 import PageShareModal from "../../components/share-modal";
 import MovePageModal from "../../components/move-page-modal.tsx";
+import CreateSyncPageModal from "../../components/create-sync-page-modal.tsx";
 
 interface SpaceTreeProps {
   spaceId: string;
@@ -442,9 +445,15 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
     useDisclosure(false);
   const [shareOpened, { open: openShareModal, close: closeShareModal }] =
     useDisclosure(false);
+
   const [
     movePageModalOpened,
     { open: openMovePageModal, close: closeMoveSpaceModal },
+  ] = useDisclosure(false);
+
+  const [
+    createSyncedPageModelOpened,
+    { open: openCreateSyncedPageModal, close: closeCreateSyncedPageModal },
   ] = useDisclosure(false);
 
   const handleCopyLink = () => {
@@ -507,6 +516,17 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
             {t("Share")}
           </Menu.Item>
 
+          <Menu.Item
+            leftSection={<IconFileSymlink size={16} />}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openCreateSyncedPageModal();
+            }}
+          >
+            {t("New Synced Page")}
+          </Menu.Item>
+
           {!(treeApi.props.disableEdit as boolean) && (
             <>
               <Menu.Item
@@ -543,6 +563,12 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
         currentSpaceSlug={spaceSlug}
         onClose={closeMoveSpaceModal}
         open={movePageModalOpened}
+      />
+
+      <CreateSyncPageModal
+        currentSpaceSlug={spaceSlug}
+        onClose={closeCreateSyncedPageModal}
+        open={createSyncedPageModelOpened}
       />
 
       <ExportModal
