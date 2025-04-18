@@ -1,5 +1,8 @@
 import { Modal, Button, Group, Text, Select, Stack } from "@mantine/core";
-import { getSidebarPages } from "@/features/page/services/page-service.ts";
+import {
+  createSynchronizedPage,
+  getSidebarPages,
+} from "@/features/page/services/page-service.ts";
 import { useState, useEffect } from "react";
 import { notifications } from "@mantine/notifications";
 import { useTranslation } from "react-i18next";
@@ -7,8 +10,10 @@ import { ISpace } from "@/features/space/types/space.types.ts";
 import { SpaceSelect } from "@/features/space/components/sidebar/space-select.tsx";
 import { useNavigate } from "react-router-dom";
 import Page from "@/pages/page/page";
+import { buildPageUrl } from "../page.utils";
 
 interface CreateSyncPageModalProps {
+  originPageId: string;
   currentSpaceSlug: string;
   open: boolean;
   onClose: () => void;
@@ -20,6 +25,7 @@ interface PageOption {
 }
 
 export default function CreateSyncPageModal({
+  originPageId,
   currentSpaceSlug,
   open,
   onClose,
@@ -29,6 +35,7 @@ export default function CreateSyncPageModal({
   const [targetPageId, setTargetPageId] = useState<string>("");
   const [pages, setPages] = useState<PageOption[]>([]);
   const [isLoadingPages, setIsLoadingPages] = useState<boolean>(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (targetSpace) {
@@ -71,35 +78,39 @@ export default function CreateSyncPageModal({
 
   const handlePageMove = async () => {
     if (!targetSpace) return;
-    // try {
-    //   await movePageToSpace({
-    //     pageId,
-    //     spaceId: targetSpace.id,
-    //     targetPageId: targetPageId || undefined,
-    //   });
 
-    //   queryClient.removeQueries({
-    //     predicate: (item) =>
-    //       ["pages", "sidebar-pages", "root-sidebar-pages"].includes(
-    //         item.queryKey[0] as string,
-    //       ),
-    //   });
+    const createdPage = await createSynchronizedPage({
+      spaceId: targetSpace.id,
+      originPageId: originPageId,
+      parentPageId: targetPageId,
+    }).catch((err) => {
+      notifications.show({
+        message: err.response?.data.message || "An error occurred",
+        color: "red",
+      });
+    });
 
-    //   const pageUrl = buildPageUrl(targetSpace.slug, slugId, undefined);
-    //   navigate(pageUrl);
+    if (!createdPage) {
+      notifications.show({
+        message: "An error occurred",
+        color: "red",
+      });
+      return;
+    }
+
+    const pageUrl = buildPageUrl(
+      targetSpace.slug,
+      createdPage.slugId,
+      undefined,
+    );
+    navigate(pageUrl);
 
     notifications.show({
       message: t("Successfully created synced page"),
     });
 
     onClose();
-    // } catch (err) {
-    //   notifications.show({
-    //     message: err.response?.data.message || "An error occurred",
-    //     color: "red",
-    //   });
-    //   console.log(err);
-    // }
+
     setTargetSpace(null);
     setTargetPageId("");
   };

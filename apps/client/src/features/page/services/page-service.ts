@@ -10,6 +10,7 @@ import {
   IPageMember,
   IRemovePageMember,
   IChangePageMemberRole,
+  ICreateSynchronizedPage,
 } from "@/features/page/types/page.types";
 import { IAttachment, IPagination, QueryParams } from "@/lib/types.ts";
 import { saveAs } from "file-saver";
@@ -42,6 +43,13 @@ export async function movePage(data: IMovePage): Promise<void> {
 
 export async function movePageToSpace(data: IMovePageToSpace): Promise<void> {
   await api.post<void>("/pages/move-to-space", data);
+}
+
+export async function createSynchronizedPage(
+  data: ICreateSynchronizedPage,
+): Promise<IPage> {
+  const req = await api.post<IPage>("/pages/sync-page", data);
+  return req.data;
 }
 
 export async function getSidebarPages(

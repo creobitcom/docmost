@@ -19,10 +19,12 @@ import {
   getPageMembers,
   removePageMember,
   changeMemberRole,
+  createSynchronizedPage,
 } from "@/features/page/services/page-service";
 import {
   IAddPageMember,
   IChangePageMemberRole,
+  ICreateSynchronizedPage,
   IMovePage,
   IPage,
   IPageInput,
@@ -114,6 +116,12 @@ export function useDeletePageMutation() {
 export function useMovePageMutation() {
   return useMutation<void, Error, IMovePage>({
     mutationFn: (data) => movePage(data),
+  });
+}
+
+export function useCreateSynchronizedPageMutation() {
+  return useMutation<void, Error, ICreateSynchronizedPage>({
+    mutationFn: (data) => createSynchronizedPage(data),
   });
 }
 

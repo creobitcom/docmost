@@ -566,6 +566,7 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
       />
 
       <CreateSyncPageModal
+        originPageId={node.id}
         currentSpaceSlug={spaceSlug}
         onClose={closeCreateSyncedPageModal}
         open={createSyncedPageModelOpened}

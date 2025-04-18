@@ -102,6 +102,12 @@ export interface IMovePageToSpace {
   spaceId: string;
 }
 
+export interface ICreateSynchronizedPage {
+  spaceId: string;
+  originPageId: string;
+  parentPageId?: string;
+}
+
 export interface SidebarPagesParams {
   spaceId: string;
   pageId?: string;
