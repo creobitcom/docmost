@@ -23,6 +23,7 @@ import { executeTx } from '@docmost/db/utils';
 import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
 import { SpaceRole } from 'src/common/helpers/types/permission';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
+import { SidebarPageResultDto } from '../dto/sidebar-page.dto';
 
 @Injectable()
 export class PageService {
@@ -190,7 +191,7 @@ export class PageService {
     spaceId: string,
     pagination: PaginationOptions,
     pageId?: string,
-  ): Promise<any> {
+  ): Promise<PaginationResult<SidebarPageResultDto>> {
     let query = this.db
       .selectFrom('pages')
       .select([
