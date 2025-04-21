@@ -13,8 +13,15 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.references('pages.id').onDelete('cascade').notNull(),
     )
     .execute();
+
+  await db.schema
+    .alterTable('pages')
+    .addColumn('is_synced', 'boolean', (col) => col.notNull().defaultTo(false))
+    .execute();
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
   await db.schema.dropTable('synchronized_pages').execute();
+
+  await db.schema.alterTable('pages').dropColumn('is_synced').execute();
 }

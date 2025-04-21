@@ -182,6 +182,7 @@ export interface Pages {
   icon: string | null;
   id: Generated<string>;
   isLocked: Generated<boolean>;
+  isSynced: Generated<boolean>;
   lastUpdatedById: string | null;
   parentPageId: string | null;
   position: string | null;
