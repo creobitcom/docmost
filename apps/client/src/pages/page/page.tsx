@@ -21,6 +21,9 @@ import {
 export default function Page() {
   const { t } = useTranslation();
   const { pageSlug } = useParams();
+
+  console.log(extractPageSlugId(pageSlug));
+
   const {
     data: page,
     isLoading,

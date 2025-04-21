@@ -70,13 +70,11 @@ export default function CreateSyncPageModal({
       label: page.title || "Untitled Page",
     }));
 
-    console.log(pageOptions);
-
     setPages(pageOptions);
     setIsLoadingPages(false);
   };
 
-  const handlePageMove = async () => {
+  const handleNewSyncPage = async () => {
     if (!targetSpace) return;
 
     const createdPage = await createSynchronizedPage({
@@ -170,7 +168,7 @@ export default function CreateSyncPageModal({
             <Button onClick={onClose} variant="default">
               {t("Cancel")}
             </Button>
-            <Button onClick={handlePageMove} disabled={!targetSpace}>
+            <Button onClick={handleNewSyncPage} disabled={!targetSpace}>
               {t("Create")}
             </Button>
           </Group>

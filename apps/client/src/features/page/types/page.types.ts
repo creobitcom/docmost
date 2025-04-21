@@ -28,6 +28,7 @@ export interface IPage {
   lastUpdatedBy: ILastUpdatedBy;
   space: Partial<ISpace>;
   membership?: IMembership;
+  isSynced?: boolean;
 }
 
 interface IMembership {

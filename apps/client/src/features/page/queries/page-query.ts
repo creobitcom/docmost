@@ -42,7 +42,10 @@ import { useTranslation } from "react-i18next";
 
 export function usePageQuery(
   pageInput: Partial<IPageInput>,
-): UseQueryResult<IPage, Error> {
+): UseQueryResult<
+  IPage & { originPageId?: string; isSyncedPage?: boolean },
+  Error
+> {
   const query = useQuery({
     queryKey: ["pages", pageInput.pageId],
     queryFn: () => getPageById(pageInput),
@@ -120,7 +123,7 @@ export function useMovePageMutation() {
 }
 
 export function useCreateSynchronizedPageMutation() {
-  return useMutation<void, Error, ICreateSynchronizedPage>({
+  return useMutation<IPage, Error, ICreateSynchronizedPage>({
     mutationFn: (data) => createSynchronizedPage(data),
   });
 }

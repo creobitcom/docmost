@@ -23,7 +23,7 @@ export async function createPage(data: Partial<IPage>): Promise<IPage> {
 
 export async function getPageById(
   pageInput: Partial<IPageInput>,
-): Promise<IPage> {
+): Promise<IPage & { originPageId?: string; isSyncedPage?: boolean }> {
   const req = await api.post<IPage>("/pages/info", pageInput);
   return req.data;
 }

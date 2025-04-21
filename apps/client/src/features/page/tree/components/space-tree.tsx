@@ -361,7 +361,6 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
         onMouseLeave={cancelPagePrefetch}
       >
         <PageArrow node={node} onExpandTree={() => handleLoadChildren(node)} />
-
         <div onClick={handleEmojiIconClick} style={{ marginRight: "4px" }}>
           <EmojiPicker
             onEmojiSelect={handleEmojiSelect}
@@ -378,6 +377,8 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
         </div>
 
         <span className={classes.text}>{node.data.name || t("untitled")}</span>
+
+        {node.data.isSynced ? <IconLink size="18" /> : null}
 
         <div className={classes.actions}>
           <NodeMenu node={node} treeApi={tree} />
