@@ -2,7 +2,7 @@ import { KyselyDB } from '@docmost/db/types/kysely.types';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
 import { CreateSyncPageDto } from '../dto/create-sync-page.dto';
-import { Page } from '@docmost/db/types/entity.types';
+import { Page, SynchronizedPage } from '@docmost/db/types/entity.types';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
 import { executeTx } from '@docmost/db/utils';
 import { generateSlugId } from 'src/common/helpers';
@@ -54,11 +54,15 @@ export class SynchronizedPageService {
           creatorId: userId,
           workspaceId: workspaceId,
           lastUpdatedById: userId,
+          isSynced: true,
         },
         trx,
       );
 
-      Logger.debug(`Created page with id ${refPage.id}`);
+      Logger.debug(
+        `Created page with id ${refPage.id}`,
+        'SynchronizedPageService',
+      );
 
       await this.syncPageRepo.insert(
         {
@@ -72,5 +76,9 @@ export class SynchronizedPageService {
     });
 
     return createdPage;
+  }
+
+  async findByReferenceId(pageId: string): Promise<SynchronizedPage> {
+    return await this.syncPageRepo.findByReferencePageId(pageId);
   }
 }

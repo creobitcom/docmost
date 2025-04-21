@@ -127,8 +127,10 @@ export class PageRepo {
       .executeTakeFirst();
   }
 
-  async deletePage(pageId: string): Promise<void> {
-    let query = this.db.deleteFrom('pages');
+  async deletePage(pageId: string, trx?: KyselyTransaction): Promise<void> {
+    const db = dbOrTx(this.db, trx);
+
+    let query = db.deleteFrom('pages');
 
     if (isValidUUID(pageId)) {
       query = query.where('id', '=', pageId);

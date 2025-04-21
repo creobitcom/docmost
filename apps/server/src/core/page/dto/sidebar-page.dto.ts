@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIP, IsOptional, IsString } from 'class-validator';
 import { SpaceIdDto } from './page.dto';
 import { isString } from '@tiptap/core';
 
@@ -32,4 +32,7 @@ export class SidebarPageResultDto {
 
   @IsString()
   creatorId: string;
+
+  @IsBoolean()
+  isSynced: boolean;
 }

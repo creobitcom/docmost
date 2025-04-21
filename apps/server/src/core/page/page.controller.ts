@@ -8,6 +8,7 @@ import {
   ForbiddenException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -90,6 +91,23 @@ export class PageController {
       role: userPageRole,
       permissions: pageAbility.rules,
     };
+
+    const syncPage = await this.syncPageService.findByReferenceId(page.id);
+
+    if (syncPage) {
+      const originPage = await this.pageRepo.findById(syncPage.originPageId, {
+        includeContent: true,
+        includeLastUpdatedBy: true,
+        includeContributors: true,
+      });
+      if (!originPage) {
+        throw new NotFoundException('Origin page not found');
+      }
+      page.content = originPage.content;
+      page.id = originPage.id;
+      page.title = originPage.title;
+      page.icon = originPage.icon;
+    }
 
     return { ...page, membership };
   }
@@ -311,6 +329,18 @@ export class PageController {
       items: await Promise.all(
         pagesInSpace.items.map(async (page) => {
           try {
+            if (page.isSynced) {
+              const syncPageMeta = await this.syncPageService.findByReferenceId(
+                page.id,
+              );
+              const originPage = await this.pageRepo.findById(
+                syncPageMeta.originPageId,
+              );
+
+              page.title = originPage.title;
+              page.icon = originPage.icon;
+            }
+
             const pageAbility = await this.pageAbility.createForUser(
               user,
               page.id,
