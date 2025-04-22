@@ -517,16 +517,18 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
             {t("Share")}
           </Menu.Item>
 
-          <Menu.Item
-            leftSection={<IconFileSymlink size={16} />}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openCreateSyncedPageModal();
-            }}
-          >
-            {t("New Synced Page")}
-          </Menu.Item>
+          {!node.data.isSynced ? (
+            <Menu.Item
+              leftSection={<IconFileSymlink size={16} />}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openCreateSyncedPageModal();
+              }}
+            >
+              {t("New Synced Page")}
+            </Menu.Item>
+          ) : null}
 
           {!(treeApi.props.disableEdit as boolean) && (
             <>
