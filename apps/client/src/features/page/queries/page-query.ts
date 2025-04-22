@@ -20,6 +20,7 @@ import {
   removePageMember,
   changeMemberRole,
   createSynchronizedPage,
+  getPagesInSpace,
 } from "@/features/page/services/page-service";
 import {
   IAddPageMember,
@@ -30,6 +31,7 @@ import {
   IPageInput,
   IPageMember,
   IRemovePageMember,
+  PagesInSpaceParams,
   SidebarPagesParams,
 } from "@/features/page/types/page.types";
 import { notifications } from "@mantine/notifications";
@@ -134,6 +136,15 @@ export function useGetSidebarPagesQuery(
   return useQuery({
     queryKey: ["sidebar-pages", data],
     queryFn: () => getSidebarPages(data),
+  });
+}
+
+export function useGetPagesInSpace(
+  data: PagesInSpaceParams,
+): UseQueryResult<IPagination<IPage>, Error> {
+  return useQuery({
+    queryKey: ["pages-in-space", data],
+    queryFn: () => getPagesInSpace(data),
   });
 }
 

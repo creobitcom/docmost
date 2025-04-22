@@ -11,6 +11,7 @@ import {
   IRemovePageMember,
   IChangePageMemberRole,
   ICreateSynchronizedPage,
+  PagesInSpaceParams,
 } from "@/features/page/types/page.types";
 import { IAttachment, IPagination, QueryParams } from "@/lib/types.ts";
 import { saveAs } from "file-saver";
@@ -56,6 +57,13 @@ export async function getSidebarPages(
   params: SidebarPagesParams,
 ): Promise<IPagination<IPage>> {
   const req = await api.post("/pages/sidebar-pages", params);
+  return req.data;
+}
+
+export async function getPagesInSpace(
+  params: PagesInSpaceParams,
+): Promise<IPagination<IPage>> {
+  const req = await api.get("/pages", { params: params });
   return req.data;
 }
 

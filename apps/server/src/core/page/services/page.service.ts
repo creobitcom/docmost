@@ -13,7 +13,7 @@ import {
   PaginationResult,
 } from '@docmost/db/pagination/pagination';
 import { InjectKysely } from 'nestjs-kysely';
-import { KyselyDB } from '@docmost/db/types/kysely.types';
+import { KyselyDB, KyselyTransaction } from '@docmost/db/types/kysely.types';
 import { generateJitteredKeyBetween } from 'fractional-indexing-jittered';
 import { MovePageDto } from '../dto/move-page.dto';
 import { ExpressionBuilder } from 'kysely';
@@ -23,7 +23,7 @@ import { executeTx } from '@docmost/db/utils';
 import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
 import { SpaceRole } from 'src/common/helpers/types/permission';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
-import { SidebarPageResultDto } from '../dto/sidebar-page.dto';
+import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 
 @Injectable()
@@ -187,6 +187,35 @@ export class PageService {
       .whereRef('child.parentPageId', '=', 'pages.id')
       .limit(1)
       .as('hasChildren');
+  }
+
+  async getPagesInSpace(
+    spaceId: string,
+    pagination?: PaginationOptions,
+    trx?: KyselyTransaction,
+  ): Promise<PaginationResult<SidebarPageResultDto>> {
+    const query = this.db
+      .selectFrom('pages')
+      .select([
+        'id',
+        'slugId',
+        'title',
+        'icon',
+        'position',
+        'parentPageId',
+        'spaceId',
+        'creatorId',
+        'isSynced',
+      ])
+      .orderBy('position', 'asc')
+      .where('spaceId', '=', spaceId);
+
+    const result = executeWithPagination(query, {
+      page: pagination.page,
+      perPage: 250,
+    });
+
+    return result;
   }
 
   async getSidebarPages(

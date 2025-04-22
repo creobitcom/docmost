@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   HttpCode,
@@ -9,6 +10,7 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Query,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -43,6 +45,8 @@ import { UpdatePageMemberRoleDto } from './dto/update-page-member-role.dto';
 import { SpaceRole } from 'src/common/helpers/types/permission';
 import { CreateSyncPageDto } from './dto/create-sync-page.dto';
 import { SynchronizedPageService } from './services/synchronized-page.service';
+import { cpSync } from 'fs-extra';
+import { SpaceIdDto } from '../space/dto/space-id.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -146,6 +150,18 @@ export class PageController {
 
     if (pageAbility.cannot(PageCaslAction.Edit, PageCaslSubject.Page)) {
       throw new ForbiddenException();
+    }
+
+    Logger.debug(updatePageDto);
+
+    if (page.isSynced) {
+      const syncPageData = await this.syncPageService.findByReferenceId(
+        page.id,
+      );
+      const originPage = await this.pageRepo.findById(
+        syncPageData.originPageId,
+      );
+      return this.pageService.update(originPage, updatePageDto, user.id);
     }
 
     return this.pageService.update(page, updatePageDto, user.id);
@@ -474,6 +490,52 @@ export class PageController {
     }
 
     return this.syncPageService.create(dto, user.id, workspace.id);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get('/')
+  async getSpacePages(
+    @Query() dto: SpaceIdDto,
+    @Query() pagination: PaginationOptions,
+    @AuthUser() user: User,
+  ) {
+    const spaceAbility = await this.spaceAbility.createForUser(
+      user,
+      dto.spaceId,
+    );
+    if (spaceAbility.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    const pagesInSpace = await this.pageService.getPagesInSpace(
+      dto.spaceId,
+      pagination,
+    );
+
+    if (!pagesInSpace) {
+      return;
+    }
+
+    Logger.debug(pagesInSpace);
+
+    return {
+      items: await Promise.all(
+        pagesInSpace.items.map(async (page) => {
+          try {
+            const pageAbility = await this.pageAbility.createForUser(
+              user,
+              page.id,
+            );
+            return pageAbility.can(PageCaslAction.Read, PageCaslSubject.Page)
+              ? page
+              : null;
+          } catch (err) {
+            return null;
+          }
+        }),
+      ).then((items) => items.filter(Boolean)),
+      meta: pagesInSpace.meta,
+    };
   }
 
   validateIds(dto: RemovePageMemberDto | UpdatePageMemberRoleDto) {

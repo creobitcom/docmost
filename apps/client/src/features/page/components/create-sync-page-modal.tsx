@@ -1,7 +1,7 @@
 import { Modal, Button, Group, Text, Select, Stack } from "@mantine/core";
 import {
   createSynchronizedPage,
-  getSidebarPages,
+  getPagesInSpace,
 } from "@/features/page/services/page-service.ts";
 import { useState, useEffect } from "react";
 import { notifications } from "@mantine/notifications";
@@ -51,7 +51,7 @@ export default function CreateSyncPageModal({
 
     setIsLoadingPages(true);
 
-    const pagesData = await getSidebarPages({
+    const pagesData = await getPagesInSpace({
       spaceId: targetSpace.id,
     }).catch((error) => {
       notifications.show({

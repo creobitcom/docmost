@@ -115,6 +115,11 @@ export interface SidebarPagesParams {
   page?: number; // pagination
 }
 
+export interface PagesInSpaceParams {
+  spaceId: string;
+  page?: number; // pagination
+}
+
 export interface IPageInput {
   pageId: string;
   title: string;
