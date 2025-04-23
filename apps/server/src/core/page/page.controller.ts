@@ -152,8 +152,6 @@ export class PageController {
       throw new ForbiddenException();
     }
 
-    Logger.debug(updatePageDto);
-
     if (page.isSynced) {
       const syncPageData = await this.syncPageService.findByReferenceId(
         page.id,
@@ -331,19 +329,19 @@ export class PageController {
       pageId = page.id;
     }
 
-    const pagesInSpace = await this.pageService.getSidebarPages(
+    const pages = await this.pageService.getSidebarPages(
       dto.spaceId,
       pagination,
       pageId,
     );
 
-    if (!pagesInSpace) {
+    if (!pages) {
       return;
     }
 
     return {
       items: await Promise.all(
-        pagesInSpace.items.map(async (page) => {
+        pages.items.map(async (page) => {
           try {
             if (page.isSynced) {
               const syncPageMeta = await this.syncPageService.findByReferenceId(
@@ -369,7 +367,7 @@ export class PageController {
           }
         }),
       ).then((items) => items.filter(Boolean)),
-      meta: pagesInSpace.meta,
+      meta: pages.meta,
     };
   }
 

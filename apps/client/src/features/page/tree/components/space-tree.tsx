@@ -1,22 +1,15 @@
 import { NodeApi, NodeRendererProps, Tree, TreeApi } from "react-arborist";
-import { atom, useAtom } from "jotai";
-import { treeApiAtom } from "@/features/page/tree/atoms/tree-api-atom.ts";
-import {
-  fetchAncestorChildren,
-  useGetRootSidebarPagesQuery,
-  usePageQuery,
-  useUpdatePageMutation,
-} from "@/features/page/queries/page-query.ts";
-import { useEffect, useRef } from "react";
+import { useAtom, atom } from "jotai";
+import { atomFamily } from "jotai/utils";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import classes from "@/features/page/tree/styles/tree.module.css";
-import { ActionIcon, Menu, rem } from "@mantine/core";
+import { ActionIcon, Menu, rem, Tooltip } from "@mantine/core";
 import {
   IconArrowRight,
   IconChevronDown,
   IconChevronRight,
-  IconCopy,
-  IconDotsVertical,
+  IconDots,
   IconFileDescription,
   IconFileExport,
   IconFileSymlink,
@@ -26,10 +19,8 @@ import {
   IconTrash,
   IconUsers,
 } from "@tabler/icons-react";
-import { treeDataAtom } from "@/features/page/tree/atoms/tree-data-atom.ts";
 import clsx from "clsx";
 import EmojiPicker from "@/components/ui/emoji-picker.tsx";
-import { useTreeMutation } from "@/features/page/tree/hooks/use-tree-mutation.ts";
 import {
   appendNodeChildren,
   buildTree,
@@ -63,18 +54,52 @@ import ExportModal from "@/components/common/export-modal";
 import PageShareModal from "../../components/share-modal";
 import MovePageModal from "../../components/move-page-modal.tsx";
 import CreateSyncPageModal from "../../components/create-sync-page-modal.tsx";
+import {
+  fetchAncestorChildren,
+  useGetRootSidebarPagesQuery,
+  usePageQuery,
+  useUpdatePageMutation,
+} from "@/features/page/queries/page-query.ts";
+
+const treeDataAtomFamily = atomFamily((spaceId) => atom([]));
+const openTreeNodesAtomFamily = atomFamily((spaceId) => atom<OpenMap>({}));
+const treeApiAtomFamily = atomFamily((spaceId) =>
+  atom<TreeApi<SpaceTreeNode>>(null),
+);
 
 interface SpaceTreeProps {
   spaceId: string;
   readOnly: boolean;
 }
 
-const openTreeNodesAtom = atom<OpenMap>({});
-
 export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   const { pageSlug } = useParams();
-  const { data, setData, controllers } =
-    useTreeMutation<TreeApi<SpaceTreeNode>>(spaceId);
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  const [treeData, setTreeData] = useAtom(treeDataAtomFamily(spaceId));
+  const treeApiRef = useRef<TreeApi<SpaceTreeNode>>();
+  const [openTreeNodes, setOpenTreeNodes] = useAtom<OpenMap>(
+    openTreeNodesAtomFamily(spaceId),
+  );
+
+  // Local state for tree controllers
+  const [controllers, setControllers] = useState({
+    onCreate: null,
+    onMove: null,
+    onRename: null,
+    onDelete: null,
+  });
+
+  const rootElement = useRef(null);
+  const { ref: sizeRef, width, height } = useElementSize();
+  const mergedRef = useMergedRef(rootElement, sizeRef);
+  const isDataLoaded = useRef(false);
+
+  const { data: currentPage } = usePageQuery({
+    pageId: extractPageSlugId(pageSlug),
+  });
+
   const {
     data: pagesData,
     hasNextPage,
@@ -83,16 +108,50 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   } = useGetRootSidebarPagesQuery({
     spaceId,
   });
-  const [, setTreeApi] = useAtom<TreeApi<SpaceTreeNode>>(treeApiAtom);
-  const treeApiRef = useRef<TreeApi<SpaceTreeNode>>();
-  const [openTreeNodes, setOpenTreeNodes] = useAtom<OpenMap>(openTreeNodesAtom);
-  const rootElement = useRef<HTMLDivElement>();
-  const { ref: sizeRef, width, height } = useElementSize();
-  const mergedRef = useMergedRef(rootElement, sizeRef);
-  const isDataLoaded = useRef(false);
-  const { data: currentPage } = usePageQuery({
-    pageId: extractPageSlugId(pageSlug),
-  });
+
+  // Custom hook to handle tree mutations
+  const useTreeMutationHook = () => {
+    const updateData = (newData) => {
+      setTreeData(newData);
+    };
+
+    const handleCreate = (params) => {
+      // Implementation of create logic
+      console.log("Creating node", params);
+    };
+
+    const handleMove = (params) => {
+      // Implementation of move logic
+      console.log("Moving node", params);
+    };
+
+    const handleRename = (params) => {
+      // Implementation of rename logic
+      console.log("Renaming node", params);
+    };
+
+    const handleDelete = (params) => {
+      // Implementation of delete logic
+      console.log("Deleting node", params);
+    };
+
+    useEffect(() => {
+      setControllers({
+        onCreate: handleCreate,
+        onMove: handleMove,
+        onRename: handleRename,
+        onDelete: handleDelete,
+      });
+    }, []);
+
+    return {
+      data: treeData,
+      setData: updateData,
+      controllers,
+    };
+  };
+
+  const { setData } = useTreeMutationHook();
 
   useEffect(() => {
     if (hasNextPage && !isFetching) {
@@ -104,26 +163,26 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
     if (pagesData?.pages && !hasNextPage) {
       const allItems = pagesData.pages.flatMap((page) => page.items);
       const treeData = buildTree(allItems);
+      console.log(`SpaceId: ${spaceId}, pages: ${allItems.length}`);
 
-      if (data.length < 1 || data?.[0].spaceId !== spaceId) {
-        //Thoughts
-        // don't reset if there is data in state
-        // we only expect to call this once on initial load
-        // even if we decide to refetch, it should only update
-        // and append root pages instead of resetting the entire tree
-        // which looses async loaded children too
+      if (treeData.length > 0) {
         setData(treeData);
         isDataLoaded.current = true;
-        setOpenTreeNodes({});
       }
     }
-  }, [pagesData, hasNextPage]);
+  }, [pagesData, hasNextPage, spaceId]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (isDataLoaded.current && currentPage) {
+      if (
+        isDataLoaded.current &&
+        currentPage &&
+        currentPage.spaceId === spaceId
+      ) {
         // check if pageId node is present in the tree
-        const node = dfs(treeApiRef.current?.root, currentPage.id);
+        const node = treeApiRef.current
+          ? dfs(treeApiRef.current.root, currentPage.id)
+          : null;
         if (node) {
           // if node is found, no need to traverse its ancestors
           return;
@@ -133,7 +192,7 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
         if (!currentPage.id) return;
         const ancestors = await getPageBreadcrumbs(currentPage.id);
 
-        if (ancestors && ancestors?.length > 1) {
+        if (ancestors && ancestors.length > 1) {
           let flatTreeItems = [...buildTree(ancestors)];
 
           const fetchAndUpdateChildren = async (ancestor: IPage) => {
@@ -167,7 +226,7 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
 
             // attach built ancestors to tree
             const updatedTree = appendNodeChildren(
-              data,
+              treeData,
               rootChild.id,
               rootChild.children,
             );
@@ -175,7 +234,9 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
 
             setTimeout(() => {
               // focus on node and open all parents
-              treeApiRef.current.select(currentPage.id);
+              if (treeApiRef.current) {
+                treeApiRef.current.select(currentPage.id);
+              }
             }, 100);
           });
         }
@@ -183,38 +244,48 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
     };
 
     fetchData();
-  }, [isDataLoaded.current, currentPage?.id]);
+  }, [isDataLoaded.current, currentPage?.id, spaceId]);
 
   useEffect(() => {
-    if (currentPage?.id) {
+    if (
+      currentPage?.id &&
+      currentPage.spaceId === spaceId &&
+      treeApiRef.current
+    ) {
       setTimeout(() => {
         // focus on node and open all parents
         treeApiRef.current?.select(currentPage.id, { align: "auto" });
       }, 200);
-    } else {
+    } else if (treeApiRef.current) {
       treeApiRef.current?.deselectAll();
     }
-  }, [currentPage?.id]);
+  }, [currentPage?.id, spaceId]);
 
   useEffect(() => {
-    if (treeApiRef.current) {
-      // @ts-ignore
-      setTreeApi(treeApiRef.current);
-    }
+    // if (treeApiRef.current) {
+    //   setTreeApi(treeApiRef.current);
+    // }
   }, [treeApiRef.current]);
+
+  const handleTreeRef = (ref) => {
+    // treeApiRef.current = ref;
+    // if (ref) {
+    //   setTreeApi(ref);
+    // }
+  };
 
   return (
     <div ref={mergedRef} className={classes.treeContainer}>
       {rootElement.current && (
         <Tree
-          data={data.filter((node) => node?.spaceId === spaceId)}
+          data={treeData.filter((node) => node?.spaceId === spaceId)}
           disableDrag={readOnly}
           disableDrop={readOnly}
           disableEdit={readOnly}
           {...controllers}
-          width={width}
-          height={rootElement.current.clientHeight}
-          ref={treeApiRef}
+          width={width || 300}
+          height={height || 400}
+          ref={handleTreeRef}
           openByDefault={false}
           disableMultiSelection={true}
           className={classes.tree}
@@ -223,7 +294,9 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
           overscanCount={10}
           dndRootElement={rootElement.current}
           onToggle={() => {
-            setOpenTreeNodes(treeApiRef.current?.openState);
+            if (treeApiRef.current) {
+              setOpenTreeNodes(treeApiRef.current.openState);
+            }
           }}
           initialOpenState={openTreeNodes}
         >
@@ -234,10 +307,14 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   );
 }
 
-function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
+function Node(
+  { node, style, dragHandle, tree }: NodeRendererProps<any>,
+  spaceId: string,
+) {
   const navigate = useNavigate();
   const updatePageMutation = useUpdatePageMutation();
-  const [treeData, setTreeData] = useAtom(treeDataAtom);
+
+  const [treeData, setTreeData] = useAtom(treeDataAtomFamily(spaceId));
   const emit = useQueryEmit();
   const { spaceSlug } = useParams();
   const timerRef = useRef(null);
@@ -381,8 +458,6 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
         {node.data.isSynced ? <IconLink size="18" /> : null}
 
         <div className={classes.actions}>
-          <NodeMenu node={node} treeApi={tree} />
-
           {!tree.props.disableEdit && (
             <CreateNode
               node={node}
@@ -390,6 +465,8 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
               onExpandTree={() => handleLoadChildren(node)}
             />
           )}
+
+          <NodeMenu node={node} treeApi={tree} />
         </div>
       </div>
     </>
@@ -476,10 +553,7 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
               e.stopPropagation();
             }}
           >
-            <IconDotsVertical
-              style={{ width: rem(20), height: rem(20) }}
-              stroke={2}
-            />
+            <IconDots style={{ width: rem(20), height: rem(20) }} stroke={2} />
           </ActionIcon>
         </Menu.Target>
 

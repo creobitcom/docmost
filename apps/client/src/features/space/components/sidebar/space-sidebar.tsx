@@ -18,7 +18,7 @@ import {
 } from "@tabler/icons-react";
 
 import classes from "./space-sidebar.module.css";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAtom } from "jotai";
 import { SearchSpotlight } from "@/features/search/search-spotlight.tsx";
 import { treeApiAtom } from "@/features/page/tree/atoms/tree-api-atom.ts";
@@ -26,7 +26,10 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import clsx from "clsx";
 import { useDisclosure } from "@mantine/hooks";
 import SpaceSettingsModal from "@/features/space/components/settings-modal.tsx";
-import { useGetSpaceBySlugQuery } from "@/features/space/queries/space-query.ts";
+import {
+  useGetSpaceBySlugQuery,
+  useGetSpacesQuery,
+} from "@/features/space/queries/space-query.ts";
 import { getSpaceUrl } from "@/lib/config.ts";
 import SpaceTree from "@/features/page/tree/components/space-tree.tsx";
 import { useSpaceAbility } from "@/features/space/permissions/use-space-ability.ts";
@@ -38,6 +41,7 @@ import PageImportModal from "@/features/page/components/page-import-modal.tsx";
 import { useTranslation } from "react-i18next";
 import { SwitchSpace } from "./switch-space";
 import ExportModal from "@/components/common/export-modal";
+import { ISpace } from "../../types/space.types";
 
 export function SpaceSidebar() {
   const { t } = useTranslation();
@@ -47,6 +51,18 @@ export function SpaceSidebar() {
     useDisclosure(false);
   const { spaceSlug } = useParams();
   const { data: space, isLoading, isError } = useGetSpaceBySlugQuery(spaceSlug);
+
+  const [spaces, setSpaces] = useState<ISpace[]>([]);
+  const { data: spacesData, isLoading: isSpacesLoading } = useGetSpacesQuery();
+
+  useEffect(() => {
+    if (isSpacesLoading) {
+      return;
+    }
+    setSpaces(spacesData.items);
+
+    console.log(spaces);
+  }, [spacesData, isSpacesLoading]);
 
   const spaceRules = space?.membership?.permissions;
   const spaceAbility = useSpaceAbility(spaceRules);
@@ -62,7 +78,7 @@ export function SpaceSidebar() {
   return (
     <>
       <div className={classes.navbar}>
-        <div
+        {/* <div
           className={classes.section}
           style={{
             border: "none",
@@ -71,10 +87,10 @@ export function SpaceSidebar() {
           }}
         >
           <SwitchSpace spaceName={space?.name} spaceSlug={space?.slug} />
-        </div>
+        </div> */}
 
         <div className={classes.section}>
-          <div className={classes.menuItems}>
+          {/* <div className={classes.menuItems}>
             <UnstyledButton
               component={Link}
               to={getSpaceUrl(spaceSlug)}
@@ -135,46 +151,55 @@ export function SpaceSidebar() {
                 </div>
               </UnstyledButton>
             )}
-          </div>
+          </div> */}
         </div>
 
-        <div className={clsx(classes.section, classes.sectionPages)}>
-          <Group className={classes.pagesHeader} justify="space-between">
-            <Text size="xs" fw={500} c="dimmed">
-              {t("Pages")}
-            </Text>
+        {spaces.map((spaceItem) => (
+          <div
+            key={spaceItem.id}
+            className={clsx(classes.section, classes.sectionPages)}
+          >
+            <Group className={classes.pagesHeader} justify="space-between">
+              <Text size="xs" fw={500} c="dimmed">
+                {spaceItem.name}
+              </Text>
 
-            {spaceAbility.can(
-              SpaceCaslAction.Manage,
-              SpaceCaslSubject.Page,
-            ) && (
-              <Group gap="xs">
-                <SpaceMenu spaceId={space.id} onSpaceSettings={openSettings} />
-
-                <Tooltip label={t("Create page")} withArrow position="right">
-                  <ActionIcon
-                    variant="default"
-                    size={18}
-                    onClick={handleCreatePage}
-                    aria-label={t("Create page")}
-                  >
-                    <IconPlus />
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
-            )}
-          </Group>
-
-          <div className={classes.pages}>
-            <SpaceTree
-              spaceId={space.id}
-              readOnly={spaceAbility.cannot(
+              {spaceAbility.can(
                 SpaceCaslAction.Manage,
                 SpaceCaslSubject.Page,
+              ) && (
+                <Group gap="xs">
+                  <Tooltip label={t("Create page")} withArrow position="right">
+                    <ActionIcon
+                      variant="default"
+                      size={18}
+                      onClick={handleCreatePage}
+                      aria-label={t("Create page")}
+                    >
+                      <IconPlus />
+                    </ActionIcon>
+                  </Tooltip>
+
+                  <SpaceMenu
+                    spaceId={spaceItem.id}
+                    onSpaceSettings={openSettings}
+                  />
+                </Group>
               )}
-            />
+            </Group>
+
+            <div className={classes.pages}>
+              <SpaceTree
+                key={`tree-${spaceItem.id}`}
+                spaceId={spaceItem.id}
+                readOnly={spaceAbility.cannot(
+                  SpaceCaslAction.Manage,
+                  SpaceCaslSubject.Page,
+                )}
+              />
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
       <SpaceSettingsModal
@@ -182,8 +207,6 @@ export function SpaceSidebar() {
         onClose={closeSettings}
         spaceId={space?.slug}
       />
-
-      <SearchSpotlight spaceId={space.id} />
     </>
   );
 }
