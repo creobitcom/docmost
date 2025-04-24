@@ -359,6 +359,7 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
         onMouseEnter={prefetchPage}
         onMouseLeave={cancelPagePrefetch}
       >
+        {node.data.isSynced && <i className={classes.syncIndicator}></i>}
         <PageArrow node={node} onExpandTree={() => handleLoadChildren(node)} />
         <div onClick={handleEmojiIconClick} style={{ marginRight: "4px" }}>
           <EmojiPicker
@@ -374,11 +375,7 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
             removeEmojiAction={handleRemoveEmoji}
           />
         </div>
-
         <span className={classes.text}>{node.data.name || t("untitled")}</span>
-
-        {node.data.isSynced ? <IconLink size="18" /> : null}
-
         <div className={classes.actions}>
           {!tree.props.disableEdit && (
             <CreateNode
@@ -387,7 +384,6 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
               onExpandTree={() => handleLoadChildren(node)}
             />
           )}
-
           <NodeMenu node={node} treeApi={tree} />
         </div>
       </div>
@@ -612,9 +608,8 @@ function PageArrow({ node, onExpandTree }: PageArrowProps) {
           ) : (
             <IconChevronRight stroke={2} size={18} />
           )
-        ) : (
-          <IconPointFilled size={8} />
-        )
+        ) : // <IconPointFilled size={8} />
+        null
       ) : null}
     </ActionIcon>
   );
