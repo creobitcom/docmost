@@ -62,7 +62,7 @@ export function SpaceSidebar() {
   return (
     <>
       <div className={classes.navbar}>
-        <div
+        {/* <div
           className={classes.section}
           style={{
             border: "none",
@@ -71,7 +71,7 @@ export function SpaceSidebar() {
           }}
         >
           <SwitchSpace spaceName={space?.name} spaceSlug={space?.slug} />
-        </div>
+        </div> */}
 
         <div className={classes.section}>
           <div className={classes.menuItems}>
