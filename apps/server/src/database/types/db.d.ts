@@ -217,6 +217,7 @@ export interface Spaces {
   id: Generated<string>;
   logo: string | null;
   name: string | null;
+  ownerId: string | null;
   slug: string;
   updatedAt: Generated<Timestamp>;
   visibility: Generated<string>;
