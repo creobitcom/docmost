@@ -39,4 +39,31 @@ export class SynchronizedPageRepo {
       .select(['referencePageId'])
       .execute();
   }
+
+  async getByUserOriginId(
+    userId: string,
+    originPageId: string,
+    trx?: KyselyTransaction,
+  ): Promise<{ id: string }[]> {
+    const db = dbOrTx(this.db, trx);
+
+    return await db
+      .selectFrom('pages')
+      .leftJoin(
+        'synchronizedPages',
+        'pages.id',
+        'synchronizedPages.referencePageId',
+      )
+      .select(['pages.id'])
+      .where('pages.spaceId', '=', (eb) =>
+        eb
+          .selectFrom('spaces')
+          .select('id')
+          .where('ownerId', '=', userId)
+          .limit(1),
+      )
+      .where('synchronizedPages.originPageId', '=', originPageId)
+      .where('pages.isSynced', '=', true)
+      .execute();
+  }
 }

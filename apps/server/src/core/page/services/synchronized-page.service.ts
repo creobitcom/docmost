@@ -39,6 +39,8 @@ export class SynchronizedPageService {
       parentPageId = parentPage.id;
     }
 
+    const childrenPages = await this.pageService.getAllChildren(originPage.id);
+
     const createdPage = await executeTx<Page>(this.db, async (trx) => {
       const refPage = await this.pageRepo.insertPage(
         {
@@ -59,11 +61,6 @@ export class SynchronizedPageService {
         trx,
       );
 
-      Logger.debug(
-        `Created page with id ${refPage.id}`,
-        'SynchronizedPageService',
-      );
-
       await this.syncPageRepo.insert(
         {
           originPageId: originPage.id,
@@ -72,10 +69,59 @@ export class SynchronizedPageService {
         trx,
       );
 
+      for (const childPage of childrenPages) {
+        const newPage = await this.pageRepo.insertPage(
+          {
+            slugId: generateSlugId(),
+            title: childPage.title + ' Sync',
+            position: await this.pageService.nextPagePosition(
+              createPageDto.spaceId,
+              parentPageId,
+            ),
+            icon: childPage.icon,
+            parentPageId: parentPageId,
+            spaceId: createPageDto.spaceId,
+            creatorId: userId,
+            workspaceId: workspaceId,
+            lastUpdatedById: userId,
+            isSynced: true,
+          },
+          trx,
+        );
+
+        await this.syncPageRepo.insert(
+          {
+            originPageId: childPage.id,
+            referencePageId: newPage.id,
+          },
+          trx,
+        );
+      }
+
       return refPage;
     });
 
     return createdPage;
+  }
+
+  async removeByUserIdOriginId(
+    userId: string,
+    originPageId: string,
+  ): Promise<void> {
+    await executeTx<void>(this.db, async (trx) => {
+      const pages = await this.syncPageRepo.getByUserOriginId(
+        userId,
+        originPageId,
+      );
+
+      if (!pages) {
+        throw new NotFoundException('Page not found');
+      }
+
+      for (const page of pages) {
+        await this.pageRepo.deletePage(page.id);
+      }
+    });
   }
 
   async findByReferenceId(pageId: string): Promise<SynchronizedPage> {

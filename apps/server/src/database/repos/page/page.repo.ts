@@ -250,4 +250,25 @@ export class PageRepo {
       .selectAll()
       .execute();
   }
+
+  // async getAllChildren(pageId: string): Promise<Page[]> {
+  //   const descendants = this.db
+  //     .withRecursive('descendants', (cte) => {
+  //       return this.db
+  //         .selectFrom('pages')
+  //         .selectAll()
+  //         .where('parentPageId', '=', pageId)
+  //         .unionAll(
+  //           this.db
+  //             .selectFrom('pages')
+  //             .selectAll()
+  //             .innerJoin('descendants as d', 'pages.parentPageId', 'd.id'),
+  //         );
+  //     })
+  //     .selectFrom('descendants')
+  //     .selectAll()
+  //     .execute();
+
+  //   return descendants;
+  // }
 }

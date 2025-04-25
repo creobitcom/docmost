@@ -47,6 +47,8 @@ import { CreateSyncPageDto } from './dto/create-sync-page.dto';
 import { SynchronizedPageService } from './services/synchronized-page.service';
 import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
+import { SpaceService } from '../space/services/space.service';
+import { GroupUserRepo } from '@docmost/db/repos/group/group-user.repo';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -58,8 +60,10 @@ export class PageController {
     private readonly pageRepo: PageRepo,
     private readonly pageHistoryService: PageHistoryService,
     private readonly spaceAbility: SpaceAbilityFactory,
+    private readonly spaceService: SpaceService,
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
+    private readonly groupUserRepo: GroupUserRepo,
   ) {}
 
   @HttpCode(HttpStatus.OK)
@@ -181,6 +185,19 @@ export class PageController {
     if (pageAbility.cannot(PageCaslAction.Delete, PageCaslSubject.Page)) {
       throw new ForbiddenException();
     }
+
+    if (page.isSynced) {
+      const originPage = await this.syncPageService.findByReferenceId(
+        pageIdDto.pageId,
+      );
+
+      await this.pageMemberService.removeMemberFromPage({
+        pageId: originPage.originPageId,
+        userId: user.id,
+        groupId: undefined,
+      });
+    }
+
     await this.pageService.forceDelete(pageIdDto.pageId);
   }
 
@@ -227,6 +244,33 @@ export class PageController {
     const ability = await this.pageAbility.createForUser(user, dto.pageId);
     if (ability.cannot(PageCaslAction.Manage, PageCaslSubject.Member)) {
       throw new ForbiddenException();
+    }
+
+    for (const userId of dto.userIds) {
+      const userPersonalSpace =
+        await this.spaceService.getUserPersonalSpace(userId);
+
+      await this.syncPageService.create(
+        { spaceId: userPersonalSpace.id, originPageId: dto.pageId },
+        user.id,
+        workspace.id,
+      );
+    }
+
+    for (const groupId of dto.groupIds) {
+      const groupUsers = await this.groupUserRepo.getGroupUsers(groupId);
+
+      for (const groupUser of groupUsers) {
+        const userPersonalSpace = await this.spaceService.getUserPersonalSpace(
+          groupUser.id,
+        );
+
+        await this.syncPageService.create(
+          { spaceId: userPersonalSpace.id, originPageId: dto.pageId },
+          user.id,
+          workspace.id,
+        );
+      }
     }
 
     return this.pageMemberService.addMembersToPageBatch(
@@ -450,6 +494,21 @@ export class PageController {
     const ability = await this.pageAbility.createForUser(user, dto.pageId);
     if (ability.cannot(PageCaslAction.Manage, PageCaslSubject.Member)) {
       throw new ForbiddenException();
+    }
+
+    if (dto.userId) {
+      await this.syncPageService.removeByUserIdOriginId(dto.userId, dto.pageId);
+    }
+
+    if (dto.groupId) {
+      const groupUsers = await this.groupUserRepo.getGroupUsers(dto.groupId);
+
+      for (const groupUser of groupUsers) {
+        await this.syncPageService.removeByUserIdOriginId(
+          groupUser.id,
+          dto.pageId,
+        );
+      }
     }
 
     return this.pageMemberService.removeMemberFromPage(dto);

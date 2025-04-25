@@ -46,6 +46,22 @@ export class GroupUserRepo {
       .executeTakeFirst();
   }
 
+  async getGroupUsers(groupId: string) {
+    const result = await this.db
+      .selectFrom('groupUsers')
+      .innerJoin('users', 'users.id', 'groupUsers.userId')
+      .selectAll('users')
+      .where('groupId', '=', groupId)
+      .orderBy('createdAt', 'asc')
+      .execute();
+
+    result.map((user) => {
+      delete user.password;
+    });
+
+    return result;
+  }
+
   async getGroupUsersPaginated(groupId: string, pagination: PaginationOptions) {
     let query = this.db
       .selectFrom('groupUsers')

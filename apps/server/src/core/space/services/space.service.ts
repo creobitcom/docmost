@@ -148,4 +148,13 @@ export class SpaceService {
     await this.spaceRepo.deleteSpace(spaceId, workspaceId);
     await this.attachmentQueue.add(QueueJob.DELETE_SPACE_ATTACHMENTS, space);
   }
+
+  async getUserPersonalSpace(userId: string): Promise<Space> {
+    const space = await this.spaceRepo.getUserPersonalSpace(userId);
+    if (!space) {
+      throw new NotFoundException('Personal space not found');
+    }
+
+    return space;
+  }
 }

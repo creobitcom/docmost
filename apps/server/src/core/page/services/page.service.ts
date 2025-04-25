@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreatePageDto } from '../dto/create-page.dto';
@@ -396,6 +397,37 @@ export class PageService {
 
       await this.pageRepo.deletePage(pageId, trx);
     });
+  }
+
+  async getAllChildren(pageId: string): Promise<any[]> {
+    const allDescendants: any[] = [];
+    let pageQueue: string[] = [pageId];
+    const processedIds = new Set<string>();
+
+    while (pageQueue.length > 0) {
+      const currentBatch = [...pageQueue];
+      pageQueue = [];
+
+      const idsToQuery = currentBatch;
+      if (idsToQuery.length === 0) continue;
+
+      const children = await this.db
+        .selectFrom('pages')
+        .select(['id', 'title', 'icon'])
+        .where('parentPageId', 'in', idsToQuery)
+        .execute();
+
+      allDescendants.push(...children);
+
+      for (const child of children) {
+        if (!processedIds.has(child.id)) {
+          processedIds.add(child.id);
+          pageQueue.push(child.id);
+        }
+      }
+    }
+
+    return allDescendants;
   }
 }
 

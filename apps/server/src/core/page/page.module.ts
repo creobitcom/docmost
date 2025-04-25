@@ -5,8 +5,10 @@ import { PageHistoryService } from './services/page-history.service';
 import { PageMemberService } from './services/page-member.service';
 import { SynchronizedPageService } from './services/synchronized-page.service';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
+import { SpaceModule } from '../space/space.module';
 
 @Module({
+  imports: [SpaceModule],
   controllers: [PageController],
   providers: [
     PageService,

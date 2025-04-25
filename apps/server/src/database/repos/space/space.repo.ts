@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB, KyselyTransaction } from '@docmost/db/types/kysely.types';
 import { dbOrTx } from '@docmost/db/utils';
@@ -155,5 +155,19 @@ export class SpaceRepo {
       .where('id', '=', spaceId)
       .where('workspaceId', '=', workspaceId)
       .execute();
+  }
+
+  async getUserPersonalSpace(userId: string): Promise<Space> {
+    const space = await this.db
+      .selectFrom('spaces')
+      .selectAll('spaces')
+      .where('ownerId', '=', userId)
+      .executeTakeFirst();
+
+    if (!space) {
+      throw new NotFoundException('Personal space not found');
+    }
+
+    return space;
   }
 }
