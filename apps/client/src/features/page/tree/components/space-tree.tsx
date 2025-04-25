@@ -62,6 +62,7 @@ import ExportModal from "@/components/common/export-modal";
 import PageShareModal from "../../components/share-modal";
 import MovePageModal from "../../components/move-page-modal.tsx";
 import CreateSyncPageModal from "../../components/create-sync-page-modal.tsx";
+import { syncIndicatorColorAtom } from "../atoms/tree-color-atom.ts";
 
 interface SpaceTreeProps {
   spaceId: string;
@@ -242,6 +243,10 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
   const timerRef = useRef(null);
   const { t } = useTranslation();
 
+  const [syncIndicatorColor, setSyncIndicatorColor] = useAtom(
+    syncIndicatorColorAtom,
+  );
+
   const prefetchPage = () => {
     timerRef.current = setTimeout(() => {
       queryClient.prefetchQuery({
@@ -359,7 +364,13 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
         onMouseEnter={prefetchPage}
         onMouseLeave={cancelPagePrefetch}
       >
-        {node.data.isSynced && <i className={classes.syncIndicator}></i>}
+        {node.data.isSynced && (
+          <i
+            className={classes.syncIndicator}
+            style={{ backgroundColor: syncIndicatorColor }}
+          ></i>
+        )}
+
         <PageArrow node={node} onExpandTree={() => handleLoadChildren(node)} />
         <div onClick={handleEmojiIconClick} style={{ marginRight: "4px" }}>
           <EmojiPicker

@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  ColorInput,
   Group,
   Menu,
   Text,
@@ -38,6 +39,7 @@ import PageImportModal from "@/features/page/components/page-import-modal.tsx";
 import { useTranslation } from "react-i18next";
 import { SwitchSpace } from "./switch-space";
 import ExportModal from "@/components/common/export-modal";
+import { syncIndicatorColorAtom } from "@/features/page/tree/atoms/tree-color-atom";
 
 export function SpaceSidebar() {
   const { t } = useTranslation();
@@ -47,6 +49,10 @@ export function SpaceSidebar() {
     useDisclosure(false);
   const { spaceSlug } = useParams();
   const { data: space, isLoading, isError } = useGetSpaceBySlugQuery(spaceSlug);
+
+  const [syncIndicatorColor, setSyncIndicatorColor] = useAtom(
+    syncIndicatorColorAtom,
+  );
 
   const spaceRules = space?.membership?.permissions;
   const spaceAbility = useSpaceAbility(spaceRules);
@@ -137,6 +143,15 @@ export function SpaceSidebar() {
             )}
           </div>
         </div>
+
+        <ColorInput
+          value={syncIndicatorColor}
+          onChange={setSyncIndicatorColor}
+          format="hex"
+          swatches={["#4caf50", "#00b894", "#0984e3", "#d63031", "#fdcb6e"]}
+          size="xs"
+          styles={{ input: { cursor: "pointer" } }}
+        />
 
         <div className={clsx(classes.section, classes.sectionPages)}>
           <Group className={classes.pagesHeader} justify="space-between">
