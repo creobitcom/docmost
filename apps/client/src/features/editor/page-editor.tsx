@@ -215,7 +215,7 @@ export default function PageEditor({
             // @ts-ignore
             setEditor(editor);
             editor.storage.pageId = pageId;
-            setPageId(pageId); // <<<<< Вот здесь сохраняем!
+            setPageId(pageId);
           }
         }
       },
@@ -334,7 +334,7 @@ export default function PageEditor({
           zIndex: 9999,
         }}
         onClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => e.preventDefault()} // предотвращаем повторный вызов
+        onContextMenu={(e) => e.preventDefault()}
       >
 
       </div>
