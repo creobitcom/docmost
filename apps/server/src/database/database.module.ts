@@ -26,6 +26,7 @@ import { UserTokenRepo } from './repos/user-token/user-token.repo';
 import { BacklinkRepo } from '@docmost/db/repos/backlink/backlink.repo';
 import { PageMemberRepo } from './repos/page/page-member.repo';
 import { SynchronizedPageRepo } from './repos/page/synchronized_page.repo';
+import { DbService } from './services/db.service';
 
 // https://github.com/brianc/node-postgres/issues/811
 types.setTypeParser(types.builtins.INT8, (val) => Number(val));
@@ -63,6 +64,7 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     }),
   ],
   providers: [
+    DbService,
     MigrationService,
     WorkspaceRepo,
     UserRepo,
@@ -80,6 +82,7 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     SynchronizedPageRepo,
   ],
   exports: [
+    DbService,
     WorkspaceRepo,
     UserRepo,
     GroupRepo,

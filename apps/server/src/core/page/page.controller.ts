@@ -30,6 +30,7 @@ import {
 } from '../casl/interfaces/space-ability.type';
 import SpaceAbilityFactory from '../casl/abilities/space-ability.factory';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
+
 import { RecentPageDto } from './dto/recent-page.dto';
 import PageAbilityFactory from '../casl/abilities/page-ability.factory';
 import {
@@ -47,6 +48,8 @@ import { CreateSyncPageDto } from './dto/create-sync-page.dto';
 import { SynchronizedPageService } from './services/synchronized-page.service';
 import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
+import { SaveBlockPermissionDto } from './dto/save-block-permission.dto';
+import { BlockPermissionService } from './services/block-permission.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -60,8 +63,23 @@ export class PageController {
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
+    private readonly blockPermissionService: BlockPermissionService, // Добавить это
   ) {}
 
+  @HttpCode(HttpStatus.OK)
+  @Post('/block-permissions')
+  async saveBlockPermission(
+    @Body() dto: SaveBlockPermissionDto,
+    @AuthUser() user: User,
+  ) {
+    const pageAbility = await this.pageAbility.createForUser(user, dto.pageId);
+
+    if (pageAbility.cannot(PageCaslAction.Manage, PageCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    return this.blockPermissionService.saveBlockPermission(dto);
+  }
   @HttpCode(HttpStatus.OK)
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {

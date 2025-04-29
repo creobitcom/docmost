@@ -52,7 +52,8 @@ import { IPage } from "@/features/page/types/page.types.ts";
 import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
-import { jwtDecode } from "jwt-decode";
+import { CustomParagraph } from "@/features/editor/extensions/custom-paragraph.ts";
+import { v4 as uuidv4 } from 'uuid';
 
 interface PageEditorProps {
   pageId: string;
@@ -84,7 +85,10 @@ export default function PageEditor({
   const documentState = useDocumentVisibility();
   const [isCollabReady, setIsCollabReady] = useState(false);
   const { pageSlug } = useParams();
+  const collabRetryCount = useRef(0);
   const slugId = extractPageSlugId(pageSlug);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; Id: string } | null>(null);
+
 
   const localProvider = useMemo(() => {
     const provider = new IndexeddbPersistence(documentName, ydoc);
@@ -96,6 +100,7 @@ export default function PageEditor({
     return provider;
   }, [pageId, ydoc]);
 
+
   const remoteProvider = useMemo(() => {
     const provider = new HocuspocusProvider({
       name: documentName,
@@ -105,11 +110,13 @@ export default function PageEditor({
       connect: false,
       preserveConnection: false,
       onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
-        const payload = jwtDecode(collabQuery?.token);
-        const now = Date.now().valueOf() / 1000;
-        const isTokenExpired = now >= payload.exp;
-        if (isTokenExpired) {
-          refetchCollabToken();
+        collabRetryCount.current = collabRetryCount.current + 1;
+        refetchCollabToken().then(() => {
+          collabRetryCount.current = 0;
+        });
+
+        if (collabRetryCount.current > 20) {
+          window.location.reload();
         }
       },
       onStatus: (status) => {
@@ -130,6 +137,14 @@ export default function PageEditor({
     return provider;
   }, [ydoc, pageId, collabQuery?.token]);
 
+  useEffect(() => {
+    const handleClick = () => {
+      setContextMenu(null);
+    };
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
+
   useLayoutEffect(() => {
     remoteProvider.connect();
     return () => {
@@ -144,6 +159,7 @@ export default function PageEditor({
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
+      CustomParagraph,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
@@ -195,7 +211,6 @@ export default function PageEditor({
       onUpdate({ editor }) {
         if (editor.isEmpty) return;
         const editorJson = editor.getJSON();
-        //update local page cache to reduce flickers
         debouncedUpdateContent(editorJson);
       },
     },
@@ -205,11 +220,17 @@ export default function PageEditor({
   const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
     const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
 
+    if (
+      !newContent ||
+      JSON.stringify(newContent) === JSON.stringify({ type: "doc", content: [] })
+    ) {
+      return;
+    }
+
     if (pageData) {
       queryClient.setQueryData(["pages", slugId], {
         ...pageData,
         content: newContent,
-        updatedAt: new Date(),
       });
     }
   }, 3000);
@@ -227,10 +248,7 @@ export default function PageEditor({
   useEffect(() => {
     document.addEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
     return () => {
-      document.removeEventListener(
-        "ACTIVE_COMMENT_EVENT",
-        handleActiveCommentEvent,
-      );
+      document.removeEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
     };
   }, []);
 
@@ -264,13 +282,14 @@ export default function PageEditor({
       documentState === "visible" &&
       remoteProvider?.status === WebSocketStatus.Disconnected
     ) {
-      resetIdle();
-      remoteProvider.connect();
-      setTimeout(() => {
-        setIsCollabReady(true);
-      }, 600);
+      const reconnectTimeout = setTimeout(() => {
+        remoteProvider.connect();
+        resetIdle();
+      }, collabRetryCount.current > 2 ? 3000 : 0);
+
+      return () => clearTimeout(reconnectTimeout);
     }
-  }, [isIdle, documentState, remoteProvider]);
+  }, [isIdle, documentState, remoteProvider?.status]);
 
   const isSynced = isLocalSynced && isRemoteSynced;
 
@@ -279,7 +298,7 @@ export default function PageEditor({
       if (
         !isCollabReady &&
         isSynced &&
-        remoteProvider?.status === WebSocketStatus.Connected
+        remoteProvider.status === WebSocketStatus.Connected
       ) {
         setIsCollabReady(true);
       }
@@ -291,7 +310,29 @@ export default function PageEditor({
     <div>
       <div ref={menuContainerRef}>
         <EditorContent editor={editor} />
-
+        {contextMenu && (
+  <div
+    style={{
+      position: "absolute",
+      top: contextMenu.y,
+      left: contextMenu.x,
+      background: "#fff",
+      border: "1px solid #ccc",
+      borderRadius: "6px",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      zIndex: 9999,
+      padding: "8px 12px",
+    }}
+    onClick={(e) => {
+      e.stopPropagation();
+      alert(`Context action: Block ID - ${contextMenu.Id}`);
+      setContextMenu(null); // hiding after click
+    }}
+    onContextMenu={(e) => e.preventDefault()} // previnting recursive context
+  >
+    Context action: Block ID
+  </div>
+)}
         {editor && editor.isEditable && (
           <div>
             <EditorBubbleMenu editor={editor} />

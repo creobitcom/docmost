@@ -74,4 +74,23 @@ function redirectToLogin() {
   }
 }
 
+
 export default api;
+export const assignPermissionToBlock = async ({
+  pageId,
+  blockId,
+  userId,
+  role,
+}: {
+  pageId: string;
+  blockId: string;
+  userId: string;
+  role: string;
+}) => {
+  return axios.post("/api/page-permissions", {
+    pageId,
+    blockId,
+    userId,
+    role,
+  });
+};

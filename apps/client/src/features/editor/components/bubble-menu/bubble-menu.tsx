@@ -12,6 +12,7 @@ import {
   IconStrikethrough,
   IconUnderline,
   IconMessage,
+  IconSearch,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import classes from "./bubble-menu.module.css";
@@ -26,31 +27,36 @@ import {
 import { useAtom } from "jotai";
 import { v7 as uuid7 } from "uuid";
 import { isCellSelection, isTextSelected } from "@docmost/editor-ext";
-import { LinkSelector } from "@/features/editor/components/bubble-menu/link-selector.tsx";
+import { LinkSelector } from "@/features/editor/components/bubble-menu/link-selector";
 import { useTranslation } from "react-i18next";
-
-export interface BubbleMenuItem {
-  name: string;
-  isActive: () => boolean;
-  command: () => void;
-  icon: typeof IconBold;
-}
+import { ContextMenu } from "./ContextMenu";
+import { SearchMenu } from "./SearchMenu";
 
 type EditorBubbleMenuProps = Omit<BubbleMenuProps, "children" | "editor"> & {
   editor: ReturnType<typeof useEditor>;
 };
+
+// ...импорты остаются без изменений
 
 export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
   const { t } = useTranslation();
   const [showCommentPopup, setShowCommentPopup] = useAtom(showCommentPopupAtom);
   const [, setDraftCommentId] = useAtom(draftCommentIdAtom);
   const showCommentPopupRef = useRef(showCommentPopup);
+  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+
+
+
 
   useEffect(() => {
     showCommentPopupRef.current = showCommentPopup;
   }, [showCommentPopup]);
 
-  const items: BubbleMenuItem[] = [
+  const items = [
     {
       name: "Bold",
       isActive: () => props.editor.isActive("bold"),
@@ -83,7 +89,34 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
     },
   ];
 
-  const commentItem: BubbleMenuItem = {
+  const handleContextAction = (action: string) => {
+    if (action === "Block ID") {
+      const { state } = props.editor;
+      const { selection } = state;
+
+      let foundNode = null;
+
+      state.doc.descendants((node, pos) => {
+        if (
+          pos <= selection.from &&
+          selection.to <= pos + node.nodeSize &&
+          node.attrs?.id
+        ) {
+          foundNode = node;
+          return false;
+        }
+        return true;
+      });
+
+      if (foundNode?.attrs?.id) {
+        console.log("Block ID:", foundNode.attrs.id);
+      } else {
+        console.log("ID not found for selected block");
+      }
+    }
+  };
+
+  const commentItem = {
     name: "Comment",
     isActive: () => props.editor.isActive("comment"),
     command: () => {
@@ -113,15 +146,6 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
         return false;
       }
       return isTextSelected(editor);
-    },
-    tippyOptions: {
-      moveTransition: "transform 0.15s ease-out",
-      onHide: () => {
-        setIsNodeSelectorOpen(false);
-        setIsTextAlignmentOpen(false);
-        setIsColorSelectorOpen(false);
-        setIsLinkSelectorOpen(false);
-      },
     },
   };
 
@@ -159,7 +183,6 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           {items.map((item, index) => (
             <Tooltip key={index} label={t(item.name)} withArrow>
               <ActionIcon
-                key={index}
                 variant="default"
                 size="lg"
                 radius="0"
@@ -172,7 +195,42 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
               </ActionIcon>
             </Tooltip>
           ))}
+
+          <ContextMenu
+            isOpen={isContextMenuOpen}
+            setIsOpen={setIsContextMenuOpen}
+            onSelect={handleContextAction}
+            editor={props.editor}
+          />
+
         </ActionIcon.Group>
+
+        {showSearch && (
+          <div
+            style={{
+              marginTop: "8px",
+              background: "white",
+              border: "1px solid #ccc",
+              padding: "8px",
+              borderRadius: "4px",
+              width: "200px",
+              boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+            }}
+          >
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                border: "1px solid #ccc",
+                borderRadius: "4px",
+              }}
+            />
+          </div>
+        )}
 
         <LinkSelector
           editor={props.editor}
@@ -206,7 +264,53 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
         >
           <IconMessage size={16} stroke={2} />
         </ActionIcon>
+        <Tooltip label="Search Users" withArrow>
+  <ActionIcon
+    variant="default"
+    size="lg"
+    radius="0"
+    aria-label="Search"
+    style={{ border: "none" }}
+    onClick={() => {
+      setIsSearchOpen((prev) => !prev);
+      setIsColorSelectorOpen(false);
+      setIsLinkSelectorOpen(false);
+      setIsNodeSelectorOpen(false);
+      setIsTextAlignmentOpen(false);
+    }}
+    ref={searchButtonRef}
+  >
+    <IconSearch size={16} stroke={2} />
+  </ActionIcon>
+</Tooltip>
+
+{isSearchOpen && (
+  <div
+    style={{
+      position: "absolute",
+      top: "100%",
+      left: 0,
+      zIndex: 10,
+      backgroundColor: "white",
+      border: "1px solid #ccc",
+      borderRadius: "4px",
+      padding: "8px",
+      marginTop: "8px",
+      boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+      width: "250px",
+    }}
+  >
+    <SearchMenu
+      onSelect={(user) => {
+        console.log("Выбран пользователь:", user);
+        setIsSearchOpen(false);
+      }}
+    />
+  </div>
+)}
+
       </div>
     </BubbleMenu>
   );
 };
+
