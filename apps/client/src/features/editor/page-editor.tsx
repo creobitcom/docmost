@@ -53,7 +53,8 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { CustomParagraph } from "@/features/editor/extensions/custom-paragraph.ts";
-import { v4 as uuidv4 } from 'uuid';
+
+
 
 interface PageEditorProps {
   pageId: string;
@@ -66,6 +67,7 @@ export default function PageEditor({
   editable,
   content,
 }: PageEditorProps) {
+  const [, setPageId] = useState<string | null>(null);
   const collaborationURL = useCollaborationUrl();
   const [currentUser] = useAtom(currentUserAtom);
   const [, setEditor] = useAtom(pageEditorAtom);
@@ -136,6 +138,9 @@ export default function PageEditor({
 
     return provider;
   }, [ydoc, pageId, collabQuery?.token]);
+  useEffect(() => {
+    setPageId(pageId);
+  }, [pageId]);
 
   useEffect(() => {
     const handleClick = () => {
@@ -206,6 +211,12 @@ export default function PageEditor({
           // @ts-ignore
           setEditor(editor);
           editor.storage.pageId = pageId;
+          if (editor) {
+            // @ts-ignore
+            setEditor(editor);
+            editor.storage.pageId = pageId;
+            setPageId(pageId); // <<<<< Вот здесь сохраняем!
+          }
         }
       },
       onUpdate({ editor }) {
@@ -311,28 +322,23 @@ export default function PageEditor({
       <div ref={menuContainerRef}>
         <EditorContent editor={editor} />
         {contextMenu && (
-  <div
-    style={{
-      position: "absolute",
-      top: contextMenu.y,
-      left: contextMenu.x,
-      background: "#fff",
-      border: "1px solid #ccc",
-      borderRadius: "6px",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-      zIndex: 9999,
-      padding: "8px 12px",
-    }}
-    onClick={(e) => {
-      e.stopPropagation();
-      alert(`Context action: Block ID - ${contextMenu.Id}`);
-      setContextMenu(null); // hiding after click
-    }}
-    onContextMenu={(e) => e.preventDefault()} // previnting recursive context
-  >
-    Context action: Block ID
-  </div>
-)}
+      <div
+        style={{
+          position: "absolute",
+          top: contextMenu.y,
+          left: contextMenu.x,
+          background: "#fff",
+          border: "1px solid #ccc",
+          borderRadius: "6px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          zIndex: 9999,
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()} // предотвращаем повторный вызов
+      >
+
+      </div>
+    )}
         {editor && editor.isEditable && (
           <div>
             <EditorBubbleMenu editor={editor} />
@@ -356,6 +362,7 @@ export default function PageEditor({
       ></div>
     </div>
   ) : (
+
     <EditorProvider
       editable={false}
       immediatelyRender={true}

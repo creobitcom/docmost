@@ -9,7 +9,19 @@ import { BlockPermissionService } from './services/block-permission.service';
 
 @Module({
   controllers: [PageController],
-  providers: [PageService, PageHistoryService],
-  exports: [PageService, PageHistoryService],
+  providers: [
+    PageService,
+    PageHistoryService,
+    PageMemberService,
+    SynchronizedPageService,
+    BlockPermissionService,
+  ],
+  exports: [
+    PageService,
+    PageHistoryService,
+    PageMemberService,
+    SynchronizedPageService,
+    BlockPermissionService,
+  ],
 })
 export class PageModule {}

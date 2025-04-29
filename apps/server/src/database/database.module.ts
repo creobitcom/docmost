@@ -27,6 +27,8 @@ import { BacklinkRepo } from '@docmost/db/repos/backlink/backlink.repo';
 import { PageMemberRepo } from './repos/page/page-member.repo';
 import { SynchronizedPageRepo } from './repos/page/synchronized_page.repo';
 import { DbService } from './services/db.service';
+import {BlockPermissionRepo} from '../database/repos/page/BlockMember.repo'
+import {BlockAbilityFactory} from '../core/casl/abilities/block-ability.factory'
 
 // https://github.com/brianc/node-postgres/issues/811
 types.setTypeParser(types.builtins.INT8, (val) => Number(val));
@@ -64,6 +66,8 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     }),
   ],
   providers: [
+    BlockPermissionRepo,
+    BlockAbilityFactory,
     DbService,
     MigrationService,
     WorkspaceRepo,
@@ -82,6 +86,8 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     SynchronizedPageRepo,
   ],
   exports: [
+    BlockPermissionRepo,
+    BlockAbilityFactory,
     DbService,
     WorkspaceRepo,
     UserRepo,

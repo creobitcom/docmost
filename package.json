@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@docmost/editor-ext": "workspace:*",
+    "@fastify/cors": "^11.0.1",
     "@hocuspocus/extension-redis": "^2.15.2",
     "@hocuspocus/provider": "^2.15.2",
     "@hocuspocus/server": "^2.15.2",

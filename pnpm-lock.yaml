@@ -19,6 +19,9 @@ importers:
       '@docmost/editor-ext':
         specifier: workspace:*
         version: link:packages/editor-ext
+      '@fastify/cors':
+        specifier: ^11.0.1
+        version: 11.0.1
       '@hocuspocus/extension-redis':
         specifier: ^2.15.2
         version: 2.15.2(y-protocols@1.0.6(yjs@13.6.20))(yjs@13.6.20)
@@ -2258,6 +2261,9 @@ packages:
 
   '@fastify/cors@10.0.2':
     resolution: {integrity: sha512-DGdxOG36sS/tZv1NFiCJGi7wGuXOSPL2CmNX5PbOVKx0C6LuIALRMrqLByHTCcX1Rbl8NJ9IWlJex32bzydvlw==}
+
+  '@fastify/cors@11.0.1':
+    resolution: {integrity: sha512-dmZaE7M1f4SM8ZZuk5RhSsDJ+ezTgI7v3HHRj8Ow9CneczsPLZV6+2j2uwdaSLn8zhTv6QV0F4ZRcqdalGx1pQ==}
 
   '@fastify/deepmerge@2.0.2':
     resolution: {integrity: sha512-3wuLdX5iiiYeZWP6bQrjqhrcvBIf0NHbQH1Ur1WbHvoiuTYUEItgygea3zs8aHpiitn0lOB8gX20u1qO+FDm7Q==}
@@ -11229,6 +11235,11 @@ snapshots:
     dependencies:
       fastify-plugin: 5.0.1
       mnemonist: 0.39.8
+
+  '@fastify/cors@11.0.1':
+    dependencies:
+      fastify-plugin: 5.0.1
+      toad-cache: 3.7.0
 
   '@fastify/deepmerge@2.0.2': {}
 

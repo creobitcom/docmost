@@ -28,142 +28,142 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface Attachments {
-  created_at: Generated<Timestamp>;
-  creator_id: string;
-  deleted_at: Timestamp | null;
-  file_ext: string;
-  file_name: string;
-  file_path: string;
-  file_size: Int8 | null;
+  createdAt: Generated<Timestamp>;
+  creatorId: string;
+  deletedAt: Timestamp | null;
+  fileExt: string;
+  fileName: string;
+  filePath: string;
+  fileSize: Int8 | null;
   id: Generated<string>;
-  mime_type: string | null;
-  page_id: string | null;
-  space_id: string | null;
+  mimeType: string | null;
+  pageId: string | null;
+  spaceId: string | null;
   type: string | null;
-  updated_at: Generated<Timestamp>;
-  workspace_id: string;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
 }
 
 export interface AuthAccounts {
-  auth_provider_id: string | null;
-  created_at: Generated<Timestamp>;
-  deleted_at: Timestamp | null;
+  authProviderId: string | null;
+  createdAt: Generated<Timestamp>;
+  deletedAt: Timestamp | null;
   id: Generated<string>;
-  provider_user_id: string;
-  updated_at: Generated<Timestamp>;
-  user_id: string;
-  workspace_id: string;
+  providerUserId: string;
+  updatedAt: Generated<Timestamp>;
+  userId: string;
+  workspaceId: string;
 }
 
 export interface AuthProviders {
-  allow_signup: Generated<boolean>;
-  created_at: Generated<Timestamp>;
-  creator_id: string | null;
-  deleted_at: Timestamp | null;
+  allowSignup: Generated<boolean>;
+  createdAt: Generated<Timestamp>;
+  creatorId: string | null;
+  deletedAt: Timestamp | null;
   id: Generated<string>;
-  is_enabled: Generated<boolean>;
+  isEnabled: Generated<boolean>;
   name: string;
-  oidc_client_id: string | null;
-  oidc_client_secret: string | null;
-  oidc_issuer: string | null;
-  saml_certificate: string | null;
-  saml_url: string | null;
+  oidcClientId: string | null;
+  oidcClientSecret: string | null;
+  oidcIssuer: string | null;
+  samlCertificate: string | null;
+  samlUrl: string | null;
   type: AuthProviderType;
-  updated_at: Generated<Timestamp>;
-  workspace_id: string;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
 }
 
 export interface Backlinks {
-  created_at: Generated<Timestamp>;
+  createdAt: Generated<Timestamp>;
   id: Generated<string>;
-  source_page_id: string;
-  target_page_id: string;
-  updated_at: Generated<Timestamp>;
-  workspace_id: string;
+  sourcePageId: string;
+  targetPageId: string;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
 }
 
 export interface Billing {
   amount: Int8 | null;
-  cancel_at: Timestamp | null;
-  cancel_at_period_end: boolean | null;
-  canceled_at: Timestamp | null;
-  created_at: Generated<Timestamp>;
+  cancelAt: Timestamp | null;
+  cancelAtPeriodEnd: boolean | null;
+  canceledAt: Timestamp | null;
+  createdAt: Generated<Timestamp>;
   currency: string | null;
-  deleted_at: Timestamp | null;
-  ended_at: Timestamp | null;
+  deletedAt: Timestamp | null;
+  endedAt: Timestamp | null;
   id: Generated<string>;
   interval: string | null;
   metadata: Json | null;
-  period_end_at: Timestamp | null;
-  period_start_at: Timestamp;
+  periodEndAt: Timestamp | null;
+  periodStartAt: Timestamp;
   quantity: Int8 | null;
   status: string;
-  stripe_customer_id: string | null;
-  stripe_item_id: string | null;
-  stripe_price_id: string | null;
-  stripe_product_id: string | null;
-  stripe_subscription_id: string;
-  updated_at: Generated<Timestamp>;
-  workspace_id: string;
+  stripeCustomerId: string | null;
+  stripeItemId: string | null;
+  stripePriceId: string | null;
+  stripeProductId: string | null;
+  stripeSubscriptionId: string;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
 }
 
 export interface BlockPermissions {
-  block_id: string;
-  created_at: Generated<Timestamp | null>;
+  blockId: string;
+  createdAt: Generated<Timestamp | null>;
   id: Generated<string>;
-  page_id: string;
+  pageId: string;
   permission: string;
   role: string | null;
-  updated_at: Generated<Timestamp | null>;
-  user_id: string | null;
+  updatedAt: Generated<Timestamp | null>;
+  userId: string | null;
 }
 
 export interface Comments {
   content: Json | null;
-  created_at: Generated<Timestamp>;
-  creator_id: string | null;
-  deleted_at: Timestamp | null;
-  edited_at: Timestamp | null;
+  createdAt: Generated<Timestamp>;
+  creatorId: string | null;
+  deletedAt: Timestamp | null;
+  editedAt: Timestamp | null;
   id: Generated<string>;
-  page_id: string;
-  parent_comment_id: string | null;
-  resolved_at: Timestamp | null;
+  pageId: string;
+  parentCommentId: string | null;
+  resolvedAt: Timestamp | null;
   selection: string | null;
   type: string | null;
-  workspace_id: string;
+  workspaceId: string;
 }
 
 export interface Groups {
-  created_at: Generated<Timestamp>;
-  creator_id: string | null;
-  deleted_at: Timestamp | null;
+  createdAt: Generated<Timestamp>;
+  creatorId: string | null;
+  deletedAt: Timestamp | null;
   description: string | null;
   id: Generated<string>;
-  is_default: boolean;
+  isDefault: boolean;
   name: string;
-  updated_at: Generated<Timestamp>;
-  workspace_id: string;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
 }
 
 export interface GroupUsers {
-  created_at: Generated<Timestamp>;
-  group_id: string;
+  createdAt: Generated<Timestamp>;
+  groupId: string;
   id: Generated<string>;
-  updated_at: Generated<Timestamp>;
-  user_id: string;
+  updatedAt: Generated<Timestamp>;
+  userId: string;
 }
 
 export interface PageHistory {
   content: Json | null;
-  cover_photo: string | null;
-  created_at: Generated<Timestamp>;
+  coverPhoto: string | null;
+  createdAt: Generated<Timestamp>;
   icon: string | null;
   id: Generated<string>;
-  last_updated_by_id: string | null;
-  page_id: string;
+  lastUpdatedById: string | null;
+  pageId: string;
   slug: string | null;
-  slug_id: string | null;
-  space_id: string;
+  slugId: string | null;
+  spaceId: string;
   title: string | null;
   updatedAt: Generated<Timestamp>;
   version: number | null;
@@ -184,12 +184,12 @@ export interface PageMembers {
 
 export interface Pages {
   content: Json | null;
-  contributor_ids: Generated<string[] | null>;
-  cover_photo: string | null;
-  created_at: Generated<Timestamp>;
-  creator_id: string | null;
-  deleted_at: Timestamp | null;
-  deleted_by_id: string | null;
+  contributorIds: Generated<string[] | null>;
+  coverPhoto: string | null;
+  createdAt: Generated<Timestamp>;
+  creatorId: string | null;
+  deletedAt: Timestamp | null;
+  deletedById: string | null;
   icon: string | null;
   id: Generated<string>;
   isLocked: Generated<boolean>;
@@ -197,39 +197,39 @@ export interface Pages {
   lastUpdatedById: string | null;
   parentPageId: string | null;
   position: string | null;
-  slug_id: string;
-  space_id: string;
-  text_content: string | null;
+  slugId: string;
+  spaceId: string;
+  textContent: string | null;
   title: string | null;
   tsv: string | null;
-  updated_at: Generated<Timestamp>;
-  workspace_id: string;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
   ydoc: Buffer | null;
 }
 
 export interface SpaceMembers {
-  added_by_id: string | null;
-  created_at: Generated<Timestamp>;
-  deleted_at: Timestamp | null;
-  group_id: string | null;
+  addedById: string | null;
+  createdAt: Generated<Timestamp>;
+  deletedAt: Timestamp | null;
+  groupId: string | null;
   id: Generated<string>;
   role: string;
-  space_id: string;
-  updated_at: Generated<Timestamp>;
-  user_id: string | null;
+  spaceId: string;
+  updatedAt: Generated<Timestamp>;
+  userId: string | null;
 }
 
 export interface Spaces {
-  created_at: Generated<Timestamp>;
-  creator_id: string | null;
-  default_role: Generated<string>;
-  deleted_at: Timestamp | null;
+  createdAt: Generated<Timestamp>;
+  creatorId: string | null;
+  defaultRole: Generated<string>;
+  deletedAt: Timestamp | null;
   description: string | null;
   id: Generated<string>;
   logo: string | null;
   name: string | null;
   slug: string;
-  updated_at: Generated<Timestamp>;
+  updatedAt: Generated<Timestamp>;
   visibility: Generated<string>;
   workspaceId: string;
 }
@@ -241,91 +241,90 @@ export interface SynchronizedPages {
 }
 
 export interface Users {
-  avatar_url: string | null;
-  created_at: Generated<Timestamp>;
-  deactivated_at: Timestamp | null;
-  deleted_at: Timestamp | null;
+  avatarUrl: string | null;
+  createdAt: Generated<Timestamp>;
+  deactivatedAt: Timestamp | null;
+  deletedAt: Timestamp | null;
   email: string;
-  email_verified_at: Timestamp | null;
+  emailVerifiedAt: Timestamp | null;
   id: Generated<string>;
-  invited_by_id: string | null;
-  last_active_at: Timestamp | null;
-  last_login_at: Timestamp | null;
+  invitedById: string | null;
+  lastActiveAt: Timestamp | null;
+  lastLoginAt: Timestamp | null;
   locale: string | null;
   name: string | null;
   password: string | null;
   role: string | null;
   settings: Json | null;
   timezone: string | null;
-  updated_at: Generated<Timestamp>;
-  workspace_id: string | null;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string | null;
 }
 
 export interface UserTokens {
-  created_at: Generated<Timestamp>;
-  expires_at: Timestamp | null;
+  createdAt: Generated<Timestamp>;
+  expiresAt: Timestamp | null;
   id: Generated<string>;
   token: string;
   type: string;
-  used_at: Timestamp | null;
-  user_id: string;
-  workspace_id: string | null;
+  usedAt: Timestamp | null;
+  userId: string;
+  workspaceId: string | null;
 }
 
 export interface WorkspaceInvitations {
-  created_at: Generated<Timestamp>;
+  createdAt: Generated<Timestamp>;
   email: string | null;
-  group_ids: string[] | null;
+  groupIds: string[] | null;
   id: Generated<string>;
-  invited_by_id: string | null;
+  invitedById: string | null;
   role: string;
   token: string;
-  updated_at: Generated<Timestamp>;
-  workspace_id: string;
+  updatedAt: Generated<Timestamp>;
+  workspaceId: string;
 }
 
 export interface Workspaces {
-  billing_email: string | null;
-  created_at: Generated<Timestamp>;
-  custom_domain: string | null;
-  default_role: Generated<string>;
-  default_space_id: string | null;
-  deleted_at: Timestamp | null;
+  billingEmail: string | null;
+  createdAt: Generated<Timestamp>;
+  customDomain: string | null;
+  defaultRole: Generated<string>;
+  defaultSpaceId: string | null;
+  deletedAt: Timestamp | null;
   description: string | null;
-  email_domains: Generated<string[] | null>;
-  enforce_sso: Generated<boolean>;
+  emailDomains: Generated<string[] | null>;
+  enforceSso: Generated<boolean>;
   hostname: string | null;
   id: Generated<string>;
-  license_key: string | null;
+  licenseKey: string | null;
   logo: string | null;
   name: string | null;
   plan: string | null;
   settings: Json | null;
   status: string | null;
-  stripe_customer_id: string | null;
-  trial_end_at: Timestamp | null;
-  updated_at: Generated<Timestamp>;
+  stripeCustomerId: string | null;
+  trialEndAt: Timestamp | null;
+  updatedAt: Generated<Timestamp>;
 }
 
 export interface DB {
   attachments: Attachments;
-  auth_accounts: AuthAccounts;
-  auth_providers: AuthProviders;
+  authAccounts: AuthAccounts;
+  authProviders: AuthProviders;
   backlinks: Backlinks;
   billing: Billing;
-  block_permissions: BlockPermissions;
+  blockPermissions: BlockPermissions;
   comments: Comments;
-  group_users: GroupUsers;
   groups: Groups;
   groupUsers: GroupUsers;
   pageHistory: PageHistory;
   pageMembers: PageMembers;
   pages: Pages;
-  space_members: SpaceMembers;
+  spaceMembers: SpaceMembers;
   spaces: Spaces;
-  synchronized_pages: SynchronizedPages;
-  user_tokens: UserTokens;
+  synchronizedPages: SynchronizedPages;
   users: Users;
-  workspace_invitations: WorkspaceInvitations;
+  userTokens: UserTokens;
+  workspaceInvitations: WorkspaceInvitations;
   workspaces: Workspaces;
 }

@@ -63,23 +63,21 @@ export class PageController {
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
-    private readonly blockPermissionService: BlockPermissionService, // Добавить это
+    private readonly blockPermissionService: BlockPermissionService,
   ) {}
 
-  @HttpCode(HttpStatus.OK)
-  @Post('/block-permissions')
-  async saveBlockPermission(
-    @Body() dto: SaveBlockPermissionDto,
-    @AuthUser() user: User,
-  ) {
-    const pageAbility = await this.pageAbility.createForUser(user, dto.pageId);
 
-    if (pageAbility.cannot(PageCaslAction.Manage, PageCaslSubject.Page)) {
-      throw new ForbiddenException();
-    }
 
-    return this.blockPermissionService.saveBlockPermission(dto);
-  }
+@HttpCode(HttpStatus.OK)
+@Post('blockPermissions')
+async saveBlockPermission(@Body() dto: SaveBlockPermissionDto) {
+  await this.blockPermissionService.saveBlockPermission(dto);
+}
+
+
+
+
+
   @HttpCode(HttpStatus.OK)
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {
