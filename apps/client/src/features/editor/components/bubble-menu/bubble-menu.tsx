@@ -25,8 +25,8 @@ import { v7 as uuid7 } from "uuid";
 import { isCellSelection, isTextSelected } from "@docmost/editor-ext";
 import { LinkSelector } from "@/features/editor/components/bubble-menu/link-selector";
 import { useTranslation } from "react-i18next";
-import { ContextMenu } from "./ContextMenu";
-import { SearchMenu } from "./SearchMenu";
+import { ContextMenu } from "./context-menu";
+import { SearchMenu } from "./search-menu";
 
 type EditorBubbleMenuProps = {
   editor: ReturnType<typeof useEditor>;
