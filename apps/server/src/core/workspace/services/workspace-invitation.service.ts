@@ -224,7 +224,7 @@ export class WorkspaceInvitationService {
             workspaceId,
             creatorId: newUser.id,
             slug: `${newUser.id}-space`,
-            visibility: SpaceVisibility.PRIVATE,
+            visibility: SpaceVisibility.PERSONAL,
           },
           trx,
         );

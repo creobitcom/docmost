@@ -19,7 +19,6 @@ import {
 } from "@tabler/icons-react";
 
 import classes from "./space-sidebar.module.css";
-import React, { useMemo } from "react";
 import { useAtom } from "jotai";
 import { SearchSpotlight } from "@/features/search/search-spotlight.tsx";
 import { treeApiAtom } from "@/features/page/tree/atoms/tree-api-atom.ts";
@@ -39,7 +38,6 @@ import PageImportModal from "@/features/page/components/page-import-modal.tsx";
 import { useTranslation } from "react-i18next";
 import { SwitchSpace } from "./switch-space";
 import ExportModal from "@/components/common/export-modal";
-import { syncIndicatorColorAtom } from "@/features/page/tree/atoms/tree-color-atom";
 
 export function SpaceSidebar() {
   const { t } = useTranslation();
@@ -49,10 +47,6 @@ export function SpaceSidebar() {
     useDisclosure(false);
   const { spaceSlug } = useParams();
   const { data: space, isLoading, isError } = useGetSpaceBySlugQuery(spaceSlug);
-
-  const [syncIndicatorColor, setSyncIndicatorColor] = useAtom(
-    syncIndicatorColorAtom,
-  );
 
   const spaceRules = space?.membership?.permissions;
   const spaceAbility = useSpaceAbility(spaceRules);
@@ -100,7 +94,6 @@ export function SpaceSidebar() {
                 <span>{t("Overview")}</span>
               </div>
             </UnstyledButton>
-
             <UnstyledButton className={classes.menu} onClick={spotlight.open}>
               <div className={classes.menuItemInner}>
                 <IconSearch
@@ -111,7 +104,6 @@ export function SpaceSidebar() {
                 <span>{t("Search")}</span>
               </div>
             </UnstyledButton>
-
             <UnstyledButton className={classes.menu} onClick={openSettings}>
               <div className={classes.menuItemInner}>
                 <IconSettings
@@ -122,7 +114,6 @@ export function SpaceSidebar() {
                 <span>{t("Space settings")}</span>
               </div>
             </UnstyledButton>
-
             {spaceAbility.can(
               SpaceCaslAction.Manage,
               SpaceCaslSubject.Page,
@@ -143,15 +134,6 @@ export function SpaceSidebar() {
             )}
           </div>
         </div>
-
-        <ColorInput
-          value={syncIndicatorColor}
-          onChange={setSyncIndicatorColor}
-          format="hex"
-          swatches={["#4caf50", "#00b894", "#0984e3", "#d63031", "#fdcb6e"]}
-          size="xs"
-          styles={{ input: { cursor: "pointer" } }}
-        />
 
         <div className={clsx(classes.section, classes.sectionPages)}>
           <Group className={classes.pagesHeader} justify="space-between">

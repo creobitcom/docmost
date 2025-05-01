@@ -148,4 +148,8 @@ export class SpaceService {
     await this.spaceRepo.deleteSpace(spaceId, workspaceId);
     await this.attachmentQueue.add(QueueJob.DELETE_SPACE_ATTACHMENTS, space);
   }
+
+  async getPersonalSpace(userId: string): Promise<Space> {
+    return await this.spaceRepo.getPersonalSpace(userId);
+  }
 }

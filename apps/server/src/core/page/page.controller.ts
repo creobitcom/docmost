@@ -411,6 +411,21 @@ export class PageController {
       throw new NotFoundException('Moved page not found');
     }
 
+    if (dto.isMyPages && dto.parentPageId) {
+      const parentPage = await this.pageRepo.findById(dto.parentPageId);
+      if (!parentPage) {
+        throw new NotFoundException('Parent page not found');
+      }
+
+      if (parentPage.spaceId !== movedPage.spaceId) {
+        throw new BadRequestException('Parent page must be in the same space');
+      }
+
+      if (parentPage.spaceId !== dto.personalSpaceId) {
+        throw new BadRequestException();
+      }
+    }
+
     const spaceAbility = await this.spaceAbility.createForUser(
       user,
       movedPage.spaceId,
@@ -418,6 +433,10 @@ export class PageController {
 
     if (spaceAbility.cannot(SpaceCaslAction.Edit, SpaceCaslSubject.Page)) {
       throw new ForbiddenException();
+    }
+
+    if (dto.isMyPages) {
+      return this.pageService.moveMyPage(dto, user.id);
     }
 
     return this.pageService.movePage(dto, movedPage);
@@ -516,8 +535,6 @@ export class PageController {
       return;
     }
 
-    Logger.debug(pagesInSpace);
-
     return {
       items: await Promise.all(
         pagesInSpace.items.map(async (page) => {
@@ -536,6 +553,18 @@ export class PageController {
       ).then((items) => items.filter(Boolean)),
       meta: pagesInSpace.meta,
     };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get('/my-pages')
+  async myPages(@Query() pagination: PaginationOptions) {
+    const myPages = await this.pageService.getMyPages(pagination);
+
+    if (!myPages) {
+      return;
+    }
+
+    return myPages;
   }
 
   validateIds(dto: RemovePageMemberDto | UpdatePageMemberRoleDto) {

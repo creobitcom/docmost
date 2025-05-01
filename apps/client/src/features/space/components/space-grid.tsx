@@ -1,5 +1,4 @@
 import { Text, Avatar, SimpleGrid, Card, rem } from "@mantine/core";
-import React, { useEffect } from 'react';
 import {
   prefetchSpace,
   useGetSpacesQuery,
@@ -12,7 +11,7 @@ import { useTranslation } from "react-i18next";
 
 export default function SpaceGrid() {
   const { t } = useTranslation();
-  const { data, isLoading } = useGetSpacesQuery({ page: 1 });
+  const { data } = useGetSpacesQuery({ page: 1 });
 
   const cards = data?.items.map((space, index) => (
     <Card
@@ -20,7 +19,9 @@ export default function SpaceGrid() {
       p="xs"
       radius="md"
       component={Link}
-      to={getSpaceUrl(space.slug)}
+      to={
+        space.visibility === "personal" ? "/my-pages" : getSpaceUrl(space.slug)
+      }
       onMouseEnter={() => prefetchSpace(space.slug, space.id)}
       className={classes.card}
       withBorder
@@ -35,11 +36,13 @@ export default function SpaceGrid() {
       />
 
       <Text fz="md" fw={500} mt="xs" className={classes.title}>
-        {space.name}
+        {space.visibility === "personal" ? t("Personal space") : space.name}
       </Text>
 
       <Text c="dimmed" size="xs" fw={700} mt="md">
-        {formatMemberCount(space.memberCount, t)}
+        {space.visibility === "personal"
+          ? t("Personal space")
+          : formatMemberCount(space.memberCount, t)}
       </Text>
     </Card>
   ));

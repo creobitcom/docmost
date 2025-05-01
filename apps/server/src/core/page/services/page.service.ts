@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreatePageDto } from '../dto/create-page.dto';
@@ -315,6 +316,20 @@ export class PageService {
     );
   }
 
+  async moveMyPage(dto: MovePageDto, userId: string): Promise<void> {
+    try {
+      generateJitteredKeyBetween(dto.position, null);
+    } catch (err) {
+      throw new BadRequestException('Invalid move position');
+    }
+
+    return this.pageRepo.updateUserPagePreferences({
+      position: dto.position,
+      pageId: dto.pageId,
+      userId: userId,
+    });
+  }
+
   async getPageBreadCrumbs(childPageId: string) {
     const ancestors = await this.db
       .withRecursive('page_ancestors', (db) =>
@@ -396,6 +411,52 @@ export class PageService {
 
       await this.pageRepo.deletePage(pageId, trx);
     });
+  }
+
+  async getMyPages(
+    pagination: PaginationOptions,
+  ): Promise<PaginationResult<SidebarPageResultDto>> {
+    const query = this.db
+      .selectFrom('pages')
+      .select([
+        'id',
+        'slugId',
+        'title',
+        'icon',
+        'position',
+        'parentPageId',
+        'spaceId',
+        'creatorId',
+        'isSynced',
+      ])
+      .select((eb) => this.withHasChildren(eb))
+      .where('parentPageId', 'is', null)
+      .orderBy('position', 'asc');
+
+    const result = await executeWithPagination(query, {
+      page: pagination.page,
+      perPage: 250,
+    });
+
+    for (const page of result.items) {
+      const preferences = await this.pageRepo.findUserPagePreferences(
+        page.id,
+        page.creatorId,
+      );
+
+      if (!preferences) {
+        await this.pageRepo.createUserPagePreferences({
+          pageId: page.id,
+          userId: page.creatorId,
+          position: page.position,
+        });
+        continue;
+      }
+
+      page.position = preferences.position;
+    }
+
+    return result;
   }
 }
 

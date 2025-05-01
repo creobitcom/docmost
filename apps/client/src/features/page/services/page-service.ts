@@ -149,3 +149,8 @@ export async function changeMemberRole(
 ): Promise<void> {
   await api.post("/pages/members/change-role", data);
 }
+
+export async function getMyPages(pageId?: string): Promise<IPagination<IPage>> {
+  const req = await api.get("/pages/my-pages", { data: { pageId } });
+  return req.data;
+}

@@ -96,6 +96,8 @@ export interface IMovePage {
   after?: string;
   before?: string;
   parentPageId?: string;
+  isMyPages?: boolean;
+  personalSpaceId?: string;
 }
 
 export interface IMovePageToSpace {
