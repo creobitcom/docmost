@@ -71,10 +71,9 @@ import ExportModal from "@/components/common/export-modal";
 import PageShareModal from "../../components/share-modal";
 import MovePageModal from "../../components/move-page-modal.tsx";
 import CreateSyncPageModal from "../../components/create-sync-page-modal.tsx";
-import { colorAtom, spaceColorAtom } from "../atoms/tree-color-atom.ts";
+import { colorAtom } from "../atoms/tree-color-atom.ts";
 import { personalSpaceIdAtom } from "../atoms/tree-current-space-atom.ts";
-// import { useMyPagesTreeMutation } from "@/features/my-pages/tree/hooks/use-tree-mutation.ts";
-import { useTreeMutation } from "../hooks/use-tree-mutation.ts";
+import { useMyPagesTreeMutation } from "@/features/my-pages/tree/hooks/use-tree-mutation.ts";
 
 interface MyPagesTreeProps {
   spaceId: string;
@@ -87,7 +86,7 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
   const { pageSlug } = useParams();
 
   const { data, setData, controllers } =
-    useTreeMutation<TreeApi<SpaceTreeNode>>(spaceId);
+    useMyPagesTreeMutation<TreeApi<SpaceTreeNode>>(spaceId);
   const {
     data: pagesData,
     hasNextPage,
@@ -109,22 +108,22 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
 
   const [, setPersonalSpaceId] = useAtom<string>(personalSpaceIdAtom);
 
-  // const [setSpaceColor] = useAtom(colorAtom);
+  const [, setSpaceColor] = useAtom(colorAtom);
 
-  // useEffect(() => {
-  //   if (data.length === 0) {
-  //     return;
-  //   }
+  useEffect(() => {
+    if (data.length === 0) {
+      return;
+    }
 
-  //   for (const node of data) {
-  //     const colors = ["#4CAF50", "#2196F3", "#9C27B0", "#FF9800", "#E91E63"];
-  //     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-  //     setSpaceColor((prev) => ({
-  //       ...prev,
-  //       [node.spaceId]: randomColor,
-  //     }));
-  //   }
-  // }, [data]);
+    for (const node of data) {
+      const colors = ["#4CAF50", "#2196F3", "#9C27B0", "#FF9800", "#E91E63"];
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      setSpaceColor((prev) => ({
+        ...prev,
+        [node.spaceId]: randomColor,
+      }));
+    }
+  }, [data]);
 
   useEffect(() => {
     setPersonalSpaceId(spaceId);
@@ -271,13 +270,20 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
   const updatePageMutation = useUpdatePageMutation();
 
   const [treeData, setTreeData] = useAtom(treeDataAtom);
-  // const [spaceColor] = useAtom(spaceColorAtom(node.data.spaceId));
   const [personalSpaceId] = useAtom(personalSpaceIdAtom);
+  const [spaceColors] = useAtom(colorAtom);
+  const [spaceColor, setColor] = useState<string>(
+    spaceColors[node.data.spaceId] || "#4CAF50",
+  );
 
   const emit = useQueryEmit();
   const timerRef = useRef(null);
 
   const isPersonalSpace = node.data.spaceId === personalSpaceId;
+
+  useEffect(() => {
+    setColor(spaceColors[node.data.spaceId] || "#4CAF50");
+  }, [spaceColors, node.data.spaceId]);
 
   const prefetchPage = () => {
     timerRef.current = setTimeout(() => {
@@ -395,12 +401,12 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
         onMouseEnter={prefetchPage}
         onMouseLeave={cancelPagePrefetch}
       >
-        {/* {!isPersonalSpace && (
+        {!isPersonalSpace && (
           <i
             className={classes.syncIndicator}
             style={{ backgroundColor: spaceColor }}
           ></i>
-        )} */}
+        )}
 
         <PageArrow node={node} onExpandTree={() => handleLoadChildren(node)} />
         <div onClick={handleEmojiIconClick} style={{ marginRight: "4px" }}>
@@ -477,11 +483,9 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
   const { t } = useTranslation();
   const { openDeleteModal } = useDeletePageModal();
 
-  // const [spaceColor, setSpaceColor] = useAtom(
-  //   spaceColorAtom(node.data.spaceId),
-  // );
+  const [spaceColors, setSpaceColors] = useAtom(colorAtom);
 
-  // const [color, setColor] = useState(spaceColor);
+  const [color, setColor] = useState(spaceColors[node.data.spaceId]);
 
   const [exportOpened, { open: openExportModal, close: closeExportModal }] =
     useDisclosure(false);
@@ -492,16 +496,19 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
     { open: openColorPicker, close: closeColorPicker },
   ] = useDisclosure(false);
 
-  // const handleColorChange = (newColor: string) => {
-  //   setColor(newColor);
-  // };
+  const handleColorChange = (newColor: string) => {
+    setColor(newColor);
+  };
 
-  // const applyNewColor = () => {
-  //   setSpaceColor(color);
+  const applyNewColor = () => {
+    setSpaceColors((prev) => ({
+      ...prev,
+      [node.data.spaceId]: color,
+    }));
 
-  //   closeColorPicker();
-  //   notifications.show({ message: t("Color updated") });
-  // };
+    closeColorPicker();
+    notifications.show({ message: t("Color updated") });
+  };
 
   return (
     <>
@@ -520,7 +527,7 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
         </Menu.Target>
 
         <Menu.Dropdown>
-          {/* <Menu.Item
+          <Menu.Item
             leftSection={<IconColorPicker size={16} />}
             onClick={(e) => {
               e.preventDefault();
@@ -529,7 +536,7 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
             }}
           >
             {t("Change color")}
-          </Menu.Item> */}
+          </Menu.Item>
 
           <Menu.Item
             leftSection={<IconFileExport size={16} />}
@@ -572,7 +579,7 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
         </Menu.Dropdown>
       </Menu>
 
-      {/* <Modal
+      <Modal
         opened={colorPickerOpened}
         onClose={closeColorPicker}
         title={t("Choose a color")}
@@ -607,7 +614,7 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
             <Button onClick={() => applyNewColor()}>{t("Apply")}</Button>
           </Group>
         </Stack>
-      </Modal> */}
+      </Modal>
 
       <ExportModal
         type="page"
