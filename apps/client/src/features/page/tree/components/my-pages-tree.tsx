@@ -21,17 +21,13 @@ import {
   Stack,
 } from "@mantine/core";
 import {
-  IconArrowRight,
   IconChevronDown,
   IconChevronRight,
   IconColorPicker,
   IconDots,
   IconFileDescription,
   IconFileExport,
-  IconFileSymlink,
-  IconLink,
   IconPlus,
-  IconPointFilled,
   IconTrash,
   IconUsers,
 } from "@tabler/icons-react";
@@ -53,24 +49,15 @@ import {
 import { IPage, SidebarPagesParams } from "@/features/page/types/page.types.ts";
 import { queryClient } from "@/main.tsx";
 import { OpenMap } from "react-arborist/dist/main/state/open-slice";
-import {
-  useClipboard,
-  useDisclosure,
-  useElementSize,
-  useMergedRef,
-} from "@mantine/hooks";
+import { useDisclosure, useElementSize, useMergedRef } from "@mantine/hooks";
 import { dfs } from "react-arborist/dist/module/utils";
 import { useQueryEmit } from "@/features/websocket/use-query-emit.ts";
-import { buildPageUrl } from "@/features/page/page.utils.ts";
 import { notifications } from "@mantine/notifications";
-import { getAppUrl } from "@/lib/config.ts";
 import { extractPageSlugId } from "@/lib";
 import { useDeletePageModal } from "@/features/page/hooks/use-delete-page-modal.tsx";
 import { useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
 import PageShareModal from "../../components/share-modal";
-import MovePageModal from "../../components/move-page-modal.tsx";
-import CreateSyncPageModal from "../../components/create-sync-page-modal.tsx";
 import { colorAtom } from "../atoms/tree-color-atom.ts";
 import { personalSpaceIdAtom } from "../atoms/tree-current-space-atom.ts";
 import { useMyPagesTreeMutation } from "@/features/my-pages/tree/hooks/use-tree-mutation.ts";

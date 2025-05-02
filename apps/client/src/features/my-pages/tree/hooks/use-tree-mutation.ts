@@ -108,6 +108,9 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
     const originalParentId = originalNode.parent.id;
     const originalIndex = originalNode.childIndex;
 
+    // @ts-ignore
+    const originalPosition = args.dragNodes[0].data.position;
+
     tree.move({
       id: draggedNodeId,
       parentId: args.parentId,
@@ -190,13 +193,17 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
       });
       setData(originalTreeData);
 
-      if (originalParentId !== args.parentId) {
-        tree.move({
-          id: draggedNodeId,
-          parentId: originalParentId,
-          index: originalIndex,
-        });
-      }
+      console.log(originalPosition);
+
+      tree.move({
+        id: draggedNodeId,
+        parentId: originalParentId,
+        index: originalIndex,
+      });
+      tree.update({
+        id: draggedNodeId,
+        changes: { position: originalPosition } as any,
+      });
     });
 
     setTimeout(() => {

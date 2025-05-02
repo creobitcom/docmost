@@ -316,11 +316,34 @@ export class PageService {
     );
   }
 
-  async moveMyPage(dto: MovePageDto, userId: string): Promise<void> {
+  async moveMyPage(
+    dto: MovePageDto,
+    movedPage: Page,
+    userId: string,
+  ): Promise<void> {
     try {
       generateJitteredKeyBetween(dto.position, null);
     } catch (err) {
       throw new BadRequestException('Invalid move position');
+    }
+
+    if (dto.parentPageId) {
+      const parentPage = await this.pageRepo.findById(dto.parentPageId);
+      if (!parentPage) {
+        throw new NotFoundException('Parent page not found');
+      }
+
+      if (parentPage.spaceId !== movedPage.spaceId) {
+        throw new BadRequestException('Parent page must be in the same space');
+      }
+
+      if (parentPage.spaceId !== dto.personalSpaceId) {
+        throw new BadRequestException();
+      }
+    }
+
+    if (movedPage.spaceId !== dto.personalSpaceId && movedPage.parentPageId) {
+      throw new BadRequestException();
     }
 
     return this.pageRepo.updateUserPagePreferences({

@@ -411,21 +411,6 @@ export class PageController {
       throw new NotFoundException('Moved page not found');
     }
 
-    if (dto.isMyPages && dto.parentPageId) {
-      const parentPage = await this.pageRepo.findById(dto.parentPageId);
-      if (!parentPage) {
-        throw new NotFoundException('Parent page not found');
-      }
-
-      if (parentPage.spaceId !== movedPage.spaceId) {
-        throw new BadRequestException('Parent page must be in the same space');
-      }
-
-      if (parentPage.spaceId !== dto.personalSpaceId) {
-        throw new BadRequestException();
-      }
-    }
-
     const spaceAbility = await this.spaceAbility.createForUser(
       user,
       movedPage.spaceId,
@@ -436,7 +421,7 @@ export class PageController {
     }
 
     if (dto.isMyPages) {
-      return this.pageService.moveMyPage(dto, user.id);
+      return this.pageService.moveMyPage(dto, movedPage, user.id);
     }
 
     return this.pageService.movePage(dto, movedPage);
