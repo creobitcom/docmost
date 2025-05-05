@@ -86,7 +86,7 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
   const treeApiRef = useRef<TreeApi<SpaceTreeNode>>();
   const [openTreeNodes, setOpenTreeNodes] = useAtom<OpenMap>(openTreeNodesAtom);
   const rootElement = useRef<HTMLDivElement>();
-  const { ref: sizeRef, width, height } = useElementSize();
+  const { ref: sizeRef, width } = useElementSize();
   const mergedRef = useMergedRef(rootElement, sizeRef);
   const isDataLoaded = useRef(false);
   const { data: currentPage } = usePageQuery({
@@ -607,8 +607,7 @@ function PageArrow({ node, onExpandTree }: PageArrowProps) {
           ) : (
             <IconChevronRight stroke={2} size={18} />
           )
-        ) : // <IconPointFilled size={8} />
-        null
+        ) : null
       ) : null}
     </ActionIcon>
   );
