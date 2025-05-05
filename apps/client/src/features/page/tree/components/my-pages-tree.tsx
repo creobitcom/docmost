@@ -260,9 +260,9 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
 
   const [treeData, setTreeData] = useAtom(treeDataAtom);
   const [personalSpaceId] = useAtom(personalSpaceIdAtom);
-  const [spaceColors] = useAtom(pageColorsAtom);
-  const [spaceColor, setColor] = useState<string>(
-    spaceColors[node.data.id] || "#4CAF50",
+  const [nodeColors] = useAtom(pageColorsAtom);
+  const [nodeColor, setColor] = useState<string>(
+    nodeColors[node.data.id] || "#4CAF50",
   );
 
   const emit = useQueryEmit();
@@ -271,8 +271,15 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
   const isPersonalSpace = node.data.spaceId === personalSpaceId;
 
   useEffect(() => {
-    setColor(spaceColors[node.data.id] || "#4CAF50");
-  }, [spaceColors, node.data.id]);
+    // Assign the color based on the parent page ID or the node ID?
+    // if (node.data.parentPageId) {
+    //   setColor(nodeColors[node.data.parentPageId] || "#4CAF50");
+    // } else {
+    //   setColor(nodeColors[node.data.id] || "#4CAF50");
+    // }
+
+    setColor(nodeColors[node.data.id] || "#4CAF50");
+  }, [nodeColors, node.data.id]);
 
   const prefetchPage = () => {
     timerRef.current = setTimeout(() => {
@@ -383,7 +390,7 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
         {!isPersonalSpace && (
           <i
             className={classes.syncIndicator}
-            style={{ backgroundColor: spaceColor }}
+            style={{ backgroundColor: nodeColor }}
           ></i>
         )}
 
@@ -411,7 +418,11 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
               onExpandTree={() => handleLoadChildren(node)}
             />
           )}
-          <NodeMenu node={node} treeApi={tree} />
+          <NodeMenu
+            node={node}
+            treeApi={tree}
+            isPersonalSpace={isPersonalSpace}
+          />
         </div>
       </div>
     </>
@@ -456,9 +467,10 @@ function CreateNode({ node, treeApi, onExpandTree }: CreateNodeProps) {
 interface NodeMenuProps {
   node: NodeApi<SpaceTreeNode>;
   treeApi: TreeApi<SpaceTreeNode>;
+  isPersonalSpace: boolean;
 }
 
-function NodeMenu({ node, treeApi }: NodeMenuProps) {
+function NodeMenu({ node, treeApi, isPersonalSpace }: NodeMenuProps) {
   const { t } = useTranslation();
   const { openDeleteModal } = useDeletePageModal();
   const updateMyPageColorMutation = useUpdateMyPageColorMutation();
@@ -539,19 +551,19 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
             {t("Export page")}
           </Menu.Item>
 
-          <Menu.Item
-            leftSection={<IconUsers size={16} />}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openShareModal();
-            }}
-          >
-            {t("Share")}
-          </Menu.Item>
+          {isPersonalSpace && (
+            <div>
+              <Menu.Item
+                leftSection={<IconUsers size={16} />}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openShareModal();
+                }}
+              >
+                {t("Share")}
+              </Menu.Item>
 
-          {!(treeApi.props.disableEdit as boolean) && (
-            <>
               <Menu.Divider />
               <Menu.Item
                 c="red"
@@ -559,12 +571,14 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  openDeleteModal({ onConfirm: () => treeApi?.delete(node) });
+                  openDeleteModal({
+                    onConfirm: () => treeApi?.delete(node),
+                  });
                 }}
               >
                 {t("Delete")}
               </Menu.Item>
-            </>
+            </div>
           )}
         </Menu.Dropdown>
       </Menu>

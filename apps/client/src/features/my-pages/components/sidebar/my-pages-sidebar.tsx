@@ -1,25 +1,15 @@
-import {
-  ActionIcon,
-  Group,
-  Menu,
-  Text,
-  Tooltip,
-  UnstyledButton,
-} from "@mantine/core";
-import { spotlight } from "@mantine/spotlight";
+import { ActionIcon, Group, Menu, Text, Tooltip } from "@mantine/core";
 import {
   IconArrowDown,
   IconDots,
   IconFileExport,
   IconPlus,
-  IconSearch,
   IconSettings,
 } from "@tabler/icons-react";
 
 import classes from "./my-pages-sidebar.module.css";
 import { useAtom } from "jotai";
 import { treeApiAtom } from "@/features/page/tree/atoms/tree-api-atom.ts";
-import { useLocation } from "react-router-dom";
 import clsx from "clsx";
 import { useDisclosure } from "@mantine/hooks";
 import PageImportModal from "@/features/page/components/page-import-modal.tsx";
@@ -31,9 +21,6 @@ import MyPagesTree from "@/features/page/tree/components/my-pages-tree";
 export function MyPagesSidebar() {
   const { t } = useTranslation();
   const [tree] = useAtom(treeApiAtom);
-  const location = useLocation();
-  const [opened, { open: openSettings, close: closeSettings }] =
-    useDisclosure(false);
 
   const [currentUser] = useAtom(currentUserAtom);
 
@@ -53,24 +40,9 @@ export function MyPagesSidebar() {
           }}
         ></div>
 
-        <div className={classes.section}>
-          <div className={classes.menuItems}>
-            <UnstyledButton className={classes.menu} onClick={openSettings}>
-              <div className={classes.menuItemInner}>
-                <IconSettings
-                  size={18}
-                  className={classes.menuItemIcon}
-                  stroke={2}
-                />
-                <span>{t("Setting")}</span>
-              </div>
-            </UnstyledButton>
-          </div>
-        </div>
-
         <div className={clsx(classes.section, classes.sectionPages)}>
           <Group className={classes.pagesHeader} justify="space-between">
-            <Text size="xs" fw={500} c="dimmed">
+            <Text size="sm" fw={600} c="dimmed">
               {t("My Pages")}
             </Text>
 
@@ -85,8 +57,6 @@ export function MyPagesSidebar() {
                   <IconPlus />
                 </ActionIcon>
               </Tooltip>
-
-              <MyPagesMenu onSpaceSettings={openSettings} />
             </Group>
           </Group>
 
