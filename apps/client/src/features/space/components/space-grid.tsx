@@ -18,7 +18,6 @@ import classes from "./space-grid.module.css";
 import { formatMemberCount } from "@/lib";
 import { useTranslation } from "react-i18next";
 
-// Helper component for space card to avoid code duplication
 const SpaceCard = ({ space, t, isPersonal = false }) => (
   <Card
     key={space.id}
