@@ -153,6 +153,16 @@ export interface GroupUsers {
   userId: string;
 }
 
+export interface PageBlocks {
+  blockId: string;
+  blockType: string;
+  content: Json;
+  createdAt: Generated<Timestamp | null>;
+  id: Generated<string>;
+  pageId: string | null;
+  updatedAt: Generated<Timestamp | null>;
+}
+
 export interface PageHistory {
   content: Json | null;
   coverPhoto: string | null;
@@ -317,6 +327,7 @@ export interface DB {
   comments: Comments;
   groups: Groups;
   groupUsers: GroupUsers;
+  pageBlocks: PageBlocks;
   pageHistory: PageHistory;
   pageMembers: PageMembers;
   pages: Pages;

@@ -27,9 +27,9 @@ import { BacklinkRepo } from '@docmost/db/repos/backlink/backlink.repo';
 import { PageMemberRepo } from './repos/page/page-member.repo';
 import { SynchronizedPageRepo } from './repos/page/synchronized_page.repo';
 import { DbService } from './services/db.service';
-import {BlockPermissionRepo} from '../database/repos/page/BlockMember.repo'
+import {BlockPermissionRepo} from './repos/page/block-member.repo'
 import {BlockAbilityFactory} from '../core/casl/abilities/block-ability.factory'
-
+import { KyselyProvider } from './kysely.provider';
 // https://github.com/brianc/node-postgres/issues/811
 types.setTypeParser(types.builtins.INT8, (val) => Number(val));
 
@@ -66,6 +66,7 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     }),
   ],
   providers: [
+    KyselyProvider,
     BlockPermissionRepo,
     BlockAbilityFactory,
     DbService,
@@ -86,6 +87,7 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     SynchronizedPageRepo,
   ],
   exports: [
+    KyselyProvider,
     BlockPermissionRepo,
     BlockAbilityFactory,
     DbService,

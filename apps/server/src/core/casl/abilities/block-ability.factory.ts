@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BlockPermissionRepo } from '../../../database/repos/page/BlockMember.repo';
+import { BlockPermissionRepo } from '../../../database/repos/page/block-member.repo';
 import { BlockAbility, BlockAbilityAction, UserBlockRole } from '../../../core/casl/interfaces/block-ability.type';
 
 @Injectable()

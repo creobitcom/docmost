@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import APP_ROUTE from "@/lib/app-route.ts";
 import { isCloud } from "@/lib/config.ts";
-
+import {IPageBlock} from '../../../server/src/database/types/page-block.types'
 const api: AxiosInstance = axios.create({
   baseURL: "/api",
   withCredentials: true,
@@ -94,3 +94,13 @@ export const assignPermissionToBlock = async ({
     role,
   });
 };
+export const updatePageBlocks = async (pageId: string, blocks: IPageBlock[]) => {
+  try {
+    const response = await axios.put(`/api/pages/pageBlocks`, { pageId, blocks });
+
+    return response.data;
+  } catch (error) {
+    throw new Error('Ошибка при обновлении блоков страницы');
+  }
+};
+

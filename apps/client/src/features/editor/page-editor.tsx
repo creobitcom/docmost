@@ -53,21 +53,24 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { CustomParagraph } from "@/features/editor/extensions/custom-paragraph.ts";
-
-
+import { updatePageBlocks } from "../../lib/api-client";
+import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-page-blocks";
 
 interface PageEditorProps {
   pageId: string;
   editable: boolean;
   content: any;
+  initialContent: any;
 }
 
 export default function PageEditor({
   pageId,
   editable,
-  content,
+  content: _content,
+  initialContent,
 }: PageEditorProps) {
   const [, setPageId] = useState<string | null>(null);
+  const [content, setContent] = useState(initialContent);
   const collaborationURL = useCollaborationUrl();
   const [currentUser] = useAtom(currentUserAtom);
   const [, setEditor] = useAtom(pageEditorAtom);
@@ -78,7 +81,7 @@ export default function PageEditor({
   const [isLocalSynced, setLocalSynced] = useState(false);
   const [isRemoteSynced, setRemoteSynced] = useState(false);
   const [yjsConnectionStatus, setYjsConnectionStatus] = useAtom(
-    yjsConnectionStatusAtom,
+    yjsConnectionStatusAtom
   );
   const menuContainerRef = useRef(null);
   const documentName = `page.${pageId}`;
@@ -89,19 +92,35 @@ export default function PageEditor({
   const { pageSlug } = useParams();
   const collabRetryCount = useRef(0);
   const slugId = extractPageSlugId(pageSlug);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; Id: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    Id: string;
+  } | null>(null);
 
+  const updatePageBlocksTable = (newContent: any) => {
+    const blocksToUpdate = extractTopLevelBlocks(newContent, pageId);
+    updatePageBlocks(pageId, blocksToUpdate)
+      .then(() => {
+        console.log("PageBlocks обновлены успешно");
+      })
+      .catch((error) => {
+        console.error("Ошибка при обновлении PageBlocks:", error);
+      });
+  };
+
+  const handleContentUpdate = (newContent: any) => {
+    setContent(newContent);
+    updatePageBlocksTable(newContent);
+  };
 
   const localProvider = useMemo(() => {
     const provider = new IndexeddbPersistence(documentName, ydoc);
-
     provider.on("synced", () => {
       setLocalSynced(true);
     });
-
     return provider;
   }, [pageId, ydoc]);
-
 
   const remoteProvider = useMemo(() => {
     const provider = new HocuspocusProvider({
@@ -112,7 +131,7 @@ export default function PageEditor({
       connect: false,
       preserveConnection: false,
       onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
-        collabRetryCount.current = collabRetryCount.current + 1;
+        collabRetryCount.current += 1;
         refetchCollabToken().then(() => {
           collabRetryCount.current = 0;
         });
@@ -138,6 +157,11 @@ export default function PageEditor({
 
     return provider;
   }, [ydoc, pageId, collabQuery?.token]);
+
+  useEffect(() => {
+    setContent(initialContent);
+  }, [initialContent]);
+
   useEffect(() => {
     setPageId(pageId);
   }, [pageId]);
@@ -167,6 +191,26 @@ export default function PageEditor({
       CustomParagraph,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
+
+  const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
+    const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
+
+    if (
+      !newContent ||
+      JSON.stringify(newContent) === JSON.stringify({ type: "doc", content: [] })
+    ) {
+      return;
+    }
+
+    if (pageData) {
+      queryClient.setQueryData(["pages", slugId], {
+        ...pageData,
+        content: newContent,
+      });
+    }
+
+    handleContentUpdate(newContent);
+  }, 3000);
 
   const editor = useEditor(
     {
@@ -211,12 +255,6 @@ export default function PageEditor({
           // @ts-ignore
           setEditor(editor);
           editor.storage.pageId = pageId;
-          if (editor) {
-            // @ts-ignore
-            setEditor(editor);
-            editor.storage.pageId = pageId;
-            setPageId(pageId);
-          }
         }
       },
       onUpdate({ editor }) {
@@ -225,26 +263,8 @@ export default function PageEditor({
         debouncedUpdateContent(editorJson);
       },
     },
-    [pageId, editable, remoteProvider?.status],
+    [pageId, editable, remoteProvider?.status]
   );
-
-  const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
-    const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
-
-    if (
-      !newContent ||
-      JSON.stringify(newContent) === JSON.stringify({ type: "doc", content: [] })
-    ) {
-      return;
-    }
-
-    if (pageData) {
-      queryClient.setQueryData(["pages", slugId], {
-        ...pageData,
-        content: newContent,
-      });
-    }
-  }, 3000);
 
   const handleActiveCommentEvent = (event) => {
     const { commentId } = event.detail;
@@ -313,9 +333,10 @@ export default function PageEditor({
       ) {
         setIsCollabReady(true);
       }
-    }, 500);
+    }, 300);
+
     return () => clearTimeout(collabReadyTimeout);
-  }, [isRemoteSynced, isLocalSynced, remoteProvider?.status]);
+  }, [isSynced, isCollabReady, remoteProvider?.status]);
 
   return isCollabReady ? (
     <div>
@@ -364,6 +385,7 @@ export default function PageEditor({
   ) : (
 
     <EditorProvider
+      onUpdate={handleContentUpdate}
       editable={false}
       immediatelyRender={true}
       extensions={mainExtensions}

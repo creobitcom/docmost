@@ -11,6 +11,8 @@ import {
   BadRequestException,
   Logger,
   Query,
+  Param,
+  Put,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -50,11 +52,14 @@ import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { SaveBlockPermissionDto } from './dto/save-block-permission.dto';
 import { BlockPermissionService } from './services/block-permission.service';
+import { PageBlocksService } from './services/page-blocks.service';
+import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
 export class PageController {
   constructor(
+    private readonly pageBlocksService: PageBlocksService,
     private readonly pageService: PageService,
     private readonly pageMemberService: PageMemberService,
     private readonly pageMemberRepo: PageMemberRepo,
@@ -66,6 +71,15 @@ export class PageController {
     private readonly blockPermissionService: BlockPermissionService,
   ) {}
 
+@HttpCode(HttpStatus.OK)
+@Put('pageBlocks')
+async updateBlocks(
+  @Param('pageId') pageId: string,
+  @Body() dto: UpdatePageBlocksDto
+) {
+  await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks);
+  return { success: true };
+}
 
 
 @HttpCode(HttpStatus.OK)
@@ -73,11 +87,6 @@ export class PageController {
 async saveBlockPermission(@Body() dto: SaveBlockPermissionDto) {
   await this.blockPermissionService.saveBlockPermission(dto);
 }
-
-
-
-
-
   @HttpCode(HttpStatus.OK)
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {
@@ -169,7 +178,11 @@ async saveBlockPermission(@Body() dto: SaveBlockPermissionDto) {
     }
 
     Logger.debug(updatePageDto);
+    const updatedPage = await this.pageService.update(page, updatePageDto, user.id);
 
+    if (updatePageDto.content) {
+      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, updatePageDto.content);
+    }
     if (page.isSynced) {
       const syncPageData = await this.syncPageService.findByReferenceId(
         page.id,
