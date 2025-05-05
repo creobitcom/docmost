@@ -29,6 +29,7 @@ export interface IPage {
   space: Partial<ISpace>;
   membership?: IMembership;
   isSynced?: boolean;
+  color?: string;
 }
 
 interface IMembership {

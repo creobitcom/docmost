@@ -5,6 +5,7 @@ import {
   fetchAncestorChildren,
   useGetMyPagesQuery,
   usePageQuery,
+  useUpdateMyPageColorMutation,
   useUpdatePageMutation,
 } from "@/features/page/queries/page-query.ts";
 import { useEffect, useRef, useState } from "react";
@@ -42,11 +43,11 @@ import {
 } from "@/features/page/tree/utils/utils.ts";
 import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import {
+  getMyPages,
   getPageBreadcrumbs,
   getPageById,
-  getSidebarPages,
 } from "@/features/page/services/page-service.ts";
-import { IPage, SidebarPagesParams } from "@/features/page/types/page.types.ts";
+import { IPage } from "@/features/page/types/page.types.ts";
 import { queryClient } from "@/main.tsx";
 import { OpenMap } from "react-arborist/dist/main/state/open-slice";
 import { useDisclosure, useElementSize, useMergedRef } from "@mantine/hooks";
@@ -58,7 +59,7 @@ import { useDeletePageModal } from "@/features/page/hooks/use-delete-page-modal.
 import { useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
 import PageShareModal from "../../components/share-modal";
-import { colorAtom } from "../atoms/tree-color-atom.ts";
+import { colorAtom as pageColorsAtom } from "../atoms/tree-color-atom.ts";
 import { personalSpaceIdAtom } from "../atoms/tree-current-space-atom.ts";
 import { useMyPagesTreeMutation } from "@/features/my-pages/tree/hooks/use-tree-mutation.ts";
 
@@ -95,22 +96,20 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
 
   const [, setPersonalSpaceId] = useAtom<string>(personalSpaceIdAtom);
 
-  const [, setSpaceColor] = useAtom(colorAtom);
+  const [, setPageColors] = useAtom(pageColorsAtom);
 
-  useEffect(() => {
-    if (data.length === 0) {
-      return;
-    }
-
-    for (const node of data) {
-      const colors = ["#4CAF50", "#2196F3", "#9C27B0", "#FF9800", "#E91E63"];
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      setSpaceColor((prev) => ({
-        ...prev,
-        [node.spaceId]: randomColor,
-      }));
-    }
-  }, [data]);
+  const loadColors = (pages: any[]) => {
+    const colors = ["#4CAF50", "#2196F3", "#9C27B0", "#FF9800", "#E91E63"];
+    const loadedColors = pages.reduce(
+      (acc, page) => ({
+        ...acc,
+        [page.id]:
+          page.color ?? colors[Math.floor(Math.random() * colors.length)],
+      }),
+      {},
+    );
+    setPageColors((prev) => ({ ...prev, ...loadedColors }));
+  };
 
   useEffect(() => {
     setPersonalSpaceId(spaceId);
@@ -126,6 +125,8 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
     if (pagesData?.pages && !hasNextPage) {
       const allItems = pagesData.pages.flatMap((page) => page.items);
       const treeData = buildTree(allItems);
+
+      loadColors(allItems);
 
       if (data.length < 1 || data?.[0].spaceId !== spaceId) {
         setData(treeData);
@@ -157,10 +158,11 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
             if (ancestor.id === currentPage.id) {
               return;
             }
-            const children = await fetchAncestorChildren({
-              pageId: ancestor.id,
-              spaceId: ancestor.spaceId,
-            });
+
+            const pages = await getMyPages(ancestor.id);
+            const children = buildTree(pages.items);
+
+            loadColors(pages.items);
 
             flatTreeItems = [
               ...flatTreeItems,
@@ -258,9 +260,9 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
 
   const [treeData, setTreeData] = useAtom(treeDataAtom);
   const [personalSpaceId] = useAtom(personalSpaceIdAtom);
-  const [spaceColors] = useAtom(colorAtom);
+  const [spaceColors] = useAtom(pageColorsAtom);
   const [spaceColor, setColor] = useState<string>(
-    spaceColors[node.data.spaceId] || "#4CAF50",
+    spaceColors[node.data.id] || "#4CAF50",
   );
 
   const emit = useQueryEmit();
@@ -269,8 +271,8 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
   const isPersonalSpace = node.data.spaceId === personalSpaceId;
 
   useEffect(() => {
-    setColor(spaceColors[node.data.spaceId] || "#4CAF50");
-  }, [spaceColors, node.data.spaceId]);
+    setColor(spaceColors[node.data.id] || "#4CAF50");
+  }, [spaceColors, node.data.id]);
 
   const prefetchPage = () => {
     timerRef.current = setTimeout(() => {
@@ -296,17 +298,7 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
     }
 
     try {
-      const params: SidebarPagesParams = {
-        pageId: node.data.id,
-        spaceId: node.data.spaceId,
-      };
-
-      const newChildren = await queryClient.fetchQuery({
-        queryKey: ["sidebar-pages", params],
-        queryFn: () => getSidebarPages(params),
-        staleTime: 10 * 60 * 1000,
-      });
-
+      const newChildren = await getMyPages(node.data.id);
       const childrenTree = buildTree(newChildren.items);
 
       const updatedTreeData = appendNodeChildren(
@@ -469,10 +461,11 @@ interface NodeMenuProps {
 function NodeMenu({ node, treeApi }: NodeMenuProps) {
   const { t } = useTranslation();
   const { openDeleteModal } = useDeletePageModal();
+  const updateMyPageColorMutation = useUpdateMyPageColorMutation();
 
-  const [spaceColors, setSpaceColors] = useAtom(colorAtom);
+  const [pageColors, setPageColors] = useAtom(pageColorsAtom);
 
-  const [color, setColor] = useState(spaceColors[node.data.spaceId]);
+  const [color, setColor] = useState(pageColors[node.data.id]);
 
   const [exportOpened, { open: openExportModal, close: closeExportModal }] =
     useDisclosure(false);
@@ -488,13 +481,23 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
   };
 
   const applyNewColor = () => {
-    setSpaceColors((prev) => ({
-      ...prev,
-      [node.data.spaceId]: color,
-    }));
+    updateMyPageColorMutation
+      .mutateAsync({ pageId: node.data.id, color: color })
+      .then(() => {
+        setPageColors((prev) => ({
+          ...prev,
+          [node.data.id]: color,
+        }));
+        notifications.show({ message: t("Color updated") });
+      })
+      .catch(() => {
+        notifications.show({
+          message: t("Failed to update color"),
+          color: "red",
+        });
+      });
 
     closeColorPicker();
-    notifications.show({ message: t("Color updated") });
   };
 
   return (

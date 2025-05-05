@@ -100,16 +100,43 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
     index: number;
   }) => {
     const draggedNodeId = args.dragIds[0];
-
     const originalTreeData = [...tree.data];
     const originalNode = tree.find(draggedNodeId);
+
     if (!originalNode) return;
 
     const originalParentId = originalNode.parent.id;
     const originalIndex = originalNode.childIndex;
-
     // @ts-ignore
     const originalPosition = args.dragNodes[0].data.position;
+
+    const draggedNodeSpaceId = originalNode.data.spaceId;
+    const draggedNodeHasParentPage = Boolean(originalNode.data.parentPageId);
+    // @ts-ignore
+    const targetSpaceId = args.parentNode?.data?.spaceId;
+
+    const isMovingToAnotherSpace =
+      draggedNodeSpaceId !== spaceId && draggedNodeHasParentPage;
+    const isTargetInDifferentSpace =
+      args.parentId && draggedNodeSpaceId !== targetSpaceId;
+    const isTargetNotInCurrentSpace =
+      args.parentId && spaceId !== targetSpaceId;
+
+    if (isMovingToAnotherSpace || isTargetInDifferentSpace) {
+      notifications.show({
+        message: "You cannot move a page to a different space",
+        color: "red",
+      });
+      return;
+    }
+
+    if (isTargetNotInCurrentSpace) {
+      notifications.show({
+        message: "You cannot move a page to a different space",
+        color: "red",
+      });
+      return;
+    }
 
     tree.move({
       id: draggedNodeId,
@@ -186,25 +213,31 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
 
     setData(tree.data);
 
-    movePageMutation.mutateAsync(payload).catch(() => {
-      notifications.show({
-        message: t("Failed to move a page"),
-        color: "red",
-      });
-      setData(originalTreeData);
+    movePageMutation
+      .mutateAsync(payload)
+      .then(() => {
+        notifications.show({
+          message: t("Page moved successfully"),
+          color: "green",
+        });
+      })
+      .catch(() => {
+        notifications.show({
+          message: t("Failed to move a page"),
+          color: "red",
+        });
+        setData(originalTreeData);
 
-      console.log(originalPosition);
-
-      tree.move({
-        id: draggedNodeId,
-        parentId: originalParentId,
-        index: originalIndex,
+        tree.move({
+          id: draggedNodeId,
+          parentId: originalParentId,
+          index: originalIndex,
+        });
+        tree.update({
+          id: draggedNodeId,
+          changes: { position: originalPosition } as any,
+        });
       });
-      tree.update({
-        id: draggedNodeId,
-        changes: { position: originalPosition } as any,
-      });
-    });
 
     setTimeout(() => {
       emit({

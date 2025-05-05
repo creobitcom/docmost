@@ -26,6 +26,7 @@ import { SpaceRole } from 'src/common/helpers/types/permission';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
 import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
+import { MyPageColorDto } from '../dto/update-color.dto';
 
 @Injectable()
 export class PageService {
@@ -438,8 +439,9 @@ export class PageService {
 
   async getMyPages(
     pagination: PaginationOptions,
+    pageId?: string,
   ): Promise<PaginationResult<SidebarPageResultDto>> {
-    const query = this.db
+    const baseQuery = this.db
       .selectFrom('pages')
       .select([
         'id',
@@ -453,13 +455,19 @@ export class PageService {
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
-      .where('parentPageId', 'is', null)
       .orderBy('position', 'asc');
 
-    const result = await executeWithPagination(query, {
-      page: pagination.page,
-      perPage: 250,
-    });
+    const query = baseQuery.where(
+      'parentPageId',
+      pageId ? '=' : 'is',
+      pageId ?? null,
+    );
+
+    const result: PaginationResult<SidebarPageResultDto> =
+      await executeWithPagination(query, {
+        page: pagination.page,
+        perPage: 250,
+      });
 
     for (const page of result.items) {
       const preferences = await this.pageRepo.findUserPagePreferences(
@@ -472,14 +480,33 @@ export class PageService {
           pageId: page.id,
           userId: page.creatorId,
           position: page.position,
+          color: '#4CAF50',
         });
         continue;
       }
 
       page.position = preferences.position;
+      page.color = preferences.color ?? '#4CAF50';
     }
 
     return result;
+  }
+
+  async updateMyPageColor(dto: MyPageColorDto, userId: string) {
+    const preferences = await this.pageRepo.findUserPagePreferences(
+      dto.pageId,
+      userId,
+    );
+
+    if (!preferences) {
+      throw new NotFoundException(`Preferences not found`);
+    }
+
+    await this.pageRepo.updateUserPagePreferences({
+      pageId: dto.pageId,
+      userId,
+      color: dto.color,
+    });
   }
 }
 
