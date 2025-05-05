@@ -109,13 +109,11 @@ export interface Billing {
 
 export interface BlockPermissions {
   blockId: string;
-  createdAt: Generated<Timestamp | null>;
   id: Generated<string>;
   pageId: string;
   permission: string;
-  role: string | null;
-  updatedAt: Generated<Timestamp | null>;
-  userId: string | null;
+  role: string;
+  userId: string;
 }
 
 export interface Comments {
@@ -159,7 +157,7 @@ export interface PageBlocks {
   content: Json;
   createdAt: Generated<Timestamp | null>;
   id: Generated<string>;
-  pageId: string | null;
+  pageId: string;
   updatedAt: Generated<Timestamp | null>;
 }
 
