@@ -158,10 +158,10 @@ export class SpaceRepo {
       .execute();
   }
 
-  async getPersonalSpace(
+  async findPersonalSpace(
     userId: string,
     trx?: KyselyTransaction,
-  ): Promise<Space> {
+  ): Promise<Space | null> {
     const db = dbOrTx(this.db, trx);
     const space = await db
       .selectFrom('spaces')
@@ -169,10 +169,6 @@ export class SpaceRepo {
       .where('creatorId', '=', userId)
       .where('visibility', '=', SpaceVisibility.PERSONAL)
       .executeTakeFirst();
-
-    if (!space) {
-      throw new NotFoundException('Personal space not found');
-    }
 
     return space;
   }
