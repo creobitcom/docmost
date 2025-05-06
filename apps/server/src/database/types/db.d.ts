@@ -231,9 +231,9 @@ export interface SynchronizedPages {
 
 export interface UserPagePreferences {
   color: string | null;
-  pageId: string | null;
+  pageId: string;
   position: string | null;
-  userId: string | null;
+  userId: string;
 }
 
 export interface Users {
