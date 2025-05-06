@@ -116,6 +116,15 @@ export interface BlockPermissions {
   userId: string;
 }
 
+export interface Blocks {
+  blockType: string;
+  content: Json;
+  createdAt: Generated<Timestamp | null>;
+  id: Generated<string>;
+  pageId: string;
+  updatedAt: Generated<Timestamp | null>;
+}
+
 export interface Comments {
   content: Json | null;
   createdAt: Generated<Timestamp>;
@@ -322,6 +331,7 @@ export interface DB {
   backlinks: Backlinks;
   billing: Billing;
   blockPermissions: BlockPermissions;
+  blocks: Blocks;
   comments: Comments;
   groups: Groups;
   groupUsers: GroupUsers;
