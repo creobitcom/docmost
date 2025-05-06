@@ -51,7 +51,7 @@ import { SynchronizedPageService } from './services/synchronized-page.service';
 import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { SaveBlockPermissionDto } from './dto/save-block-permission.dto';
-//import { BlockPermissionService } from './services/block-permission.service';
+import { BlockPermissionService } from './services/block-permission.service';
 import { PageBlocksService } from './services/page-blocks.service';
 import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
 
@@ -68,25 +68,25 @@ export class PageController {
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
-    //private readonly blockPermissionService: BlockPermissionService,
+    private readonly blockPermissionService: BlockPermissionService,
   ) {}
 
-@HttpCode(HttpStatus.OK)
-@Put('pageBlocks')
-async updateBlocks(
-  @Param('pageId') pageId: string,
-  @Body() dto: UpdatePageBlocksDto
-) {
-  await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks);
-  return { success: true };
-}
+  @HttpCode(HttpStatus.OK)
+  @Put('pageBlocks')
+  async updateBlocks(
+    @Param('pageId') pageId: string,
+    @Body() dto: UpdatePageBlocksDto,
+  ) {
+    await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks);
+    return { success: true };
+  }
 
+  @HttpCode(HttpStatus.OK)
+  @Post('block-permission')
+  async saveBlockPermission(@Body() dto: SaveBlockPermissionDto) {
+    await this.blockPermissionService.saveBlockPermission(dto);
+  }
 
-/*@HttpCode(HttpStatus.OK)
-@Post('blockPermissions')
-async saveBlockPermission(@Body() dto: SaveBlockPermissionDto) {
-  await this.blockPermissionService.saveBlockPermission(dto);
-}*/
   @HttpCode(HttpStatus.OK)
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {
@@ -178,10 +178,17 @@ async saveBlockPermission(@Body() dto: SaveBlockPermissionDto) {
     }
 
     Logger.debug(updatePageDto);
-    const updatedPage = await this.pageService.update(page, updatePageDto, user.id);
+    const updatedPage = await this.pageService.update(
+      page,
+      updatePageDto,
+      user.id,
+    );
 
     if (updatePageDto.content) {
-      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, updatePageDto.content);
+      await this.pageBlocksService.saveBlocksForPage(
+        updatePageDto.pageId,
+        updatePageDto.content,
+      );
     }
     if (page.isSynced) {
       const syncPageData = await this.syncPageService.findByReferenceId(
