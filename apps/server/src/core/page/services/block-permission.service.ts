@@ -5,7 +5,7 @@ import { InjectKysely } from 'nestjs-kysely';
 
 @Injectable()
 export class BlockPermissionService {
-  constructor(@InjectKysely() db: KyselyDB) {}
+  constructor(@InjectKysely() private readonly db: KyselyDB) {}
 
   async saveBlockPermission(dto: SaveBlockPermissionDto) {
     return this.db
@@ -17,11 +17,6 @@ export class BlockPermissionService {
         role: dto.role,
         permission: dto.permission,
       })
-      .onConflict((oc) =>
-        oc.columns(['pageId', 'blockId', 'userId']).doUpdateSet({
-          role: dto.role,
-        }),
-      )
       .execute();
   }
 }

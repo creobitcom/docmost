@@ -13,6 +13,8 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { useWorkspaceMembersQuery } from "@/features/workspace/queries/workspace-query";
 import axios from "axios";
 import { Editor } from "@tiptap/react";
+import { createBlockPermission } from "@/features/page/services/page-service";
+import { notifications } from "@mantine/notifications";
 
 const API_URL = "http://127.0.0.1:3000";
 
@@ -58,33 +60,44 @@ export const SearchMenu = ({ onSelect, editor, pageId }: SearchMenuProps) => {
     const blockId = getBlockId();
 
     if (!blockId) {
-      console.warn("Block ID not found");
+      notifications.show({
+        message: "Failed to add user",
+        color: "red",
+      });
       return;
     }
 
+    // Mock data
     const payload = {
       userId: user.id,
-      pageId,
-      blockId,
+      pageId: "0196a093-bf8e-7608-b45d-87185cbfff5a",
+      blockId: "0196a2e0-172b-7fdf-93d2-be954fd0e86b",
       role: "member",
       permission: "read",
     };
 
-    try {
-      const response = await axios.post(`${API_URL}/api/pages/blockPermissions`, payload);
-      console.log("User permission saved", response.data);
+    await createBlockPermission(payload)
+      .then(() => {
+        notifications.show({
+          message: "User permission saved",
+          color: "green",
+        });
 
-      onSelect({
-        id: user.id,
-        label: user.name,
-        entityType: "user",
-        avatarUrl: user.avatarUrl,
+        onSelect({
+          id: user.id,
+          label: user.name,
+          entityType: "user",
+          avatarUrl: user.avatarUrl,
+        });
+
+        setOpened(false);
+      })
+      .catch(() => {
+        notifications.show({
+          message: "Failed to save user permission",
+          color: "red",
+        });
       });
-
-      setOpened(false);
-    } catch (error) {
-      console.error("Error saving permission", error);
-    }
   };
 
   return (
