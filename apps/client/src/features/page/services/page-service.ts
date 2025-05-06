@@ -149,3 +149,7 @@ export async function changeMemberRole(
 ): Promise<void> {
   await api.post("/pages/members/change-role", data);
 }
+
+export async function createBlockPermission(data: any): Promise<any> {
+  return api.post("/pages/block-permission", data);
+}
