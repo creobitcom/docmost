@@ -51,7 +51,7 @@ import { SynchronizedPageService } from './services/synchronized-page.service';
 import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { SaveBlockPermissionDto } from './dto/save-block-permission.dto';
-import { BlockPermissionService } from './services/block-permission.service';
+//import { BlockPermissionService } from './services/block-permission.service';
 import { PageBlocksService } from './services/page-blocks.service';
 import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
 
@@ -68,7 +68,7 @@ export class PageController {
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
-    private readonly blockPermissionService: BlockPermissionService,
+    //private readonly blockPermissionService: BlockPermissionService,
   ) {}
 
 @HttpCode(HttpStatus.OK)
@@ -82,11 +82,11 @@ async updateBlocks(
 }
 
 
-@HttpCode(HttpStatus.OK)
+/*@HttpCode(HttpStatus.OK)
 @Post('blockPermissions')
 async saveBlockPermission(@Body() dto: SaveBlockPermissionDto) {
   await this.blockPermissionService.saveBlockPermission(dto);
-}
+}*/
   @HttpCode(HttpStatus.OK)
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {
