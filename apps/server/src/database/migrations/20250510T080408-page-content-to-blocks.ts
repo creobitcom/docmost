@@ -26,10 +26,37 @@ export async function up(db: Kysely<any>): Promise<void> {
     }
   }
 
-  // TODO: delete content from pages
-  // await db.schema.alterTable('pages').dropColumn('content').execute()
+  await db.schema.alterTable('pages').dropColumn('content').execute();
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
+  await db.schema.alterTable('pages').addColumn('content', 'jsonb').execute();
+
+  const allBlocks = await db
+    .selectFrom('blocks')
+    .select(['page_id', 'content'])
+    .execute();
+
+  const blocksByPage = allBlocks.reduce((acc, block) => {
+    if (!acc[block.page_id]) {
+      acc[block.page_id] = [];
+    }
+    acc[block.page_id].push(block.content);
+    return acc;
+  }, {});
+
+  for (const [pageId, pageBlocks] of Object.entries(blocksByPage)) {
+    await db
+      .updateTable('pages')
+      .set({
+        content: {
+          type: 'doc',
+          content: pageBlocks,
+        },
+      })
+      .where('id', '=', pageId)
+      .execute();
+  }
+
   await db.deleteFrom('blocks').execute();
 }
