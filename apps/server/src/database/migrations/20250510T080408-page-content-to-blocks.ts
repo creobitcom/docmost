@@ -26,12 +26,15 @@ export async function up(db: Kysely<any>): Promise<void> {
     }
   }
 
-  await db.schema.alterTable('pages').dropColumn('content').execute();
+  await db
+    .updateTable('pages')
+    .set({
+      content: null,
+    })
+    .execute();
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  await db.schema.alterTable('pages').addColumn('content', 'jsonb').execute();
-
   const allBlocks = await db
     .selectFrom('blocks')
     .select(['page_id', 'content'])

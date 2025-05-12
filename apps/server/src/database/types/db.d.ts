@@ -117,7 +117,7 @@ export interface BlockPermissions {
 }
 
 export interface Blocks {
-  blockType: string;
+  blockType: string | null;
   content: Json;
   createdAt: Generated<Timestamp | null>;
   id: Generated<string>;
