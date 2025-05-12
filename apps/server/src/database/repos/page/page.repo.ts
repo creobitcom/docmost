@@ -63,7 +63,6 @@ export class PageRepo {
     let query = db
       .selectFrom('pages')
       .select(this.baseFields)
-      .$if(opts?.includeContent, (qb) => qb.select('content'))
       .$if(opts?.includeYdoc, (qb) => qb.select('ydoc'));
 
     if (opts?.includeCreator) {
@@ -92,7 +91,25 @@ export class PageRepo {
       query = query.where('slugId', '=', pageId);
     }
 
-    return query.executeTakeFirst();
+    const page = await query.executeTakeFirst();
+    if (!opts?.includeContent) {
+      return page;
+    }
+
+    const pageContent = {
+      type: 'doc',
+      content: {},
+    };
+
+    const blocks = await db
+      .selectFrom('blocks')
+      .select(['content'])
+      .where('pageId', '=', page.id)
+      .execute();
+
+    pageContent.content = blocks.map((block) => block.content);
+
+    return { ...page, content: pageContent };
   }
 
   async updatePage(
