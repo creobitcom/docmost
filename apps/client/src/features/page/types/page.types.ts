@@ -10,7 +10,14 @@ export interface IPage {
   id: string;
   slugId: string;
   title: string;
-  content: string;
+  content: Array<{
+    attrs?: {
+      textAlign?: string;
+      blockId?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  }>;
   icon: string;
   coverPhoto: string;
   parentPageId: string;
@@ -30,6 +37,11 @@ export interface IPage {
   membership?: IMembership;
   isSynced?: boolean;
   color?: string;
+  // blocks: {
+  //   blockIds: string[];
+  //   deletedBlocksId: string[];
+  //   updatedBlocksId: string[];
+  // };
 }
 
 interface IMembership {

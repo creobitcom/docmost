@@ -96,9 +96,11 @@ export class PageRepo {
       return page;
     }
 
+    // todo blocks - тут мы добавили id блока
     const pageBlocks = await db
       .selectFrom('blocks')
       .select(['content'])
+      .select(['id'])
       .where('pageId', '=', page.id)
       .execute();
 
@@ -108,7 +110,19 @@ export class PageRepo {
 
     const pageContent = {
       type: 'doc',
-      content: pageBlocks.map((block) => block.content),
+      content: pageBlocks.map((block) => {
+        // @ts-ignore
+        if (block.content?.attrs) {
+          // @ts-ignore
+          block.content.attrs.blockId = block.id;
+        } 
+        // @ts-ignore
+        if (block.attrs) {
+          // @ts-ignore
+          block.attrs.blockId = block.id;
+        }
+        return block.content;
+      }),
     };
 
     return { ...page, content: pageContent };
@@ -128,8 +142,10 @@ export class PageRepo {
     trx?: KyselyTransaction,
   ): Promise<any> {
     const db = dbOrTx(this.db, trx);
+    const pageClone = { ...updatePageData };
+    delete updatePageData.content;
 
-    const result = await db
+    const pageUpdateResult = await db
       .updateTable('pages')
       .set({ ...updatePageData, updatedAt: new Date() })
       .where(
@@ -139,11 +155,13 @@ export class PageRepo {
       )
       .executeTakeFirst();
 
-    if (!updatePageData?.content) {
-      return result;
+    if (!pageClone?.content) {
+      return pageUpdateResult;
     }
 
-    const blocks: any[] = (updatePageData.content as any).content;
+    const blocks: any[] = (pageClone.content as any).content;
+    console.log("[blocks]");
+    console.log(blocks);
 
     // TODO: upsert
     // TODO: delete blocks
@@ -176,7 +194,7 @@ export class PageRepo {
           .execute();
       }
     }
-    return result;
+    return pageUpdateResult;
   }
 
   async insertPage(

@@ -140,6 +140,7 @@ export default function PageEditor({
     };
   }, [remoteProvider, localProvider]);
 
+  // todo blocks extensions repo for uuid
   const extensions = useMemo(() => {
     return [
       ...mainExtensions,
@@ -195,6 +196,9 @@ export default function PageEditor({
       onUpdate({ editor }) {
         if (editor.isEmpty) return;
         const editorJson = editor.getJSON();
+        console.log("[editorJson]");
+        console.log(editorJson);
+        console.log(editor);
         //update local page cache to reduce flickers
         debouncedUpdateContent(editorJson);
       },

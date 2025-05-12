@@ -6,6 +6,7 @@ import {
 } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { ReactNodeViewRenderer } from "@tiptap/react";
+import { v4 as uuidv4 } from 'uuid';
 import { CalloutType, getValidCalloutType } from "./utils";
 
 export interface CalloutOptions {
@@ -56,6 +57,13 @@ export const Callout = Node.create<CalloutOptions>({
         parseHTML: (element) => element.getAttribute("data-callout-type"),
         renderHTML: (attributes) => ({
           "data-callout-type": attributes.type,
+        }),
+      },
+      blockId: {
+        default: uuidv4(),
+        parseHTML: (element) => element.getAttribute("blockId"),
+        renderHTML: (attributes) => ({
+          "blockId": attributes.blockId,
         }),
       },
     };

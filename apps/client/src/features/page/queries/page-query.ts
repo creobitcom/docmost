@@ -56,7 +56,8 @@ export function usePageQuery(
     enabled: !!pageInput.pageId,
     staleTime: 5 * 60 * 1000,
   });
-
+  console.log("[query.data]");
+  console.log(query.data);
   useEffect(() => {
     if (query.data) {
       if (isValidUuid(pageInput.pageId)) {

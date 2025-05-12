@@ -28,6 +28,8 @@ export default function Page() {
     isError,
     error,
   } = usePageQuery({ pageId: extractPageSlugId(pageSlug) });
+  console.log("[page]");
+  console.log(page);
   const { data: space } = useGetSpaceBySlugQuery(page?.space?.slug);
 
   const pageAbility = usePageAbility(page?.membership?.permissions);
@@ -66,6 +68,7 @@ export default function Page() {
           pageId={page.id}
           title={page.title}
           content={page.content}
+          // blocks={page.blocks}
           slugId={page.slugId}
           spaceSlug={page?.space?.slug}
           editable={pageAbility.can(PageCaslAction.Edit, PageCaslSubject.Page)}

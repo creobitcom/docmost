@@ -153,7 +153,8 @@ export class PageService {
     const contributors = new Set<string>(page.contributorIds);
     contributors.add(userId);
     const contributorIds = Array.from(contributors);
-
+    console.log("[updatePageDto]");
+    console.log(updatePageDto);
     await this.pageRepo.updatePage(
       {
         title: updatePageDto.title,
@@ -258,6 +259,8 @@ export class PageService {
 
   async movePageToSpace(rootPage: Page, spaceId: string) {
     await executeTx(this.db, async (trx) => {
+      console.log("[trx]");
+      console.log(trx);
       // Update root page
       const nextPosition = await this.nextPagePosition(spaceId);
       await this.pageRepo.updatePage(
