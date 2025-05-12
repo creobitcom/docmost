@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB, KyselyTransaction } from '../../types/kysely.types';
 import { dbOrTx } from '../../utils';
@@ -14,7 +14,7 @@ import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
 import { executeWithPagination } from '@docmost/db/pagination/pagination';
 import { validate as isValidUUID } from 'uuid';
 import { ExpressionBuilder, sql } from 'kysely';
-import { DB } from '@docmost/db/types/db';
+import { DB, Json } from '@docmost/db/types/db';
 import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 
@@ -63,7 +63,6 @@ export class PageRepo {
     let query = db
       .selectFrom('pages')
       .select(this.baseFields)
-      .$if(opts?.includeContent, (qb) => qb.select('content'))
       .$if(opts?.includeYdoc, (qb) => qb.select('ydoc'));
 
     if (opts?.includeCreator) {
@@ -92,7 +91,27 @@ export class PageRepo {
       query = query.where('slugId', '=', pageId);
     }
 
-    return query.executeTakeFirst();
+    const page = await query.executeTakeFirst();
+    if (!opts?.includeContent) {
+      return page;
+    }
+
+    const pageBlocks = await db
+      .selectFrom('blocks')
+      .select(['content'])
+      .where('pageId', '=', page.id)
+      .execute();
+
+    if (pageBlocks.length === 0) {
+      return page;
+    }
+
+    const pageContent = {
+      type: 'doc',
+      content: pageBlocks.map((block) => block.content),
+    };
+
+    return { ...page, content: pageContent };
   }
 
   async updatePage(
@@ -107,8 +126,10 @@ export class PageRepo {
     updatePageData: UpdatablePage,
     pageIds: string[],
     trx?: KyselyTransaction,
-  ) {
-    return dbOrTx(this.db, trx)
+  ): Promise<any> {
+    const db = dbOrTx(this.db, trx);
+
+    const result = await db
       .updateTable('pages')
       .set({ ...updatePageData, updatedAt: new Date() })
       .where(
@@ -117,6 +138,45 @@ export class PageRepo {
         pageIds,
       )
       .executeTakeFirst();
+
+    if (!updatePageData?.content) {
+      return result;
+    }
+
+    const blocks: any[] = (updatePageData.content as any).content;
+
+    // TODO: upsert
+    // TODO: delete blocks
+    for (const block of blocks) {
+      const existingBlock = await db
+        .selectFrom('blocks')
+        .where('id', '=', block.id)
+        .where('pageId', 'in', pageIds)
+        .executeTakeFirst();
+
+      if (existingBlock) {
+        await db
+          .updateTable('blocks')
+          .set({
+            content: block,
+            updatedAt: new Date(),
+          })
+          .where('id', '=', block.id)
+          .execute();
+      } else {
+        await db
+          .insertInto('blocks')
+          .values({
+            pageId: pageIds[0],
+            content: block,
+            blockType: block?.type,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .execute();
+      }
+    }
+    return result;
   }
 
   async insertPage(
