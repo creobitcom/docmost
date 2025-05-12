@@ -14,7 +14,7 @@ import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
 import { executeWithPagination } from '@docmost/db/pagination/pagination';
 import { validate as isValidUUID } from 'uuid';
 import { ExpressionBuilder, sql } from 'kysely';
-import { DB } from '@docmost/db/types/db';
+import { DB, Json } from '@docmost/db/types/db';
 import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 
@@ -96,18 +96,20 @@ export class PageRepo {
       return page;
     }
 
-    const pageContent = {
-      type: 'doc',
-      content: {},
-    };
-
-    const blocks = await db
+    const pageBlocks = await db
       .selectFrom('blocks')
       .select(['content'])
       .where('pageId', '=', page.id)
       .execute();
 
-    pageContent.content = blocks.map((block) => block.content);
+    if (pageBlocks.length === 0) {
+      return page;
+    }
+
+    const pageContent = {
+      type: 'doc',
+      content: pageBlocks.map((block) => block.content),
+    };
 
     return { ...page, content: pageContent };
   }
@@ -143,6 +145,8 @@ export class PageRepo {
 
     const blocks: any[] = (updatePageData.content as any).content;
 
+    // TODO: upsert
+    // TODO: delete blocks
     for (const block of blocks) {
       const existingBlock = await db
         .selectFrom('blocks')
@@ -172,7 +176,6 @@ export class PageRepo {
           .execute();
       }
     }
-    Logger.debug('Updated page content');
     return result;
   }
 
