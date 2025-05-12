@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB, KyselyTransaction } from '../../types/kysely.types';
 import { dbOrTx } from '../../utils';
@@ -107,8 +107,10 @@ export class PageRepo {
     updatePageData: UpdatablePage,
     pageIds: string[],
     trx?: KyselyTransaction,
-  ) {
-    return dbOrTx(this.db, trx)
+  ): Promise<any> {
+    const db = dbOrTx(this.db, trx);
+
+    const result = await db
       .updateTable('pages')
       .set({ ...updatePageData, updatedAt: new Date() })
       .where(
@@ -117,6 +119,44 @@ export class PageRepo {
         pageIds,
       )
       .executeTakeFirst();
+
+    if (!updatePageData?.content) {
+      return result;
+    }
+
+    const blocks: any[] = (updatePageData.content as any).content;
+
+    for (const block of blocks) {
+      const existingBlock = await db
+        .selectFrom('blocks')
+        .where('id', '=', block.id)
+        .where('pageId', 'in', pageIds)
+        .executeTakeFirst();
+
+      if (existingBlock) {
+        await db
+          .updateTable('blocks')
+          .set({
+            content: block,
+            updatedAt: new Date(),
+          })
+          .where('id', '=', block.id)
+          .execute();
+      } else {
+        await db
+          .insertInto('blocks')
+          .values({
+            pageId: pageIds[0],
+            content: block,
+            blockType: block?.type,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .execute();
+      }
+    }
+    Logger.debug('Updated page content');
+    return result;
   }
 
   async insertPage(

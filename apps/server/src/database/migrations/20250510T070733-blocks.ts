@@ -9,7 +9,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('page_id', 'uuid', (col) =>
       col.notNull().references('pages.id').onDelete('cascade'),
     )
-    .addColumn('block_type', 'text', (col) => col.notNull())
+    .addColumn('block_type', 'varchar')
     .addColumn('content', 'jsonb', (col) => col.notNull())
     .addColumn('created_at', 'timestamp', (col) => col.defaultTo(sql`now()`))
     .addColumn('updated_at', 'timestamp', (col) => col.defaultTo(sql`now()`))
