@@ -1,5 +1,4 @@
 import { Node, mergeAttributes } from '@tiptap/core'
-import { v4 as uuidv4 } from 'uuid'
 
 export const CustomParagraph = Node.create({
   name: 'paragraph',
@@ -15,9 +14,8 @@ export const CustomParagraph = Node.create({
         default: null,
         parseHTML: element => element.getAttribute('data-block-id'),
         renderHTML: attributes => {
-          const id = attributes.id || uuidv4()
           return {
-            'data-block-id': id,
+            'data-block-id': attributes.id,
           }
         },
       },
@@ -32,7 +30,15 @@ export const CustomParagraph = Node.create({
     ]
   },
 
-  renderHTML({ HTMLAttributes }) {
-    return ['p', mergeAttributes(HTMLAttributes), 0]
-  },
+  renderHTML: ({ HTMLAttributes, node }) => {
+    const isEmpty = node.content.childCount === 0
+
+    const attrs = { ...HTMLAttributes }
+
+    if (isEmpty) {
+      delete attrs['data-block-id']
+    }
+
+    return ['p', mergeAttributes(attrs), 0]
+  }
 })

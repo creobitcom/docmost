@@ -54,6 +54,7 @@ import { SaveBlockPermissionDto } from './dto/save-block-permission.dto';
 import { BlockPermissionService } from './services/block-permission.service';
 import { PageBlocksService } from './services/page-blocks.service';
 import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
+import { extractTopLevelBlocks } from './extract-page-blocks';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -72,14 +73,17 @@ export class PageController {
   ) {}
 
   @HttpCode(HttpStatus.OK)
-  @Put('pageBlocks')
-  async updateBlocks(
+  @Post('blocks/:pageId')
+  async updateBlocksForPage(
     @Param('pageId') pageId: string,
-    @Body() dto: UpdatePageBlocksDto,
+    @Body() dto: UpdatePageBlocksDto
   ) {
     await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks);
     return { success: true };
   }
+
+
+
 
   @HttpCode(HttpStatus.OK)
   @Post('block-permission')
@@ -185,11 +189,10 @@ export class PageController {
     );
 
     if (updatePageDto.content) {
-      await this.pageBlocksService.saveBlocksForPage(
-        updatePageDto.pageId,
-        updatePageDto.content,
-      );
+      const blocks = extractTopLevelBlocks(updatePageDto.content, updatePageDto.pageId);
+      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, blocks);
     }
+
     if (page.isSynced) {
       const syncPageData = await this.syncPageService.findByReferenceId(
         page.id,

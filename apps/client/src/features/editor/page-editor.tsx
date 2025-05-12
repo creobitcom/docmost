@@ -55,6 +55,8 @@ import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { CustomParagraph } from "@/features/editor/extensions/custom-paragraph.ts";
 import { updatePageBlocks } from "../../lib/api-client";
 import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-page-blocks";
+import UniqueId from "tiptap-unique-id";
+import {  v4 as uuidv4 } from "uuid";
 
 interface PageEditorProps {
   pageId: string;
@@ -189,6 +191,11 @@ export default function PageEditor({
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
       CustomParagraph,
+      UniqueId.configure({
+        attributeName: "id",
+        types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
+        createId: () => window.crypto.randomUUID(),
+      }),
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
@@ -211,10 +218,21 @@ export default function PageEditor({
 
     handleContentUpdate(newContent);
   }, 3000);
+  const sanitizedContent = (contentFromDb) => {
+    if (
+      !contentFromDb ||
+      !contentFromDb.content ||
+      contentFromDb.content.length === 0
+    ) {
+      return null
+    }
 
+    return contentFromDb
+  }
   const editor = useEditor(
     {
       extensions,
+      content: sanitizedContent(content),
       editable,
       immediatelyRender: true,
       shouldRerenderOnTransaction: true,

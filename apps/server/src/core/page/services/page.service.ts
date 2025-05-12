@@ -405,7 +405,8 @@ export class PageService {
       .where('id', '=', id)
       .execute();
 
-    await this.PageBlocksService.saveBlocksForPage(id, dto.content);
+      await this.PageBlocksService.saveFromTiptapJson(id, dto.content);
+
   }
 
 }

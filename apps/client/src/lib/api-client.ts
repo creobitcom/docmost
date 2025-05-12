@@ -95,12 +95,13 @@ export const assignPermissionToBlock = async ({
   });
 };
 export const updatePageBlocks = async (pageId: string, blocks: IPageBlock[]) => {
+  console.log('📤 Sending blocks:', blocks);
   try {
-    const response = await axios.put(`/api/pages/pageBlocks`, { pageId, blocks });
-
+    const response = await axios.post(`/api/pages/blocks/${pageId}`, { blocks });
     return response.data;
   } catch (error) {
     throw new Error('Ошибка при обновлении блоков страницы');
   }
 };
+
 

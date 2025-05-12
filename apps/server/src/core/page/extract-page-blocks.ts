@@ -1,9 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-
-function generateUniqueId() {
-  return uuidv4();
-}
-
 function extractTextFromContent(content: any[]): string {
   if (!Array.isArray(content)) return '';
 
@@ -23,21 +17,16 @@ export function extractTopLevelBlocks(content: any, pageId: string) {
   if (!Array.isArray(content.content)) return [];
 
   return content.content
-    .filter((block: any) => block.type)
+    .filter((block: any) => !!block.attrs?.id)
     .map((block: any) => {
-      if (!block.attrs) block.attrs = {};
-      if (!block.attrs.id) {
-        block.attrs.id = generateUniqueId();
-      }
-
       const textContent = extractTextFromContent(block.content);
 
       return {
         blockId: block.attrs.id,
         blockType: block.type,
-        attrs: block.attrs,
-        pageId: pageId,
-        content: textContent || null,
+        pageId,
+        content: typeof textContent === 'string' ? textContent.trim() : '',
       };
-    });
+    })
+    .filter(block => block.content !== '');
 }

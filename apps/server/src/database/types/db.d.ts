@@ -117,11 +117,12 @@ export interface BlockPermissions {
 }
 
 export interface Blocks {
-  blockType: string;
+  block_id: string;
+  block_type: string;
   content: Json;
   createdAt: Generated<Timestamp | null>;
   id: Generated<string>;
-  pageId: string;
+  page_id: string | null;
   updatedAt: Generated<Timestamp | null>;
 }
 
@@ -158,16 +159,6 @@ export interface GroupUsers {
   id: Generated<string>;
   updatedAt: Generated<Timestamp>;
   userId: string;
-}
-
-export interface PageBlocks {
-  blockId: string;
-  blockType: string;
-  content: Json;
-  createdAt: Generated<Timestamp | null>;
-  id: Generated<string>;
-  pageId: string;
-  updatedAt: Generated<Timestamp | null>;
 }
 
 export interface PageHistory {
@@ -335,7 +326,6 @@ export interface DB {
   comments: Comments;
   groups: Groups;
   groupUsers: GroupUsers;
-  pageBlocks: PageBlocks;
   pageHistory: PageHistory;
   pageMembers: PageMembers;
   pages: Pages;
