@@ -115,7 +115,7 @@ export class PageRepo {
         if (block.content?.attrs) {
           // @ts-ignore
           block.content.attrs.blockId = block.id;
-        } 
+        }
         // @ts-ignore
         if (block.attrs) {
           // @ts-ignore
@@ -160,40 +160,29 @@ export class PageRepo {
     }
 
     const blocks: any[] = (pageClone.content as any).content;
-    console.log("[blocks]");
+    console.log('[blocks]');
     console.log(blocks);
 
-    // TODO: upsert
-    // TODO: delete blocks
     for (const block of blocks) {
-      const existingBlock = await db
-        .selectFrom('blocks')
-        .where('id', '=', block.id)
-        .where('pageId', 'in', pageIds)
-        .executeTakeFirst();
-
-      if (existingBlock) {
-        await db
-          .updateTable('blocks')
-          .set({
+      await db
+        .insertInto('blocks')
+        .values({
+          id: block.id,
+          pageId: pageIds[0],
+          content: block,
+          blockType: block?.type,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .onConflict((oc) =>
+          oc.column('id').doUpdateSet({
             content: block,
             updatedAt: new Date(),
-          })
-          .where('id', '=', block.id)
-          .execute();
-      } else {
-        await db
-          .insertInto('blocks')
-          .values({
-            pageId: pageIds[0],
-            content: block,
-            blockType: block?.type,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .execute();
-      }
+          }),
+        )
+        .execute();
     }
+
     return pageUpdateResult;
   }
 
