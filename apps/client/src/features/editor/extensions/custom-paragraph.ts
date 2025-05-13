@@ -1,44 +1,48 @@
-import { Node, mergeAttributes } from '@tiptap/core'
+import { Extension } from '@tiptap/core'
+import { v4 as uuidv4 } from 'uuid'
 
-export const CustomParagraph = Node.create({
-  name: 'paragraph',
+export const BlockAttributes = Extension.create({
+  name: 'blockAttributes',
 
-  group: 'block',
-  content: 'inline*',
-  draggable: false,
-  defining: true,
-
-  addAttributes() {
-    return {
-      id: {
-        default: null,
-        parseHTML: element => element.getAttribute('data-block-id'),
-        renderHTML: attributes => {
-          return {
-            'data-block-id': attributes.id,
-          }
-        },
-      },
-    }
-  },
-
-  parseHTML() {
+  addGlobalAttributes() {
     return [
       {
-        tag: 'p',
+        types: [
+          'paragraph',
+          'heading',
+          'blockquote',
+          'codeBlock',
+          'bulletList',
+          'orderedList',
+          'listItem',
+          'taskList',
+          'taskItem',
+          'horizontalRule',
+          'image',
+          'table',
+          'tableRow',
+          'tableCell',
+          'tableHeader',
+          'iframe',
+          'figure',
+        ],
+        attributes: {
+          blockId: {
+            default: null,
+            parseHTML: element => element.getAttribute('blockId'),
+            renderHTML: attributes => ({
+              blockId: attributes.blockId,
+            }),
+          },
+          position: {
+            default: null,
+            parseHTML: element => element.getAttribute('position'),
+            renderHTML: attributes => ({
+              position: attributes.position,
+            }),
+          },
+        },
       },
     ]
   },
-
-  renderHTML: ({ HTMLAttributes, node }) => {
-    const isEmpty = node.content.childCount === 0
-
-    const attrs = { ...HTMLAttributes }
-
-    if (isEmpty) {
-      delete attrs['data-block-id']
-    }
-
-    return ['p', mergeAttributes(attrs), 0]
-  }
 })

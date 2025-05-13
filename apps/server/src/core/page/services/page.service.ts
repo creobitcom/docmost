@@ -150,8 +150,8 @@ export class PageService {
     updatePageDto: UpdatePageDto,
     userId: string,
   ): Promise<Page> {
-    const contributors = new Set<string>(page.contributorIds ?? []);
-    contributors.add(userId);
+    const contributors = new Set<string>(page.contributorIds);
+contributors.add(userId);
     const contributorIds = Array.from(contributors);
 
     await this.pageRepo.updatePage(
