@@ -3,7 +3,7 @@ import { IncomingMessage } from 'http';
 import WebSocket from 'ws';
 import { AuthenticationExtension } from './extensions/authentication.extension';
 import { PersistenceExtension } from './extensions/persistence.extension';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Redis } from '@hocuspocus/extension-redis';
 import { EnvironmentService } from '../integrations/environment/environment.service';
 import {

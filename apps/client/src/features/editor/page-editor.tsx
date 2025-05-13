@@ -86,6 +86,9 @@ export default function PageEditor({
   const { pageSlug } = useParams();
   const slugId = extractPageSlugId(pageSlug);
 
+  const updatedBlocks = ydoc.getArray<string>("updatedBlocks");
+  const deleteBlocks = ydoc.getArray<string>("deletedBlocks");
+
   const localProvider = useMemo(() => {
     const provider = new IndexeddbPersistence(documentName, ydoc);
 
@@ -193,6 +196,12 @@ export default function PageEditor({
         }
       },
       onUpdate({ editor }) {
+        deleteBlocks.delete(0, deleteBlocks.length);
+        updatedBlocks.delete(0, updatedBlocks.length);
+
+        deleteBlocks.push(["deleteBlocks1", "deleteBlocks2"]);
+        updatedBlocks.push(["updateBlock1", "updateBlocsk2"]);
+
         if (editor.isEmpty) return;
         const editorJson = editor.getJSON();
         //update local page cache to reduce flickers

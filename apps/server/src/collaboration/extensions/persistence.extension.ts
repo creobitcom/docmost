@@ -86,6 +86,11 @@ export class PersistenceExtension implements Extension {
   async onStoreDocument(data: onStoreDocumentPayload) {
     const { documentName, document, context } = data;
 
+    const deletedBlocks = document.getArray('deletedBlocks');
+    const updatedBlocks = document.getArray('updatedBlocks');
+    Logger.debug('Deleted blocks: ', deletedBlocks.toJSON());
+    Logger.debug('Updated blocks: ', updatedBlocks.toJSON());
+
     const pageId = getPageId(documentName);
 
     const tiptapJson = TiptapTransformer.fromYdoc(document, 'default');
