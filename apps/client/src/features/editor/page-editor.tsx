@@ -53,6 +53,9 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
+import { BlockAttributes } from "@/features/editor/extensions/custom-paragraph.ts";
+import UniqueId from "tiptap-unique-id";
+import {  v4 as uuidv4 } from "uuid";
 
 interface PageEditorProps {
   pageId: string;
@@ -145,6 +148,12 @@ export default function PageEditor({
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
+      BlockAttributes,
+      UniqueId.configure({
+        attributeName: "id",
+        types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
+        createId: () => window.crypto.randomUUID(),
+      }),
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
