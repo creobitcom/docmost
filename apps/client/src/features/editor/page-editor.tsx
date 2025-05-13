@@ -52,9 +52,8 @@ import { IPage } from "@/features/page/types/page.types.ts";
 import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
+import { jwtDecode } from "jwt-decode";
 import { BlockAttributes } from "@/features/editor/extensions/custom-paragraph.ts";
-import { updatePageBlocks } from "../../lib/api-client";
-import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-page-blocks";
 import UniqueId from "tiptap-unique-id";
 import {  v4 as uuidv4 } from "uuid";
 
