@@ -122,6 +122,7 @@ export interface Blocks {
   createdAt: Generated<Timestamp | null>;
   id: Generated<string>;
   pageId: string;
+  stateHash: string | null;
   updatedAt: Generated<Timestamp | null>;
 }
 
@@ -189,14 +190,7 @@ export interface PageMembers {
   userId: string | null;
 }
 
-export interface Blocks {
-  id: Generated<string>;
-  content: Json | null;
-  pageId: string;
-}
-
 export interface Pages {
-  content: Json | null;
   contributorIds: Generated<string[] | null>;
   coverPhoto: string | null;
   createdAt: Generated<Timestamp>;
@@ -340,7 +334,6 @@ export interface DB {
   groupUsers: GroupUsers;
   pageHistory: PageHistory;
   pageMembers: PageMembers;
-  blocks: Blocks;
   pages: Pages;
   spaceMembers: SpaceMembers;
   spaces: Spaces;

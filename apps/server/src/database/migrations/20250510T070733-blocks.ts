@@ -11,6 +11,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     )
     .addColumn('block_type', 'varchar')
     .addColumn('content', 'jsonb', (col) => col.notNull())
+    .addColumn('state_hash', 'varchar(32)')
     .addColumn('created_at', 'timestamp', (col) => col.defaultTo(sql`now()`))
     .addColumn('updated_at', 'timestamp', (col) => col.defaultTo(sql`now()`))
     .execute();
