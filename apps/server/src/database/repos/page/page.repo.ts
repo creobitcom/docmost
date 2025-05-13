@@ -155,15 +155,18 @@ export class PageRepo {
 
     const blocks: any[] = (updatePageData.content as any).content;
 
-    const existingBlockIds = await db
+    const existingBlocks = await db
       .selectFrom('blocks')
-      .select(['id'])
+      .select(['id', 'stateHash'])
       .where('pageId', '=', pageIds[0])
       .execute();
 
+    const existingBlocksMap = new Map(
+      existingBlocks.map((block) => [block.id, block]),
+    );
     const incomingBlockIds = new Set(blocks.map((block) => block.id));
 
-    const blocksToDelete = existingBlockIds.filter(
+    const blocksToDelete = existingBlocks.filter(
       (existingBlock) => !incomingBlockIds.has(existingBlock.id),
     );
 
@@ -180,26 +183,42 @@ export class PageRepo {
     }
 
     for (const block of blocks) {
-      await db
-        .insertInto('blocks')
-        .values({
-          id: block.id,
-          pageId: pageIds[0],
-          content: block,
-          blockType: block?.type,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .onConflict((oc) =>
-          oc.column('id').doUpdateSet({
+      const existingBlock = existingBlocksMap.get(block.id);
+
+      const calculatedHash = await this.calculateHash();
+
+      if (!existingBlock) {
+        await db
+          .insertInto('blocks')
+          .values({
+            id: block.id,
+            pageId: pageIds[0],
+            content: block,
+            blockType: block?.type,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            stateHash: calculatedHash,
+          })
+          .execute();
+      } else if (existingBlock.stateHash !== calculatedHash) {
+        await db
+          .updateTable('blocks')
+          .set({
             content: block,
             updatedAt: new Date(),
-          }),
-        )
-        .execute();
+            stateHash: calculatedHash,
+          })
+          .where('id', '=', block.id)
+          .execute();
+      }
     }
-
     return pageUpdateResult;
+  }
+
+  // TODO: hash fucntion
+  // TODO: move to another module
+  private async calculateHash(): Promise<string> {
+    return 'asd';
   }
 
   async insertPage(
