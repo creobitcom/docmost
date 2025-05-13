@@ -151,7 +151,7 @@ export class PageService {
     userId: string,
   ): Promise<Page> {
     const contributors = new Set<string>(page.contributorIds);
-    contributors.add(userId);
+contributors.add(userId);
     const contributorIds = Array.from(contributors);
     console.log("[updatePageDto]");
     console.log(updatePageDto);
