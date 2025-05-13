@@ -142,8 +142,6 @@ export class PageRepo {
     trx?: KyselyTransaction,
   ): Promise<any> {
     const db = dbOrTx(this.db, trx);
-    const pageClone = { ...updatePageData };
-    delete updatePageData.content;
 
     const pageUpdateResult = await db
       .updateTable('pages')
@@ -155,13 +153,31 @@ export class PageRepo {
       )
       .executeTakeFirst();
 
-    if (!pageClone?.content) {
-      return pageUpdateResult;
-    }
+    const blocks: any[] = (updatePageData.content as any).content;
 
-    const blocks: any[] = (pageClone.content as any).content;
-    console.log('[blocks]');
-    console.log(blocks);
+    const existingBlockIds = await db
+      .selectFrom('blocks')
+      .select(['id'])
+      .where('pageId', '=', pageIds[0])
+      .execute();
+
+    const incomingBlockIds = new Set(blocks.map((block) => block.id));
+
+    const blocksToDelete = existingBlockIds.filter(
+      (existingBlock) => !incomingBlockIds.has(existingBlock.id),
+    );
+
+    if (blocksToDelete.length > 0) {
+      await db
+        .deleteFrom('blocks')
+        .where('pageId', '=', pageIds[0])
+        .where(
+          'id',
+          'in',
+          blocksToDelete.map((block) => block.id),
+        )
+        .execute();
+    }
 
     for (const block of blocks) {
       await db
