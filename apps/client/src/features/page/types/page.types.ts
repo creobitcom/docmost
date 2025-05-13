@@ -10,14 +10,15 @@ export interface IPage {
   id: string;
   slugId: string;
   title: string;
-  content: Array<{
-    attrs?: {
-      textAlign?: string;
-      blockId?: string;
-      [key: string]: any;
-    };
-    [key: string]: any;
-  }>;
+  // content: Array<{
+  //   attrs?: {
+  //     textAlign?: string;
+  //     blockId?: string;
+  //     [key: string]: any;
+  //   };
+  //   [key: string]: any;
+  // }>;
+  content: string;
   icon: string;
   coverPhoto: string;
   parentPageId: string;

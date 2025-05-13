@@ -151,8 +151,7 @@ export class PageService {
     userId: string,
   ): Promise<Page> {
     const contributors = new Set<string>(page.contributorIds);
-contributors.add(userId);
-    const contributorIds = Array.from(contributors);
+    contributors.add(userId);
     console.log("[updatePageDto]");
     console.log(updatePageDto);
     await this.pageRepo.updatePage(
@@ -161,7 +160,7 @@ contributors.add(userId);
         icon: updatePageDto.icon,
         lastUpdatedById: userId,
         updatedAt: new Date(),
-        contributorIds: contributorIds,
+        contributorIds: Array.from(contributors),
       },
       page.id,
     );
@@ -264,7 +263,7 @@ contributors.add(userId);
       // Update root page
       const nextPosition = await this.nextPagePosition(spaceId);
       await this.pageRepo.updatePage(
-        { spaceId, parentPageId: null, position: nextPosition },
+        { spaceId, parentPageId: null, position: nextPosition, content: rootPage.content },
         rootPage.id,
         trx,
       );

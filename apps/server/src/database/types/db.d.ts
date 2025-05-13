@@ -212,6 +212,7 @@ export interface Pages {
   updatedAt: Generated<Timestamp>;
   workspaceId: string;
   ydoc: Buffer | null;
+  content: any;
 }
 
 export interface SpaceMembers {

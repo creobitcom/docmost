@@ -54,8 +54,8 @@ import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
 import { BlockAttributes } from "@/features/editor/extensions/custom-paragraph.ts";
+// import {  v4 as uuidv4 } from "uuid";
 import UniqueId from "tiptap-unique-id";
-import {  v4 as uuidv4 } from "uuid";
 
 interface PageEditorProps {
   pageId: string;
@@ -143,6 +143,11 @@ export default function PageEditor({
     };
   }, [remoteProvider, localProvider]);
 
+  // UniqueId.configure({
+  //   attributeName: "id",
+  //   types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
+  //   createId: () => window.crypto.randomUUID(),
+  // }),
   // todo blocks extensions repo for uuid
   const extensions = useMemo(() => {
     return [
@@ -150,8 +155,26 @@ export default function PageEditor({
       ...collabExtensions(remoteProvider, currentUser?.user),
       BlockAttributes,
       UniqueId.configure({
-        attributeName: "id",
-        types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
+        attributeName: "blockId",
+        types: [
+          'paragraph',
+          'heading',
+          'blockquote',
+          'codeBlock',
+          'bulletList',
+          'orderedList',
+          'listItem',
+          'taskList',
+          'taskItem',
+          'horizontalRule',
+          'image',
+          'table',
+          'tableRow',
+          'tableCell',
+          'tableHeader',
+          'iframe',
+          'figure',
+        ],
         createId: () => window.crypto.randomUUID(),
       }),
     ];

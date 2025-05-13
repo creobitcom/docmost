@@ -93,7 +93,7 @@ export class PageRepo {
 
     const page = await query.executeTakeFirst();
     if (!opts?.includeContent) {
-      return page;
+      return { ...page, content: [] };
     }
 
     // todo blocks - тут мы добавили id блока
@@ -105,7 +105,7 @@ export class PageRepo {
       .execute();
 
     if (pageBlocks.length === 0) {
-      return page;
+      return { ...page, content: [] };
     }
 
     const pageContent = {
@@ -143,6 +143,14 @@ export class PageRepo {
   ): Promise<any> {
     const db = dbOrTx(this.db, trx);
 
+    // todo разобраться может ли быть множество страниц
+    // если может - то весь алгос в цикл for of
+    // for (const page of updatePageData) {
+        /**/
+    // }
+    const pageWithContent: UpdatablePage = {...updatePageData};
+    delete updatePageData.content;
+
     const pageUpdateResult = await db
       .updateTable('pages')
       .set({ ...updatePageData, updatedAt: new Date() })
@@ -153,7 +161,9 @@ export class PageRepo {
       )
       .executeTakeFirst();
 
-    const blocks: any[] = (updatePageData.content as any).content;
+    console.log("[pageWithContent]");
+    console.log(pageWithContent);
+    const blocks: any[] = (pageWithContent?.content as any)?.content;
 
     const existingBlocks = await db
       .selectFrom('blocks')
@@ -183,6 +193,8 @@ export class PageRepo {
     }
 
     for (const block of blocks) {
+      console.log("[block]");
+      console.log(JSON.stringify(block, null, 2));
       const existingBlock = existingBlocksMap.get(block.id);
 
       const calculatedHash = await this.calculateHash();
@@ -191,7 +203,8 @@ export class PageRepo {
         await db
           .insertInto('blocks')
           .values({
-            id: block.id,
+            // id: block.id,
+            id: block.attrs.blockId,
             pageId: pageIds[0],
             content: block,
             blockType: block?.type,
@@ -329,7 +342,7 @@ export class PageRepo {
             'slugId',
             'title',
             'icon',
-            'content',
+            // 'content',
             'parentPageId',
             'spaceId',
             'workspaceId',
@@ -343,7 +356,7 @@ export class PageRepo {
                 'p.slugId',
                 'p.title',
                 'p.icon',
-                'p.content',
+                // 'p.content',
                 'p.parentPageId',
                 'p.spaceId',
                 'p.workspaceId',
