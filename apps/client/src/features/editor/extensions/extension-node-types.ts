@@ -1,5 +1,5 @@
 import { Extension } from "@tiptap/core"
-import { mainExtensions } from "./extensions"
+
 
 /**
  * Extracts unique extension names (typically node/mark types) from a list of extensions.

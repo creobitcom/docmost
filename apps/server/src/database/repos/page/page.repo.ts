@@ -160,7 +160,7 @@ export class PageRepo {
 
     const existingBlocks = await db
       .selectFrom('blocks')
-      .select(['id', 'stateHash'])
+      .select(['id'/*, 'stateHash'*/])
       .where('pageId', '=', pageId)
       .execute();
 
@@ -195,7 +195,7 @@ export class PageRepo {
 
       const existingBlock = existingBlocksMap.get(blockId);
 
-      const calculatedHash = calculateBlockHash(block);
+      //const calculatedHash = calculateBlockHash(block);
 
       if (!existingBlock) {
         this.logger.debug('Inserting block: ', block);
@@ -209,18 +209,18 @@ export class PageRepo {
             blockType: block?.type,
             createdAt: new Date(),
             updatedAt: new Date(),
-            stateHash: calculatedHash,
+            //stateHash: calculatedHash,
           })
           .execute();
-      } else if (existingBlock.stateHash !== calculatedHash) {
-        this.logger.debug('Updating block: ', block);
+      } /*else if (existingBlock.stateHash !== calculatedHash)*/ {
+        //this.logger.debug('Updating block: ', block);
 
         await db
           .updateTable('blocks')
           .set({
             content: block,
             updatedAt: new Date(),
-            stateHash: calculatedHash,
+            //stateHash: calculatedHash,
           })
           .where('id', '=', blockId)
           .execute();
