@@ -57,6 +57,9 @@ import { BlockAttributes } from "@/features/editor/extensions/custom-paragraph.t
 // import {  v4 as uuidv4 } from "uuid";
 import UniqueId from "tiptap-unique-id";
 
+import { getExtensionNodeTypes } from "./extensions/extension-node-types";
+
+
 interface PageEditorProps {
   pageId: string;
   editable: boolean;
@@ -149,11 +152,16 @@ export default function PageEditor({
   //   createId: () => window.crypto.randomUUID(),
   // }),
   // todo blocks extensions repo for uuid
+  const blockTypes = getExtensionNodeTypes(mainExtensions)
+  console.log("Block types:", blockTypes)
+
   const extensions = useMemo(() => {
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
-      BlockAttributes,
+      BlockAttributes.configure({
+        types: blockTypes,
+      }),
       UniqueId.configure({
         attributeName: "blockId",
         types: [
@@ -178,7 +186,7 @@ export default function PageEditor({
         createId: () => window.crypto.randomUUID(),
       }),
     ];
-  }, [ydoc, pageId, remoteProvider, currentUser?.user]);
+}, [ydoc, pageId, remoteProvider, currentUser?.user])
 
   const editor = useEditor(
     {
@@ -231,6 +239,7 @@ export default function PageEditor({
         console.log("[editorJson]");
         console.log(editorJson);
         console.log(editor);
+
         //update local page cache to reduce flickers
         debouncedUpdateContent(editorJson);
       },

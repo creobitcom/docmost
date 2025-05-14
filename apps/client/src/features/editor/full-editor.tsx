@@ -13,7 +13,7 @@ export interface FullEditorProps {
   pageId: string;
   slugId: string;
   title: string;
-  content: string;
+  content: any;
   // blocks: {
   //   blockIds: string[];
   //   deletedBlocksId: string[];
