@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { type Kysely } from 'kysely';
+import { calculateBlockHash } from '../utils';
 
 export async function up(db: Kysely<any>): Promise<void> {
   const pages = await db
@@ -21,20 +22,18 @@ export async function up(db: Kysely<any>): Promise<void> {
           page_id: page.id,
           block_type: block.type,
           content: JSON.stringify(block),
+          state_hash: calculateBlockHash(block),
         })
         .execute();
     }
   }
 
-  await db
-    .updateTable('pages')
-    .set({
-      content: null,
-    })
-    .execute();
+  await db.schema.alterTable('pages').dropColumn('content').execute();
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
+  await db.schema.alterTable('pages').addColumn('content', 'jsonb').execute();
+
   const allBlocks = await db
     .selectFrom('blocks')
     .select(['page_id', 'content'])

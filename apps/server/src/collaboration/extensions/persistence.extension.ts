@@ -45,7 +45,7 @@ export class PersistenceExtension implements Extension {
       return;
     }
 
-    const page = await this.pageRepo.findById(pageId, {
+    const page: Page = await this.pageRepo.findById(pageId, {
       includeContent: true,
       includeYdoc: true,
     });

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB, KyselyTransaction } from '../../types/kysely.types';
-import { dbOrTx } from '../../utils';
+import { calculateBlockHash, dbOrTx } from '../../utils';
 import {
   InsertablePage,
   InsertableUserPagePreferences,
@@ -20,10 +20,14 @@ import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 
 @Injectable()
 export class PageRepo {
+  private readonly logger: Logger;
+
   constructor(
     @InjectKysely() private readonly db: KyselyDB,
     private spaceMemberRepo: SpaceMemberRepo,
-  ) {}
+  ) {
+    this.logger = new Logger('PageRepo');
+  }
 
   private baseFields: Array<keyof Page> = [
     'id',
@@ -93,7 +97,7 @@ export class PageRepo {
 
     const page = await query.executeTakeFirst();
     if (!opts?.includeContent) {
-      return page;
+      return { ...page, content: [] };
     }
 
     // todo blocks - тут мы добавили id блока
@@ -112,89 +116,128 @@ export class PageRepo {
       type: 'doc',
       content: pageBlocks.map((block) => {
         // @ts-ignore
-        if (block.content?.attrs) {
+        if (!block.content?.attrs) {
           // @ts-ignore
-          block.content.attrs.blockId = block.id;
-        } 
-        // @ts-ignore
-        if (block.attrs) {
-          // @ts-ignore
-          block.attrs.blockId = block.id;
+          block.content.attrs = {};
         }
+        // @ts-ignore
+        block.content.attrs.blockId = block.id;
+
         return block.content;
       }),
     };
+
+    this.logger.debug('Sending page content: ', pageContent);
 
     return { ...page, content: pageContent };
   }
 
   async updatePage(
-    updatablePage: UpdatablePage,
+    updatePageData: UpdatablePage,
     pageId: string,
     trx?: KyselyTransaction,
   ) {
-    return this.updatePages(updatablePage, [pageId], trx);
+    const db = dbOrTx(this.db, trx);
+
+    const pageWithContent: UpdatablePage = { ...updatePageData };
+    delete updatePageData.content;
+
+    const pageUpdateResult = await db
+      .updateTable('pages')
+      .set({ ...updatePageData, updatedAt: new Date() })
+      .where(isValidUUID(pageId) ? 'id' : 'slugId', '=', pageId)
+      .executeTakeFirst();
+
+    this.logger.debug('PageWithContent: ', pageWithContent);
+
+    const blocks: { attrs: { blockId: string }; type?: string }[] = (
+      pageWithContent?.content as any
+    )?.content;
+
+    if (!blocks || blocks.length === 0) {
+      return pageUpdateResult;
+    }
+
+    const existingBlocks = await db
+      .selectFrom('blocks')
+      .select(['id', 'stateHash'])
+      .where('pageId', '=', pageId)
+      .execute();
+
+    const existingBlocksMap = new Map(
+      existingBlocks.map((block) => [block.id, block]),
+    );
+    const incomingBlockIds = new Set(
+      blocks.map((block) => block.attrs.blockId),
+    );
+
+    this.logger.debug('Incoming blocks: ', incomingBlockIds);
+
+    const blocksToDelete = existingBlocks.filter(
+      (existingBlock) => !incomingBlockIds.has(existingBlock.id),
+    );
+
+    this.logger.debug('Deleting blocks: ', blocksToDelete);
+    if (blocksToDelete.length > 0) {
+      await db
+        .deleteFrom('blocks')
+        .where('pageId', '=', pageId)
+        .where(
+          'id',
+          'in',
+          blocksToDelete.map((block) => block.id),
+        )
+        .execute();
+    }
+
+    for (const block of blocks) {
+      const blockId = block.attrs.blockId;
+
+      const existingBlock = existingBlocksMap.get(blockId);
+
+      const calculatedHash = calculateBlockHash(block);
+
+      if (!existingBlock) {
+        this.logger.debug('Inserting block: ', block);
+
+        await db
+          .insertInto('blocks')
+          .values({
+            id: blockId,
+            pageId: pageId,
+            content: block,
+            blockType: block?.type,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            stateHash: calculatedHash,
+          })
+          .execute();
+      } else if (existingBlock.stateHash !== calculatedHash) {
+        this.logger.debug('Updating block: ', block);
+
+        await db
+          .updateTable('blocks')
+          .set({
+            content: block,
+            updatedAt: new Date(),
+            stateHash: calculatedHash,
+          })
+          .where('id', '=', blockId)
+          .execute();
+      }
+    }
+
+    return pageUpdateResult;
   }
 
   async updatePages(
     updatePageData: UpdatablePage,
     pageIds: string[],
     trx?: KyselyTransaction,
-  ): Promise<any> {
-    const db = dbOrTx(this.db, trx);
-    const pageClone = { ...updatePageData };
-    delete updatePageData.content;
-
-    const pageUpdateResult = await db
-      .updateTable('pages')
-      .set({ ...updatePageData, updatedAt: new Date() })
-      .where(
-        pageIds.some((pageId) => !isValidUUID(pageId)) ? 'slugId' : 'id',
-        'in',
-        pageIds,
-      )
-      .executeTakeFirst();
-
-    if (!pageClone?.content) {
-      return pageUpdateResult;
+  ): Promise<void> {
+    for (const pageId of pageIds) {
+      await this.updatePage(updatePageData, pageId, trx);
     }
-
-    const blocks: any[] = (pageClone.content as any).content;
-    console.log("[blocks]");
-    console.log(blocks);
-
-    // TODO: upsert
-    // TODO: delete blocks
-    for (const block of blocks) {
-      const existingBlock = await db
-        .selectFrom('blocks')
-        .where('id', '=', block.id)
-        .where('pageId', 'in', pageIds)
-        .executeTakeFirst();
-
-      if (existingBlock) {
-        await db
-          .updateTable('blocks')
-          .set({
-            content: block,
-            updatedAt: new Date(),
-          })
-          .where('id', '=', block.id)
-          .execute();
-      } else {
-        await db
-          .insertInto('blocks')
-          .values({
-            pageId: pageIds[0],
-            content: block,
-            blockType: block?.type,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .execute();
-      }
-    }
-    return pageUpdateResult;
   }
 
   async insertPage(
@@ -305,7 +348,7 @@ export class PageRepo {
             'slugId',
             'title',
             'icon',
-            'content',
+            // 'content',
             'parentPageId',
             'spaceId',
             'workspaceId',
@@ -319,7 +362,7 @@ export class PageRepo {
                 'p.slugId',
                 'p.title',
                 'p.icon',
-                'p.content',
+                // 'p.content',
                 'p.parentPageId',
                 'p.spaceId',
                 'p.workspaceId',
