@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB, KyselyTransaction } from '../../types/kysely.types';
-import { dbOrTx } from '../../utils';
+import { calculateBlockHash, dbOrTx } from '../../utils';
 import {
   InsertablePage,
   InsertableUserPagePreferences,
@@ -146,9 +146,9 @@ export class PageRepo {
     // todo разобраться может ли быть множество страниц
     // если может - то весь алгос в цикл for of
     // for (const page of updatePageData) {
-        /**/
+    /**/
     // }
-    const pageWithContent: UpdatablePage = {...updatePageData};
+    const pageWithContent: UpdatablePage = { ...updatePageData };
     delete updatePageData.content;
 
     const pageUpdateResult = await db
@@ -161,8 +161,8 @@ export class PageRepo {
       )
       .executeTakeFirst();
 
-    console.log("[pageWithContent]");
-    console.log(pageWithContent);
+    Logger.debug('PageWithContent: ' + pageWithContent, 'PageRepo');
+
     const blocks: any[] = (pageWithContent?.content as any)?.content;
 
     const existingBlocks = await db
@@ -193,17 +193,16 @@ export class PageRepo {
     }
 
     for (const block of blocks) {
-      console.log("[block]");
-      console.log(JSON.stringify(block, null, 2));
+      Logger.debug('Block: ' + JSON.stringify(block, null, 2), 'PageRepo');
+
       const existingBlock = existingBlocksMap.get(block.id);
 
-      const calculatedHash = await this.calculateHash();
+      const calculatedHash = calculateBlockHash(block);
 
       if (!existingBlock) {
         await db
           .insertInto('blocks')
           .values({
-            // id: block.id,
             id: block.attrs.blockId,
             pageId: pageIds[0],
             content: block,
@@ -225,13 +224,8 @@ export class PageRepo {
           .execute();
       }
     }
-    return pageUpdateResult;
-  }
 
-  // TODO: hash fucntion
-  // TODO: move to another module
-  private async calculateHash(): Promise<string> {
-    return 'asd';
+    return pageUpdateResult;
   }
 
   async insertPage(
