@@ -151,7 +151,7 @@ export class PageService {
     userId: string,
   ): Promise<Page> {
     const contributors = new Set<string>(page.contributorIds);
-    contributors.add(userId);
+contributors.add(userId);
     const contributorIds = Array.from(contributors);
 
     await this.pageRepo.updatePage(
@@ -405,7 +405,8 @@ export class PageService {
       .where('id', '=', id)
       .execute();
 
-    await this.PageBlocksService.saveBlocksForPage(id, dto.content);
+      await this.PageBlocksService.saveFromTiptapJson(id, dto.content);
+
   }
 
 }
