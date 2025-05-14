@@ -127,6 +127,8 @@ export class PageRepo {
       }),
     };
 
+    this.logger.debug('Sending page content: ', pageContent);
+
     return { ...page, content: pageContent };
   }
 
@@ -169,8 +171,8 @@ export class PageRepo {
       (existingBlock) => !incomingBlockIds.has(existingBlock.id),
     );
 
+    this.logger.debug('Deleting blocks: ', blocksToDelete);
     if (blocksToDelete.length > 0) {
-      this.logger.debug('Deleting blocks: ', blocksToDelete);
       await db
         .deleteFrom('blocks')
         .where('pageId', '=', pageId)
