@@ -8,7 +8,7 @@ export const BlockAttributes = Extension.create({
     return [
       {
         types: [
-          'paragraph',
+          /*'paragraph',
           'heading',
           'blockquote',
           'codeBlock',
@@ -24,7 +24,7 @@ export const BlockAttributes = Extension.create({
           'tableCell',
           'tableHeader',
           'iframe',
-          'figure',
+          'figure',*/
         ],
         attributes: {
           blockId: {

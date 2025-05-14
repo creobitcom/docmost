@@ -55,7 +55,7 @@ import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
 import { BlockAttributes } from "@/features/editor/extensions/custom-paragraph.ts";
 import UniqueId from "tiptap-unique-id";
-import {  v4 as uuidv4 } from "uuid";
+import { getExtensionNodeTypes } from "./extensions/extension-node-types";
 
 interface PageEditorProps {
   pageId: string;
@@ -144,18 +144,23 @@ export default function PageEditor({
   }, [remoteProvider, localProvider]);
 
   // todo blocks extensions repo for uuid
+  const blockTypes = getExtensionNodeTypes(mainExtensions)
+  console.log("Block types:", blockTypes)
+
   const extensions = useMemo(() => {
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
-      BlockAttributes,
+      BlockAttributes.configure({
+        types: blockTypes,
+      }),
       UniqueId.configure({
         attributeName: "id",
         types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
         createId: () => window.crypto.randomUUID(),
       }),
     ];
-  }, [ydoc, pageId, remoteProvider, currentUser?.user]);
+}, [ydoc, pageId, remoteProvider, currentUser?.user])
 
   const editor = useEditor(
     {
@@ -208,6 +213,7 @@ export default function PageEditor({
         console.log("[editorJson]");
         console.log(editorJson);
         console.log(editor);
+
         //update local page cache to reduce flickers
         debouncedUpdateContent(editorJson);
       },
