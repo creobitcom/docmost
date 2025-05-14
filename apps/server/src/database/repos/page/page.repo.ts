@@ -109,7 +109,7 @@ export class PageRepo {
       .execute();
 
     if (pageBlocks.length === 0) {
-      return { ...page, content: [] };
+      return page;
     }
 
     const pageContent = {
@@ -150,7 +150,13 @@ export class PageRepo {
 
     this.logger.debug('PageWithContent: ', pageWithContent);
 
-    const blocks: any[] = (pageWithContent?.content as any)?.content;
+    const blocks: { attrs: { blockId: string }; type?: string }[] = (
+      pageWithContent?.content as any
+    )?.content;
+
+    if (!blocks || blocks.length === 0) {
+      return pageUpdateResult;
+    }
 
     const existingBlocks = await db
       .selectFrom('blocks')
@@ -185,7 +191,7 @@ export class PageRepo {
     }
 
     for (const block of blocks) {
-      const blockId = block.attrs.id;
+      const blockId = block.attrs.blockId;
 
       const existingBlock = existingBlocksMap.get(blockId);
 
