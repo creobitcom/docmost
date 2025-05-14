@@ -129,36 +129,19 @@ export class PageRepo {
   }
 
   async updatePage(
-    updatablePage: UpdatablePage,
+    updatePageData: UpdatablePage,
     pageId: string,
     trx?: KyselyTransaction,
   ) {
-    return this.updatePages(updatablePage, [pageId], trx);
-  }
-
-  async updatePages(
-    updatePageData: UpdatablePage,
-    pageIds: string[],
-    trx?: KyselyTransaction,
-  ): Promise<any> {
     const db = dbOrTx(this.db, trx);
 
-    // todo разобраться может ли быть множество страниц
-    // если может - то весь алгос в цикл for of
-    // for (const page of updatePageData) {
-    /**/
-    // }
     const pageWithContent: UpdatablePage = { ...updatePageData };
     delete updatePageData.content;
 
     const pageUpdateResult = await db
       .updateTable('pages')
       .set({ ...updatePageData, updatedAt: new Date() })
-      .where(
-        pageIds.some((pageId) => !isValidUUID(pageId)) ? 'slugId' : 'id',
-        'in',
-        pageIds,
-      )
+      .where(isValidUUID(pageId) ? 'id' : 'slugId', '=', pageId)
       .executeTakeFirst();
 
     Logger.debug('PageWithContent: ' + pageWithContent, 'PageRepo');
@@ -168,7 +151,7 @@ export class PageRepo {
     const existingBlocks = await db
       .selectFrom('blocks')
       .select(['id', 'stateHash'])
-      .where('pageId', '=', pageIds[0])
+      .where('pageId', '=', pageId)
       .execute();
 
     const existingBlocksMap = new Map(
@@ -183,7 +166,7 @@ export class PageRepo {
     if (blocksToDelete.length > 0) {
       await db
         .deleteFrom('blocks')
-        .where('pageId', '=', pageIds[0])
+        .where('pageId', '=', pageId)
         .where(
           'id',
           'in',
@@ -204,7 +187,7 @@ export class PageRepo {
           .insertInto('blocks')
           .values({
             id: block.attrs.blockId,
-            pageId: pageIds[0],
+            pageId: pageId,
             content: block,
             blockType: block?.type,
             createdAt: new Date(),
@@ -226,6 +209,16 @@ export class PageRepo {
     }
 
     return pageUpdateResult;
+  }
+
+  async updatePages(
+    updatePageData: UpdatablePage,
+    pageIds: string[],
+    trx?: KyselyTransaction,
+  ): Promise<void> {
+    for (const pageId of pageIds) {
+      await this.updatePage(updatePageData, pageId, trx);
+    }
   }
 
   async insertPage(
