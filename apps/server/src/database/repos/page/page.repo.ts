@@ -183,7 +183,9 @@ export class PageRepo {
     }
 
     for (const block of blocks) {
-      const existingBlock = existingBlocksMap.get(block.attrs.blockId);
+      const blockId = block.attrs.id;
+
+      const existingBlock = existingBlocksMap.get(blockId);
 
       const calculatedHash = calculateBlockHash(block);
 
@@ -193,7 +195,7 @@ export class PageRepo {
         await db
           .insertInto('blocks')
           .values({
-            id: block.attrs.blockId,
+            id: blockId,
             pageId: pageId,
             content: block,
             blockType: block?.type,
@@ -212,7 +214,7 @@ export class PageRepo {
             updatedAt: new Date(),
             stateHash: calculatedHash,
           })
-          .where('id', '=', block.attrs.blockId)
+          .where('id', '=', blockId)
           .execute();
       }
     }
