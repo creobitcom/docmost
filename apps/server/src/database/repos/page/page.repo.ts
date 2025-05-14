@@ -20,10 +20,14 @@ import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 
 @Injectable()
 export class PageRepo {
+  private readonly logger: Logger;
+
   constructor(
     @InjectKysely() private readonly db: KyselyDB,
     private spaceMemberRepo: SpaceMemberRepo,
-  ) {}
+  ) {
+    this.logger = new Logger('PageRepo');
+  }
 
   private baseFields: Array<keyof Page> = [
     'id',
@@ -112,15 +116,13 @@ export class PageRepo {
       type: 'doc',
       content: pageBlocks.map((block) => {
         // @ts-ignore
-        if (block.content?.attrs) {
+        if (!block.content?.attrs) {
           // @ts-ignore
-          block.content.attrs.blockId = block.id;
+          block.content.attrs = {};
         }
         // @ts-ignore
-        if (block.attrs) {
-          // @ts-ignore
-          block.attrs.blockId = block.id;
-        }
+        block.content.attrs.blockId = block.id;
+
         return block.content;
       }),
     };
@@ -144,7 +146,7 @@ export class PageRepo {
       .where(isValidUUID(pageId) ? 'id' : 'slugId', '=', pageId)
       .executeTakeFirst();
 
-    Logger.debug('PageWithContent: ' + pageWithContent, 'PageRepo');
+    this.logger.debug('PageWithContent: ', pageWithContent);
 
     const blocks: any[] = (pageWithContent?.content as any)?.content;
 
@@ -157,13 +159,18 @@ export class PageRepo {
     const existingBlocksMap = new Map(
       existingBlocks.map((block) => [block.id, block]),
     );
-    const incomingBlockIds = new Set(blocks.map((block) => block.id));
+    const incomingBlockIds = new Set(
+      blocks.map((block) => block.attrs.blockId),
+    );
+
+    this.logger.debug('Incoming blocks: ', incomingBlockIds);
 
     const blocksToDelete = existingBlocks.filter(
       (existingBlock) => !incomingBlockIds.has(existingBlock.id),
     );
 
     if (blocksToDelete.length > 0) {
+      this.logger.debug('Deleting blocks: ', blocksToDelete);
       await db
         .deleteFrom('blocks')
         .where('pageId', '=', pageId)
@@ -176,13 +183,13 @@ export class PageRepo {
     }
 
     for (const block of blocks) {
-      Logger.debug('Block: ' + JSON.stringify(block, null, 2), 'PageRepo');
-
-      const existingBlock = existingBlocksMap.get(block.id);
+      const existingBlock = existingBlocksMap.get(block.attrs.blockId);
 
       const calculatedHash = calculateBlockHash(block);
 
       if (!existingBlock) {
+        this.logger.debug('Inserting block: ', block);
+
         await db
           .insertInto('blocks')
           .values({
@@ -196,6 +203,8 @@ export class PageRepo {
           })
           .execute();
       } else if (existingBlock.stateHash !== calculatedHash) {
+        this.logger.debug('Updating block: ', block);
+
         await db
           .updateTable('blocks')
           .set({
@@ -203,7 +212,7 @@ export class PageRepo {
             updatedAt: new Date(),
             stateHash: calculatedHash,
           })
-          .where('id', '=', block.id)
+          .where('id', '=', block.attrs.blockId)
           .execute();
       }
     }
