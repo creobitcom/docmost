@@ -13,7 +13,7 @@ import {
   onAuthenticationFailedParameters,
   WebSocketStatus,
 } from "@hocuspocus/provider";
-import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
+import { EditorContent, EditorProvider, Extension, useEditor } from "@tiptap/react";
 import {
   collabExtensions,
   mainExtensions,
@@ -53,9 +53,10 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
-import { BlockAttributes } from "@/features/editor/extensions/custom-paragraph.ts";
+import { BlockAttributes } from "@/features/editor/extensions/custom-attributes";
 // import {  v4 as uuidv4 } from "uuid";
 import UniqueId from "tiptap-unique-id";
+import { BlockTypes, UpdateBlockPositions } from "./editor.namespace";
 
 interface PageEditorProps {
   pageId: string;
@@ -143,11 +144,6 @@ export default function PageEditor({
     };
   }, [remoteProvider, localProvider]);
 
-  // UniqueId.configure({
-  //   attributeName: "id",
-  //   types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
-  //   createId: () => window.crypto.randomUUID(),
-  // }),
   // todo blocks extensions repo for uuid
   const extensions = useMemo(() => {
     return [
@@ -156,26 +152,15 @@ export default function PageEditor({
       BlockAttributes,
       UniqueId.configure({
         attributeName: "blockId",
-        types: [
-          'paragraph',
-          'heading',
-          'blockquote',
-          'codeBlock',
-          'bulletList',
-          'orderedList',
-          'listItem',
-          'taskList',
-          'taskItem',
-          'horizontalRule',
-          'image',
-          'table',
-          'tableRow',
-          'tableCell',
-          'tableHeader',
-          'iframe',
-          'figure',
-        ],
+        types: BlockTypes,
         createId: () => window.crypto.randomUUID(),
+      }),
+      Extension.create({
+        name: 'blockPositionUpdater',
+        addProseMirrorPlugins() {
+          // return [UpdateBlockPositions]
+          return []
+        },
       }),
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);

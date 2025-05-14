@@ -14,7 +14,7 @@ import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
 import { executeWithPagination } from '@docmost/db/pagination/pagination';
 import { validate as isValidUUID } from 'uuid';
 import { ExpressionBuilder, sql } from 'kysely';
-import { DB, Json } from '@docmost/db/types/db';
+import { DB } from '@docmost/db/types/db';
 import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 
@@ -197,7 +197,7 @@ export class PageRepo {
       console.log(JSON.stringify(block, null, 2));
       const existingBlock = existingBlocksMap.get(block.id);
 
-      const calculatedHash = await this.calculateHash();
+      const calculatedHash = await this.calculateHash(block);
 
       if (!existingBlock) {
         await db
@@ -230,7 +230,7 @@ export class PageRepo {
 
   // TODO: hash fucntion
   // TODO: move to another module
-  private async calculateHash(): Promise<string> {
+  private async calculateHash(str: string): Promise<string> {
     return 'asd';
   }
 

@@ -51,22 +51,12 @@ export const Callout = Node.create<CalloutOptions>({
   defining: true,
 
   addAttributes() {
-    // const generateBlockId = (() => {
-    //   return () => uuidv4(); // Возвращает новый UUID
-    // })();
     return {
       type: {
         default: "info",
         parseHTML: (element) => element.getAttribute("data-callout-type"),
         renderHTML: (attributes) => ({
           "data-callout-type": attributes.type,
-        }),
-      },
-      blockId: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("blockId"),
-        renderHTML: (attributes) => ({
-          "blockId": attributes.blockId,
         }),
       },
     };
