@@ -81,19 +81,23 @@ export const assignPermissionToBlock = async ({
   blockId,
   userId,
   role,
+  permission,
 }: {
   pageId: string;
   blockId: string;
   userId: string;
   role: string;
+  permission?: string;
 }) => {
-  return axios.post("/api/page-permissions", {
+  return api.post("/page-permissions", {
     pageId,
     blockId,
     userId,
     role,
+    permission,
   });
 };
+
 export const updatePageBlocks = async (pageId: string, blocks: IPageBlock[]) => {
   console.log('📤 Sending blocks:', blocks);
   try {
