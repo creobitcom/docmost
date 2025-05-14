@@ -1,4 +1,5 @@
 import { KyselyDB, KyselyTransaction } from './types/kysely.types';
+import crypto from 'crypto';
 
 /*
  * Executes a transaction or a callback using the provided database instance.
@@ -30,4 +31,16 @@ export function dbOrTx(
   } else {
     return db; // Use normal database instance
   }
+}
+
+export function calculateBlockHash(content: any): string {
+  const contentString =
+    typeof content === 'string' ? content : JSON.stringify(content);
+
+  const hashInput = [contentString].map((val) => val || '').join('');
+
+  const hash = crypto.createHash('md5');
+  hash.update(hashInput);
+
+  return hash.digest('hex');
 }
