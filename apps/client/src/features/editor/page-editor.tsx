@@ -13,7 +13,7 @@ import {
   onAuthenticationFailedParameters,
   WebSocketStatus,
 } from "@hocuspocus/provider";
-import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
+import { EditorContent, EditorProvider, Extension, useEditor } from "@tiptap/react";
 import {
   collabExtensions,
   mainExtensions,
@@ -54,11 +54,9 @@ import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
 import { BlockAttributes } from "@/features/editor/extensions/custom-paragraph.ts";
-// import {  v4 as uuidv4 } from "uuid";
 import UniqueId from "tiptap-unique-id";
-
-import { getExtensionNodeTypes } from "./extensions/extension-node-types";
-
+import {updateBlockPositionsPlugin} from "./extensions/update-block-positions-plugin"
+import { allNodeTypes } from "@/features/editor/extensions/custom-paragraph.ts";
 
 interface PageEditorProps {
   pageId: string;
@@ -146,46 +144,29 @@ export default function PageEditor({
     };
   }, [remoteProvider, localProvider]);
 
-  // UniqueId.configure({
-  //   attributeName: "id",
-  //   types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
-  //   createId: () => window.crypto.randomUUID(),
-  // }),
   // todo blocks extensions repo for uuid
-  const blockTypes = getExtensionNodeTypes(mainExtensions)
-  console.log("Block types:", blockTypes)
+  const nodeTypes = mainExtensions
+  .filter(ext => ext?.type === 'node')
+  .map(ext => ext.name)
 
-  const extensions = useMemo(() => {
-    return [
-      ...mainExtensions,
-      ...collabExtensions(remoteProvider, currentUser?.user),
-      BlockAttributes.configure({
-        types: blockTypes,
-      }),
-      UniqueId.configure({
-        attributeName: "blockId",
-        types: [
-          'paragraph',
-          'heading',
-          'blockquote',
-          'codeBlock',
-          'bulletList',
-          'orderedList',
-          'listItem',
-          'taskList',
-          'taskItem',
-          'horizontalRule',
-          'image',
-          'table',
-          'tableRow',
-          'tableCell',
-          'tableHeader',
-          'iframe',
-          'figure',
-        ],
-        createId: () => window.crypto.randomUUID(),
-      }),
-    ];
+const extensions = useMemo(() => {
+
+  return [
+    ...mainExtensions,
+    ...collabExtensions(remoteProvider, currentUser?.user),
+    BlockAttributes,
+    UniqueId.configure({
+      attributeName: "id",
+      types: allNodeTypes,
+      createId: () => window.crypto.randomUUID(),
+    }),
+    Extension.create({
+      name: 'blockPositionUpdater',
+      addProseMirrorPlugins() {
+        return [updateBlockPositionsPlugin]
+      },
+    }),
+  ];
 }, [ydoc, pageId, remoteProvider, currentUser?.user])
 
   const editor = useEditor(

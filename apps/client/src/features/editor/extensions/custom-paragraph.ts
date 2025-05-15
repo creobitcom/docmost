@@ -1,30 +1,33 @@
 import { Extension } from '@tiptap/core'
 import { v4 as uuidv4 } from 'uuid'
 
+export enum BlockNodeType {
+  Paragraph = 'paragraph',
+  Heading = 'heading',
+  Blockquote = 'blockquote',
+  CodeBlock = 'codeBlock',
+  BulletList = 'bulletList',
+  OrderedList = 'orderedList',
+  ListItem = 'listItem',
+  TaskList = 'taskList',
+  TaskItem = 'taskItem',
+  HorizontalRule = 'horizontalRule',
+  Image = 'image',
+  Table = 'table',
+  TableRow = 'tableRow',
+  TableCell = 'tableCell',
+  TableHeader = 'tableHeader',
+  Iframe = 'iframe',
+  Figure = 'figure',
+}
+export const allNodeTypes: BlockNodeType[] = Object.values(BlockNodeType);
+
 export const BlockAttributes = Extension.create({
   name: 'blockAttributes',
 
   addGlobalCommands() {
     return {
-      types: [
-        'paragraph',
-        'heading',
-        'blockquote',
-        'codeBlock',
-        'bulletList',
-        'orderedList',
-        'listItem',
-        'taskList',
-        'taskItem',
-        'horizontalRule',
-        'image',
-        'table',
-        'tableRow',
-        'tableCell',
-        'tableHeader',
-        'iframe',
-        'figure',
-      ],
+      types: allNodeTypes,
       onCreate:
         (attrs: any) =>
         ({ commands }) => {
@@ -38,25 +41,7 @@ export const BlockAttributes = Extension.create({
   addGlobalAttributes() {
     return [
       {
-        types: [
-          /*'paragraph',
-          'heading',
-          'blockquote',
-          'codeBlock',
-          'bulletList',
-          'orderedList',
-          'listItem',
-          'taskList',
-          'taskItem',
-          'horizontalRule',
-          'image',
-          'table',
-          'tableRow',
-          'tableCell',
-          'tableHeader',
-          'iframe',
-          'figure',*/
-        ],
+        types: allNodeTypes,
         attributes: {
           blockId: {
             // default: () => uuidv4(),
@@ -71,7 +56,6 @@ export const BlockAttributes = Extension.create({
             }),
           },
           position: {
-            default: Math.floor(Math.random() * 10000) + 1,
             parseHTML: (element) => element.getAttribute('position'),
             renderHTML: (attributes) => ({
               position: attributes.position,
@@ -92,7 +76,7 @@ export const BlockAttributes = Extension.create({
               });
             },
         }
-        
+
     },]
   },
 })
