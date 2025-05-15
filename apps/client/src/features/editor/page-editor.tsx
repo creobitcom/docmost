@@ -164,10 +164,21 @@ export default function PageEditor({
       }),
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
+  const sanitizedContent = (content) => {
+    if (
+      !content ||
+      !content.content ||
+      content.content.length === 0
+    ) {
+      return null
+    }
 
+    return content
+  }
   const editor = useEditor(
     {
       extensions,
+      content: sanitizedContent(content),
       editable,
       immediatelyRender: true,
       shouldRerenderOnTransaction: true,

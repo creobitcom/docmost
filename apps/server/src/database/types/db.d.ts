@@ -191,6 +191,7 @@ export interface PageMembers {
 }
 
 export interface Pages {
+  content: Json | null;
   contributorIds: Generated<string[] | null>;
   coverPhoto: string | null;
   createdAt: Generated<Timestamp>;
@@ -212,7 +213,6 @@ export interface Pages {
   updatedAt: Generated<Timestamp>;
   workspaceId: string;
   ydoc: Buffer | null;
-  content: any;
 }
 
 export interface SpaceMembers {

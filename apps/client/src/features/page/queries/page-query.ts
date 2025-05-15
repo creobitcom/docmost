@@ -57,6 +57,7 @@ export function usePageQuery(
     staleTime: 5 * 60 * 1000,
   });
   console.log("[query.data]");
+  //@ts-ignore
   console.log(query.data?.content?.content);
   useEffect(() => {
     if (query.data) {
