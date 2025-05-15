@@ -148,11 +148,30 @@ export class PageRepo {
       .where(isValidUUID(pageId) ? 'id' : 'slugId', '=', pageId)
       .executeTakeFirst();
 
+    if (!updatePageData.content) {
+      return pageUpdateResult;
+    }
+
     this.logger.debug('PageWithContent: ', pageWithContent);
 
-    const blocks: { attrs: { blockId: string }; type?: string }[] = (
-      pageWithContent?.content as any
-    )?.content;
+    const blocks: {
+      attrs: { blockId: string };
+      type?: string;
+      content?: any[];
+    }[] = (pageWithContent?.content as any)?.content;
+
+    // Fix deleting all page content
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      if (
+        block.type === 'paragraph' &&
+        (!Object.prototype.hasOwnProperty.call(block, 'content') ||
+          block.content.length === 0)
+      ) {
+        blocks.splice(i, 1);
+        i--;
+      }
+    }
 
     if (!blocks || blocks.length === 0) {
       return pageUpdateResult;
