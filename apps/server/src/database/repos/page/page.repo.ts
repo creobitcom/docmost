@@ -146,9 +146,9 @@ export class PageRepo {
     // todo разобраться может ли быть множество страниц
     // если может - то весь алгос в цикл for of
     // for (const page of updatePageData) {
-        /**/
+    /**/
     // }
-    const pageWithContent: UpdatablePage = {...updatePageData};
+    const pageWithContent: UpdatablePage = { ...updatePageData };
     delete updatePageData.content;
 
     const pageUpdateResult = await db
@@ -161,9 +161,34 @@ export class PageRepo {
       )
       .executeTakeFirst();
 
-    console.log("[pageWithContent]");
-    console.log(pageWithContent);
-    const blocks: any[] = (pageWithContent?.content as any)?.content;
+    if (!updatePageData.content) {
+      return pageUpdateResult;
+    }
+
+    this.logger.debug('PageWithContent: ', pageWithContent);
+
+    const blocks: {
+      attrs: { blockId: string };
+      type?: string;
+      content?: any[];
+    }[] = (pageWithContent?.content as any)?.content;
+
+    // Fix deleting all page content
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      if (
+        block.type === 'paragraph' &&
+        (!Object.prototype.hasOwnProperty.call(block, 'content') ||
+          block.content.length === 0)
+      ) {
+        blocks.splice(i, 1);
+        i--;
+      }
+    }
+
+    if (!blocks || blocks.length === 0) {
+      return pageUpdateResult;
+    }
 
     const existingBlocks = await db
       .selectFrom('blocks')
@@ -193,7 +218,7 @@ export class PageRepo {
     }
 
     for (const block of blocks) {
-      console.log("[block]");
+      console.log('[block]');
       console.log(JSON.stringify(block, null, 2));
       const existingBlock = existingBlocksMap.get(block.id);
 

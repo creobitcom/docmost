@@ -55,15 +55,15 @@ export class PersistenceExtension implements Extension {
       return;
     }
 
-    if (page.ydoc) {
-      this.logger.debug(`ydoc loaded from db: ${pageId}`);
+    // if (page.ydoc) {
+    //   this.logger.debug(`ydoc loaded from db: ${pageId}`);
 
-      const doc = new Y.Doc();
-      const dbState = new Uint8Array(page.ydoc);
+    //   const doc = new Y.Doc();
+    //   const dbState = new Uint8Array(page.ydoc);
 
-      Y.applyUpdate(doc, dbState);
-      return doc;
-    }
+    //   Y.applyUpdate(doc, dbState);
+    //   return doc;
+    // }
 
     // if no ydoc state in db convert json in page.content to Ydoc.
     if (page.content) {
@@ -90,6 +90,17 @@ export class PersistenceExtension implements Extension {
 
     const tiptapJson = TiptapTransformer.fromYdoc(document, 'default');
     const ydocState = Buffer.from(Y.encodeStateAsUpdate(document));
+
+    Logger.debug('Document: ', tiptapJson);
+    const documentContent: { type: string; content: [] }[] = tiptapJson.content;
+    if (
+      documentContent.length === 1 &&
+      documentContent[0].type === 'paragraph' &&
+      (!Object.prototype.hasOwnProperty.call(documentContent, 'content') ||
+        documentContent[0].content.length === 0)
+    ) {
+      return;
+    }
 
     let textContent = null;
 
