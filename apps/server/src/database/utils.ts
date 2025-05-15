@@ -34,13 +34,15 @@ export function dbOrTx(
 }
 
 export function calculateBlockHash(content: any): string {
+  if (content === undefined || content === null) {
+    return createHash('md5').update('null').digest('hex');
+  }
+
   const contentString =
     typeof content === 'string' ? content : JSON.stringify(content);
 
-  const hashInput = [contentString].map((val) => val || '').join('');
-
   const hash = createHash('md5');
-  hash.update(hashInput);
+  hash.update(contentString);
 
   return hash.digest('hex');
 }
