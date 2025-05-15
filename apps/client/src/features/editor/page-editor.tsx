@@ -59,7 +59,6 @@ import UniqueId from "tiptap-unique-id";
 
 import { getExtensionNodeTypes } from "./extensions/extension-node-types";
 
-
 interface PageEditorProps {
   pageId: string;
   editable: boolean;
@@ -146,47 +145,45 @@ export default function PageEditor({
     };
   }, [remoteProvider, localProvider]);
 
-  // UniqueId.configure({
-  //   attributeName: "id",
-  //   types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
-  //   createId: () => window.crypto.randomUUID(),
-  // }),
-  // todo blocks extensions repo for uuid
-  const blockTypes = getExtensionNodeTypes(mainExtensions)
-  console.log("Block types:", blockTypes)
+  // Определяет все разрешения, не только типы блоков
+  // const blockTypes = getExtensionNodeTypes(mainExtensions);
+  // console.log("Block types:", blockTypes)
 
   const extensions = useMemo(() => {
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
-      BlockAttributes.configure({
-        types: blockTypes,
-      }),
+      // Нужно оставить одно рашришение для id
+      // UniqueId по моим наблюдениям работает нормально
+      // Для других атрибутов надо сделать отдельное разширение
+      // BlockAttributes.configure({
+      //   types: blockTypes,
+      // }),
       UniqueId.configure({
         attributeName: "blockId",
         types: [
-          'paragraph',
-          'heading',
-          'blockquote',
-          'codeBlock',
-          'bulletList',
-          'orderedList',
-          'listItem',
-          'taskList',
-          'taskItem',
-          'horizontalRule',
-          'image',
-          'table',
-          'tableRow',
-          'tableCell',
-          'tableHeader',
-          'iframe',
-          'figure',
+          "paragraph",
+          "heading",
+          "blockquote",
+          "codeBlock",
+          "bulletList",
+          "orderedList",
+          "listItem",
+          "taskList",
+          "taskItem",
+          "horizontalRule",
+          "image",
+          "table",
+          "tableRow",
+          "tableCell",
+          "tableHeader",
+          "iframe",
+          "figure",
         ],
         createId: () => window.crypto.randomUUID(),
       }),
     ];
-}, [ydoc, pageId, remoteProvider, currentUser?.user])
+  }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
   const editor = useEditor(
     {
