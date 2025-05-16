@@ -116,15 +116,12 @@ export class PageRepo {
       type: 'doc',
       content: pageBlocks.map((block) => {
         // @ts-ignore
-        if (block.content?.attrs) {
+        if (!block.content?.attrs) {
           // @ts-ignore
-          block.content.attrs.blockId = block.id;
+          block.content.attrs = {};
         }
         // @ts-ignore
-        if (block.attrs) {
-          // @ts-ignore
-          block.attrs.blockId = block.id;
-        }
+        block.content.attrs.blockId = block.id;
         return block.content;
       }),
     };
@@ -190,18 +187,6 @@ export class PageRepo {
       content?: any[];
     }[] = (updatePageData?.content as any)?.content;
 
-    // Fix deleting all page content
-    for (let i = 0; i < blocks.length; i++) {
-      const block = blocks[i];
-      if (
-        block.type === 'paragraph' &&
-        !Object.prototype.hasOwnProperty.call(block, 'content')
-      ) {
-        blocks.splice(i, 1);
-        i--;
-      }
-    }
-
     if (!blocks || blocks.length === 0) {
       return;
     }
@@ -212,7 +197,12 @@ export class PageRepo {
     );
 
     const incomingBlockIds = new Set(
-      blocks.map((block) => block.attrs.blockId),
+      blocks.map((block) => {
+        if (!Object.prototype.hasOwnProperty.call(block.attrs, 'blockId')) {
+          this.logger.error('Block missing blockId attribute: ', block);
+        }
+        return block.attrs.blockId;
+      }),
     );
     this.logger.debug('Incoming blocks: ', incomingBlockIds);
 
