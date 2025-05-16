@@ -96,8 +96,7 @@ export class PersistenceExtension implements Extension {
     if (
       documentContent.length === 1 &&
       documentContent[0].type === 'paragraph' &&
-      (!Object.prototype.hasOwnProperty.call(documentContent, 'content') ||
-        documentContent[0].content.length === 0)
+      !Object.prototype.hasOwnProperty.call(documentContent[0], 'content')
     ) {
       return;
     }
