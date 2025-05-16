@@ -13,9 +13,15 @@ import {
   onAuthenticationFailedParameters,
   WebSocketStatus,
 } from "@hocuspocus/provider";
-import { EditorContent, EditorProvider, Extension, useEditor } from "@tiptap/react";
+import {
+  EditorContent,
+  EditorProvider,
+  Extension,
+  useEditor,
+} from "@tiptap/react";
 import {
   collabExtensions,
+  creobitExtentions,
   mainExtensions,
 } from "@/features/editor/extensions/extensions";
 import { useAtom } from "jotai";
@@ -144,37 +150,20 @@ export default function PageEditor({
     };
   }, [remoteProvider, localProvider]);
 
-  // todo blocks extensions repo for uuid
   const extensions = useMemo(() => {
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
-      BlockAttributes,
-      UniqueId.configure({
-        attributeName: "blockId",
-        types: BlockTypes,
-        createId: () => window.crypto.randomUUID(),
-      }),
-      Extension.create({
-        name: 'blockPositionUpdater',
-        addProseMirrorPlugins() {
-          // return [UpdateBlockPositions]
-          return []
-        },
-      }),
+      ...creobitExtentions,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
   const sanitizedContent = (content) => {
-    if (
-      !content ||
-      !content.content ||
-      content.content.length === 0
-    ) {
-      return null
+    if (!content || !content.content || content.content.length === 0) {
+      return null;
     }
 
-    return content
-  }
+    return content;
+  };
   const editor = useEditor(
     {
       extensions,
