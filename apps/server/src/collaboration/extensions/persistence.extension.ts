@@ -24,6 +24,7 @@ import {
 import { isDeepStrictEqual } from 'node:util';
 import { IPageBacklinkJob } from '../../integrations/queue/constants/queue.interface';
 import { Page } from '@docmost/db/types/entity.types';
+import { PageService } from 'src/core/page/services/page.service';
 
 @Injectable()
 export class PersistenceExtension implements Extension {
@@ -31,6 +32,7 @@ export class PersistenceExtension implements Extension {
   private contributors: Map<string, Set<string>> = new Map();
 
   constructor(
+    private readonly pageService: PageService,
     private readonly pageRepo: PageRepo,
     @InjectKysely() private readonly db: KyselyDB,
     private eventEmitter: EventEmitter2,
@@ -145,7 +147,7 @@ export class PersistenceExtension implements Extension {
           this.logger.log('Contributors error:' + err?.['message']);
         }
 
-        await this.pageRepo.updatePage(
+        await this.pageService.updateForSocket(
           {
             content: tiptapJson,
             textContent: textContent,

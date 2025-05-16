@@ -135,37 +135,36 @@ export class PageRepo {
     trx?: KyselyTransaction,
   ): Promise<void> {
     for (const pageId of pageIds) {
-      await this.updatePage(updatePageData, pageId, trx);
+      await this.updatePageWithContent(updatePageData, pageId, trx);
     }
   }
 
-  async updatePage(
+  async updatePageWithContent(
     updatePageData: UpdatablePage,
     pageId: string,
     trx?: KyselyTransaction,
   ) {
     this.logger.debug('Updating page: ', updatePageData);
 
-    const db = dbOrTx(this.db, trx);
-
     const pageUpdateResult = await this.updatePageMetadata(
       updatePageData,
       pageId,
-      db,
+      trx,
     );
 
     if (updatePageData.content) {
-      await this.updatePageBlocks(updatePageData, pageId, db);
+      await this.updatePageBlocks(updatePageData, pageId, trx);
     }
 
     return pageUpdateResult;
   }
 
-  private async updatePageMetadata(
+  async updatePageMetadata(
     updatePageData: UpdatablePage,
     pageId: string,
-    db: any,
+    trx?: KyselyTransaction,
   ): Promise<any> {
+    const db = dbOrTx(this.db, trx);
     const pageMetadata = { ...updatePageData };
     delete pageMetadata.content;
 
@@ -176,11 +175,12 @@ export class PageRepo {
       .executeTakeFirst();
   }
 
-  private async updatePageBlocks(
+  async updatePageBlocks(
     updatePageData: UpdatablePage,
     pageId: string,
-    db: any,
+    trx?: KyselyTransaction,
   ): Promise<void> {
+    const db = dbOrTx(this.db, trx);
     const blocks: {
       attrs: { blockId: string };
       type?: string;
@@ -191,7 +191,7 @@ export class PageRepo {
       return;
     }
 
-    const existingBlocks = await this.getExistingPageBlocks(pageId, db);
+    const existingBlocks = await this.getExistingPageBlocks(pageId, trx);
     const existingBlocksMap = new Map(
       existingBlocks.map((block) => [block.id, block]),
     );
@@ -206,40 +206,6 @@ export class PageRepo {
     );
     this.logger.debug('Incoming blocks: ', incomingBlockIds);
 
-    await this.deleteRemovedBlocks(
-      pageId,
-      existingBlocks,
-      incomingBlockIds,
-      db,
-    );
-
-    for (const block of blocks) {
-      const blockId = block.attrs.blockId;
-      const existingBlock = existingBlocksMap.get(blockId);
-      const calculatedHash = calculateBlockHash(block);
-
-      if (!existingBlock) {
-        await this.createBlock(block, blockId, pageId, calculatedHash, db);
-      } else if (existingBlock.stateHash !== calculatedHash) {
-        await this.updateExistingBlock(block, blockId, calculatedHash, db);
-      }
-    }
-  }
-
-  private async getExistingPageBlocks(pageId: string, db: any): Promise<any[]> {
-    return db
-      .selectFrom('blocks')
-      .select(['id', 'stateHash'])
-      .where('pageId', '=', pageId)
-      .execute();
-  }
-
-  private async deleteRemovedBlocks(
-    pageId: string,
-    existingBlocks: any[],
-    incomingBlockIds: Set<string>,
-    db: any,
-  ): Promise<void> {
     const removedBlocks = existingBlocks.filter(
       (existingBlock) => !incomingBlockIds.has(existingBlock.id),
     );
@@ -256,6 +222,30 @@ export class PageRepo {
         )
         .execute();
     }
+
+    for (const block of blocks) {
+      const blockId = block.attrs.blockId;
+      const existingBlock = existingBlocksMap.get(blockId);
+      const calculatedHash = calculateBlockHash(block);
+
+      if (!existingBlock) {
+        await this.createBlock(block, blockId, pageId, calculatedHash, trx);
+      } else if (existingBlock.stateHash !== calculatedHash) {
+        await this.updateExistingBlock(block, blockId, calculatedHash, trx);
+      }
+    }
+  }
+
+  private async getExistingPageBlocks(
+    pageId: string,
+    trx?: KyselyTransaction,
+  ): Promise<any[]> {
+    const db = dbOrTx(this.db, trx);
+    return db
+      .selectFrom('blocks')
+      .select(['id', 'stateHash'])
+      .where('pageId', '=', pageId)
+      .execute();
   }
 
   private async createBlock(
@@ -263,8 +253,9 @@ export class PageRepo {
     blockId: string,
     pageId: string,
     calculatedHash: string,
-    db: any,
+    trx?: KyselyTransaction,
   ): Promise<void> {
+    const db = dbOrTx(this.db, trx);
     this.logger.debug('Inserting block: ', block);
 
     await db
@@ -285,8 +276,9 @@ export class PageRepo {
     block: any,
     blockId: string,
     calculatedHash: string,
-    db: any,
+    trx?: KyselyTransaction,
   ): Promise<void> {
+    const db = dbOrTx(this.db, trx);
     this.logger.debug('Updating block: ', block);
 
     await db

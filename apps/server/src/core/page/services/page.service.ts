@@ -7,7 +7,7 @@ import {
 import { CreatePageDto } from '../dto/create-page.dto';
 import { UpdatePageDto } from '../dto/update-page.dto';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
-import { Page } from '@docmost/db/types/entity.types';
+import { Page, UpdatablePage } from '@docmost/db/types/entity.types';
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
 import {
   executeWithPagination,
@@ -20,7 +20,7 @@ import { MovePageDto } from '../dto/move-page.dto';
 import { ExpressionBuilder } from 'kysely';
 import { DB } from '@docmost/db/types/db';
 import { generateSlugId } from '../../../common/helpers';
-import { executeTx } from '@docmost/db/utils';
+import { dbOrTx, executeTx } from '@docmost/db/utils';
 import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
 import { SpaceRole } from 'src/common/helpers/types/permission';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
@@ -30,13 +30,17 @@ import { MyPageColorDto } from '../dto/update-color.dto';
 
 @Injectable()
 export class PageService {
+  private readonly logger: Logger;
+
   constructor(
     private pageRepo: PageRepo,
     private pageMemberRepo: PageMemberRepo,
     private attachmentRepo: AttachmentRepo,
     private readonly syncPageRepo: SynchronizedPageRepo,
     @InjectKysely() private readonly db: KyselyDB,
-  ) {}
+  ) {
+    this.logger = new Logger('PageService');
+  }
 
   async findById(
     pageId: string,
@@ -152,9 +156,7 @@ export class PageService {
   ): Promise<Page> {
     const contributors = new Set<string>(page.contributorIds ?? []);
     contributors.add(userId);
-    console.log("[updatePageDto]");
-    console.log(updatePageDto);
-    await this.pageRepo.updatePage(
+    await this.pageRepo.updatePageMetadata(
       {
         title: updatePageDto.title,
         icon: updatePageDto.icon,
@@ -258,12 +260,15 @@ export class PageService {
 
   async movePageToSpace(rootPage: Page, spaceId: string) {
     await executeTx(this.db, async (trx) => {
-      console.log("[trx]");
-      console.log(trx);
       // Update root page
       const nextPosition = await this.nextPagePosition(spaceId);
-      await this.pageRepo.updatePage(
-        { spaceId, parentPageId: null, position: nextPosition, content: rootPage.content },
+      await this.pageRepo.updatePageMetadata(
+        {
+          spaceId,
+          parentPageId: null,
+          position: nextPosition,
+          content: rootPage.content,
+        },
         rootPage.id,
         trx,
       );
@@ -310,7 +315,7 @@ export class PageService {
       }
     }
 
-    await this.pageRepo.updatePage(
+    await this.pageRepo.updatePageMetadata(
       {
         position: dto.position,
         parentPageId: parentPageId,
@@ -509,6 +514,26 @@ export class PageService {
       userId,
       color: dto.color,
     });
+  }
+
+  async updateForSocket(
+    updatePageData: UpdatablePage,
+    pageId: string,
+    trx?: KyselyTransaction,
+  ) {
+    this.logger.debug('Updating page: ', updatePageData);
+
+    const pageUpdateResult = await this.pageRepo.updatePageMetadata(
+      updatePageData,
+      pageId,
+      trx,
+    );
+
+    if (updatePageData.content) {
+      await this.pageRepo.updatePageBlocks(updatePageData, pageId, trx);
+    }
+
+    return pageUpdateResult;
   }
 }
 
