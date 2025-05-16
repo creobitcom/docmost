@@ -1,4 +1,5 @@
 import { KyselyDB, KyselyTransaction } from './types/kysely.types';
+import { createHash } from 'crypto';
 
 /*
  * Executes a transaction or a callback using the provided database instance.
