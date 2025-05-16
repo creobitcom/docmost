@@ -97,7 +97,7 @@ export class PageRepo {
 
     const page = await query.executeTakeFirst();
     if (!opts?.includeContent) {
-      return { ...page, content: [] };
+      return { ...page };
     }
 
     // todo blocks - тут мы добавили id блока
@@ -109,7 +109,7 @@ export class PageRepo {
       .execute();
 
     if (pageBlocks.length === 0) {
-      return { ...page, content: [] };
+      return { ...page };
     }
 
     const pageContent = {

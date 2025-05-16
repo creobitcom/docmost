@@ -55,6 +55,8 @@ export class PersistenceExtension implements Extension {
       return;
     }
 
+    this.logger.debug('Sending page: ', page);
+
     // if (page.ydoc) {
     //   this.logger.debug(`ydoc loaded from db: ${pageId}`);
 
