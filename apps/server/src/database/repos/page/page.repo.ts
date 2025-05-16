@@ -133,53 +133,55 @@ export class PageRepo {
     pageId: string,
     trx?: KyselyTransaction,
   ) {
-    return this.updatePages(updatablePage, [pageId], trx);
-  }
+    this.logger.debug('Updating page: ', updatePageData);
 
-  async updatePages(
-    updatePageData: UpdatablePage,
-    pageIds: string[],
-    trx?: KyselyTransaction,
-  ): Promise<any> {
     const db = dbOrTx(this.db, trx);
 
-    // todo разобраться может ли быть множество страниц
-    // если может - то весь алгос в цикл for of
-    // for (const page of updatePageData) {
-    /**/
-    // }
-    const pageWithContent: UpdatablePage = { ...updatePageData };
-    delete updatePageData.content;
+    const pageUpdateResult = await this.updatePageMetadata(
+      updatePageData,
+      pageId,
+      db,
+    );
 
-    const pageUpdateResult = await db
-      .updateTable('pages')
-      .set({ ...updatePageData, updatedAt: new Date() })
-      .where(
-        pageIds.some((pageId) => !isValidUUID(pageId)) ? 'slugId' : 'id',
-        'in',
-        pageIds,
-      )
-      .executeTakeFirst();
-
-    if (!updatePageData.content) {
-      return pageUpdateResult;
+    if (updatePageData.content) {
+      await this.updatePageBlocks(updatePageData, pageId, db);
     }
 
-    this.logger.debug('PageWithContent: ', pageWithContent);
+    return pageUpdateResult;
+  }
 
+  private async updatePageMetadata(
+    updatePageData: UpdatablePage,
+    pageId: string,
+    db: any,
+  ): Promise<any> {
+    const pageMetadata = { ...updatePageData };
+    delete pageMetadata.content;
+
+    return db
+      .updateTable('pages')
+      .set({ ...pageMetadata, updatedAt: new Date() })
+      .where(isValidUUID(pageId) ? 'id' : 'slugId', '=', pageId)
+      .executeTakeFirst();
+  }
+
+  private async updatePageBlocks(
+    updatePageData: UpdatablePage,
+    pageId: string,
+    db: any,
+  ): Promise<void> {
     const blocks: {
       attrs: { blockId: string };
       type?: string;
       content?: any[];
-    }[] = (pageWithContent?.content as any)?.content;
+    }[] = (updatePageData?.content as any)?.content;
 
     // Fix deleting all page content
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       if (
         block.type === 'paragraph' &&
-        (!Object.prototype.hasOwnProperty.call(block, 'content') ||
-          block.content.length === 0)
+        !Object.prototype.hasOwnProperty.call(block, 'content')
       ) {
         blocks.splice(i, 1);
         i--;
@@ -187,15 +189,48 @@ export class PageRepo {
     }
 
     if (!blocks || blocks.length === 0) {
-      return pageUpdateResult;
+      return;
     }
 
-    const existingBlocks = await db
+    const existingBlocks = await this.getExistingPageBlocks(pageId, db);
+    const existingBlocksMap = new Map(
+      existingBlocks.map((block) => [block.id, block]),
+    );
+
+    const incomingBlockIds = new Set(
+      blocks.map((block) => block.attrs.blockId),
+    );
+    this.logger.debug('Incoming blocks: ', incomingBlockIds);
+
+    await this.deleteRemovedBlocks(
+      pageId,
+      existingBlocks,
+      incomingBlockIds,
+      db,
+    );
+
+    for (const block of blocks) {
+      const blockId = block.attrs.blockId;
+      const existingBlock = existingBlocksMap.get(blockId);
+      const calculatedHash = calculateBlockHash(block);
+
+      if (!existingBlock) {
+        await this.createBlock(block, blockId, pageId, calculatedHash, db);
+      } else if (existingBlock.stateHash !== calculatedHash) {
+        await this.updateExistingBlock(block, blockId, calculatedHash, db);
+      }
+    }
+  }
+
+  private async getExistingPageBlocks(pageId: string, db: any): Promise<any[]> {
+    return db
       .selectFrom('blocks')
       .select(['id', 'stateHash'])
       .where('pageId', '=', pageIds[0])
       .execute();
+  }
 
+<<<<<<< HEAD
     const existingBlocksMap = new Map(
       existingBlocks.map((block) => [block.id, block]),
     );
@@ -206,17 +241,33 @@ export class PageRepo {
     );
 
     if (blocksToDelete.length > 0) {
+=======
+  private async deleteRemovedBlocks(
+    pageId: string,
+    existingBlocks: any[],
+    incomingBlockIds: Set<string>,
+    db: any,
+  ): Promise<void> {
+    const removedBlocks = existingBlocks.filter(
+      (existingBlock) => !incomingBlockIds.has(existingBlock.id),
+    );
+
+    if (removedBlocks.length > 0) {
+      this.logger.debug('Deleting blocks: ', removedBlocks);
+>>>>>>> 1f8de26 (Refactor, small fix)
       await db
         .deleteFrom('blocks')
         .where('pageId', '=', pageIds[0])
         .where(
           'id',
           'in',
-          blocksToDelete.map((block) => block.id),
+          removedBlocks.map((block) => block.id),
         )
         .execute();
     }
+  }
 
+<<<<<<< HEAD
     for (const block of blocks) {
       console.log('[block]');
       console.log(JSON.stringify(block, null, 2));
@@ -251,6 +302,48 @@ export class PageRepo {
       }
     }
     return pageUpdateResult;
+=======
+  private async createBlock(
+    block: any,
+    blockId: string,
+    pageId: string,
+    calculatedHash: string,
+    db: any,
+  ): Promise<void> {
+    this.logger.debug('Inserting block: ', block);
+
+    await db
+      .insertInto('blocks')
+      .values({
+        id: blockId,
+        pageId: pageId,
+        content: block,
+        blockType: block?.type,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        stateHash: calculatedHash,
+      })
+      .execute();
+  }
+
+  private async updateExistingBlock(
+    block: any,
+    blockId: string,
+    calculatedHash: string,
+    db: any,
+  ): Promise<void> {
+    this.logger.debug('Updating block: ', block);
+
+    await db
+      .updateTable('blocks')
+      .set({
+        content: block,
+        updatedAt: new Date(),
+        stateHash: calculatedHash,
+      })
+      .where('id', '=', blockId)
+      .execute();
+>>>>>>> 1f8de26 (Refactor, small fix)
   }
 
   // TODO: hash fucntion
