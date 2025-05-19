@@ -151,5 +151,5 @@ export async function changeMemberRole(
 }
 
 export async function createBlockPermission(data: any): Promise<any> {
-  return api.post("/pages/block-permission", data);
+  return api.post("/pages/blockPermission", data);
 }

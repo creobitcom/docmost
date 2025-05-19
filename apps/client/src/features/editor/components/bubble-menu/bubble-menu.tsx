@@ -30,9 +30,10 @@ import { SearchMenu } from "./search-menu";
 
 type EditorBubbleMenuProps = {
   editor: ReturnType<typeof useEditor>;
+  pageId: string;
 };
 
-export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor }) => {
+export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) => {
   const { t } = useTranslation();
   const [showCommentPopup, setShowCommentPopup] = useAtom(showCommentPopupAtom);
   const [, setDraftCommentId] = useAtom(draftCommentIdAtom);
@@ -42,7 +43,6 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor }) => {
 
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [pageId, setPageId] = useState("");
   const [searchValue, setSearchValue] = useState("");
 
   const [isNodeSelectorOpen, setIsNodeSelectorOpen] = useState(false);
@@ -87,33 +87,6 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor }) => {
     },
   ];
 
-  const handleContextAction = (action: string) => {
-    if (action === "Block ID") {
-      const { state } = editor;
-      const { selection } = state;
-
-      let foundNode: any = null;
-      state.doc.descendants((node, pos) => {
-        if (
-          pos <= selection.from &&
-          selection.to <= pos + node.nodeSize &&
-          node.attrs?.id
-        ) {
-          foundNode = node;
-          return false;
-        }
-        return true;
-      });
-
-      if (foundNode?.attrs?.id) {
-        console.log("Block ID:", foundNode.attrs.id);
-        setPageId(foundNode.attrs.id);
-      } else {
-        console.log("ID not found for selected block");
-
-      }
-    }
-  };
 
   return (
     <BubbleMenu
@@ -157,34 +130,6 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor }) => {
             setIsLinkSelectorOpen(false);
           }}
         />
-
-        <ActionIcon.Group>
-          {items.map((item, index) => (
-            <Tooltip key={index} label={t(item.name)} withArrow>
-              <ActionIcon
-                variant="default"
-                size="lg"
-                radius="0"
-                aria-label={t(item.name)}
-                className={clsx({ [classes.active]: item.isActive() })}
-                style={{ border: "none" }}
-                onClick={item.command}
-              >
-                <item.icon style={{ width: rem(16) }} stroke={2} />
-              </ActionIcon>
-            </Tooltip>
-          ))}
-
-          <ContextMenu
-            isOpen={isContextMenuOpen}
-            setIsOpen={(open) => {
-              setIsContextMenuOpen(open);
-              if (open) setIsSearchOpen(false);
-            }}
-            onSelect={handleContextAction}
-            editor={editor}
-          />
-        </ActionIcon.Group>
 
         <LinkSelector
           editor={editor}

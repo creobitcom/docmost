@@ -81,26 +81,31 @@ export const assignPermissionToBlock = async ({
   blockId,
   userId,
   role,
+  permission,
 }: {
   pageId: string;
   blockId: string;
   userId: string;
   role: string;
+  permission?: string;
 }) => {
-  return axios.post("/api/page-permissions", {
+  return api.post("/pages/blockPermissions", {
     pageId,
     blockId,
     userId,
     role,
+    permission,
   });
 };
-export const updatePageBlocks = async (pageId: string, blocks: IPageBlock[]) => {
-  try {
-    const response = await axios.put(`/api/pages/pageBlocks`, { pageId, blocks });
 
+export const updatePageBlocks = async (pageId: string, blocks: IPageBlock[]) => {
+  console.log('📤 Sending blocks:', blocks);
+  try {
+    const response = await axios.post(`/api/pages/blocks/${pageId}`, { blocks });
     return response.data;
   } catch (error) {
     throw new Error('Ошибка при обновлении блоков страницы');
   }
 };
+
 

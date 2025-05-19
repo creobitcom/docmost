@@ -52,9 +52,11 @@ import { IPage } from "@/features/page/types/page.types.ts";
 import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
-import { CustomParagraph } from "@/features/editor/extensions/custom-paragraph.ts";
+import { BlockAttributes } from "@/features/editor/extensions/custom-paragraph.ts";
 import { updatePageBlocks } from "../../lib/api-client";
 import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-page-blocks";
+import UniqueId from "tiptap-unique-id";
+import {  v4 as uuidv4 } from "uuid";
 
 interface PageEditorProps {
   pageId: string;
@@ -188,7 +190,12 @@ export default function PageEditor({
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
-      CustomParagraph,
+      BlockAttributes,
+      UniqueId.configure({
+        attributeName: "id",
+        types: ["paragraph", "heading", "orderedList", "bulletList", "listItem"],
+        createId: () => window.crypto.randomUUID(),
+      }),
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
@@ -211,10 +218,21 @@ export default function PageEditor({
 
     handleContentUpdate(newContent);
   }, 3000);
+  const sanitizedContent = (contentFromDb) => {
+    if (
+      !contentFromDb ||
+      !contentFromDb.content ||
+      contentFromDb.content.length === 0
+    ) {
+      return null
+    }
 
+    return contentFromDb
+  }
   const editor = useEditor(
     {
       extensions,
+      content: sanitizedContent(content),
       editable,
       immediatelyRender: true,
       shouldRerenderOnTransaction: true,
@@ -362,7 +380,7 @@ export default function PageEditor({
     )}
         {editor && editor.isEditable && (
           <div>
-            <EditorBubbleMenu editor={editor} />
+            <EditorBubbleMenu editor={editor} pageId={pageId} />
             <TableMenu editor={editor} />
             <TableCellMenu editor={editor} appendTo={menuContainerRef} />
             <ImageMenu editor={editor} />

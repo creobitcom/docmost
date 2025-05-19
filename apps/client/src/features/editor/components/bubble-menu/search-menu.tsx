@@ -8,15 +8,13 @@ import {
   Group,
   ScrollArea,
   Popover,
+  Select,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useWorkspaceMembersQuery } from "@/features/workspace/queries/workspace-query";
-import axios from "axios";
 import { Editor } from "@tiptap/react";
-import { createBlockPermission } from "@/features/page/services/page-service";
 import { notifications } from "@mantine/notifications";
-
-const API_URL = "http://127.0.0.1:3000";
+import { assignPermissionToBlock } from "@/lib/api-client";
 
 interface SearchMenuProps {
   onSelect: (user: any) => void;
@@ -28,6 +26,7 @@ export const SearchMenu = ({ onSelect, editor, pageId }: SearchMenuProps) => {
   const [opened, setOpened] = useState(true);
   const [search, setSearch] = useState("");
   const [debounced] = useDebouncedValue(search, 300);
+  const [selectedPermission, setSelectedPermission] = useState<"read" | "edit" | "owner">("read");
 
   const { data, isLoading } = useWorkspaceMembersQuery({
     page: 1,
@@ -61,104 +60,95 @@ export const SearchMenu = ({ onSelect, editor, pageId }: SearchMenuProps) => {
 
     if (!blockId) {
       notifications.show({
-        message: "Failed to add user",
+        message: "Failed to add user: no block ID found",
         color: "red",
       });
       return;
     }
 
-    // Mock data
-    const payload = {
-      userId: user.id,
-      pageId: "0196a093-bf8e-7608-b45d-87185cbfff5a",
-      blockId: "0196a2e0-172b-7fdf-93d2-be954fd0e86b",
-      role: "member",
-      permission: "read",
-    };
-
-    await createBlockPermission(payload)
-      .then(() => {
-        notifications.show({
-          message: "User permission saved",
-          color: "green",
-        });
-
-        onSelect({
-          id: user.id,
-          label: user.name,
-          entityType: "user",
-          avatarUrl: user.avatarUrl,
-        });
-
-        setOpened(false);
-      })
-      .catch(() => {
-        notifications.show({
-          message: "Failed to save user permission",
-          color: "red",
-        });
+    if (!pageId) {
+      notifications.show({
+        message: "Failed to add user: no page ID",
+        color: "red",
       });
+      return;
+    }
+
+    try {
+      await assignPermissionToBlock({
+        userId: user.id,
+        pageId,
+        blockId,
+        role: user.role,
+        permission: selectedPermission,
+      });
+
+      notifications.show({
+        message: "User permission saved",
+        color: "green",
+      });
+
+      onSelect({
+        id: user.id,
+        label: user.name,
+        entityType: "user",
+        avatarUrl: user.avatarUrl,
+      });
+
+      setOpened(false);
+    } catch (error) {
+      notifications.show({
+        message: "Failed to save user permission",
+        color: "red",
+      });
+    }
   };
 
   return (
-    <Popover
-      opened={opened}
-      onChange={setOpened}
-      position="bottom-start"
-      width={300}
-      withArrow
-      shadow="md"
-    >
+    <Popover opened={opened} onChange={setOpened} width={300} trapFocus>
       <Popover.Target>
-        <div
-          style={{
-            position: "absolute",
-            width: 0,
-            height: 0,
-            overflow: "hidden",
-            opacity: 0,
-            pointerEvents: "none",
-          }}
+        <TextInput
+          placeholder="Search user..."
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
         />
       </Popover.Target>
 
-      <Popover.Dropdown p="xs">
-        <TextInput
-          placeholder="Поиск пользователя"
-          value={search}
-          onChange={(e) => setSearch(e.currentTarget.value)}
-          mb="sm"
-          autoFocus
+      <Popover.Dropdown>
+        <Select
+          label="Permission"
+          value={selectedPermission}
+          onChange={(value) => {
+            if (value) setSelectedPermission(value as any);
+          }}
+          data={[
+            { label: "Read", value: "read" },
+            { label: "Edit", value: "edit" },
+            { label: "Owner", value: "owner" },
+          ]}
+          mb="xs"
         />
 
         {isLoading ? (
-          <Loader size="xs" />
-        ) : data?.items?.length ? (
-          <ScrollArea.Autosize mah={250}>
-            {data.items.map((user) => (
-              <Group
+          <Loader size="sm" />
+        ) : (
+          <ScrollArea.Autosize mah={200} offsetScrollbars>
+            {data?.items.map((user) => (
+              <Box
                 key={user.id}
-                wrap="nowrap"
                 p="xs"
-                style={{ cursor: "pointer", borderRadius: 4 }}
+                style={{ cursor: "pointer" }}
                 onClick={() => handleSelectUser(user)}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f1f3f5")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
               >
-                <Avatar src={user.avatarUrl} size="sm" />
-                <div>
-                  <Text size="sm" fw={500} lineClamp={1}>
-                    {user.name}
-                  </Text>
-                  <Text size="xs" c="dimmed" lineClamp={1}>
-                    {user.email}
-                  </Text>
-                </div>
-              </Group>
+                <Group>
+                  <Avatar src={user.avatarUrl} size="sm" />
+                  <Text size="sm">{user.name}</Text>
+                </Group>
+              </Box>
             ))}
           </ScrollArea.Autosize>
-        ) : (
-          <Text size="sm" c="dimmed" ta="center">
-            Пользователи не найдены
-          </Text>
         )}
       </Popover.Dropdown>
     </Popover>

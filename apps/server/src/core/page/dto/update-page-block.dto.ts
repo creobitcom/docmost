@@ -1,28 +1,25 @@
+import { IsArray, IsNotEmpty, IsObject, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ValidateNested, IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-export class UpdatePageBlocksDto {
+export class BlockDto {
+
   @IsString()
-  @IsNotEmpty()
-  pageId: string;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PageBlockDto)
-  blocks: PageBlockDto[];
-}
-
-export class PageBlockDto {
-  @IsString()
-  @IsNotEmpty()
   blockId: string;
 
   @IsString()
-  @IsNotEmpty()
   blockType: string;
 
-  @IsOptional()
+
   @IsString()
-  content: string | null;
+  pageId: string;
+
+  @IsString()
+  content: string;
 }
 
+export class UpdatePageBlocksDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BlockDto)
+  blocks: BlockDto[];
+}
