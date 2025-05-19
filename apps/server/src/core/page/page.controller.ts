@@ -13,6 +13,7 @@ import {
   Query,
   Param,
   Put,
+  Inject,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -55,6 +56,9 @@ import { BlockPermissionService } from './services/block-permission.service';
 import { PageBlocksService } from './services/page-blocks.service';
 import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
 import { extractTopLevelBlocks } from './extract-page-blocks';
+import { InjectKysely } from 'nestjs-kysely';
+import { KyselyDB } from '@docmost/db/types/kysely.types';
+
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -70,6 +74,7 @@ export class PageController {
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
     private readonly blockPermissionService: BlockPermissionService,
+    @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
   @HttpCode(HttpStatus.OK)
@@ -82,14 +87,40 @@ export class PageController {
     return { success: true };
   }
 
-
-
-
   @HttpCode(HttpStatus.OK)
-  @Post('block-permission')
-  async saveBlockPermission(@Body() dto: SaveBlockPermissionDto) {
-    await this.blockPermissionService.saveBlockPermission(dto);
+  @Post('blockPermissions')
+  async assignPermissionToBlock(@Body()
+    dto: { pageId: string; blockId: string; userId: string; role?: string; permission?: string }) {
+    const { pageId, blockId, userId, role, permission } = dto;
+
+    const block = await this.db
+      .selectFrom('blocks')
+      .select(['id'])
+      .where('page_id', '=', pageId)
+      .where('blocks.parent_id', '=', blockId)
+      .executeTakeFirst();
+
+    if (!block) {
+      throw new NotFoundException('Block not found for given page and blockId');
+    }
+
+    await this.db
+      .insertInto('blockPermissions')
+      .values({
+        pageId: pageId,
+        blockId: block.id,
+        userId: userId,
+        role: role,
+        permission: permission ?? 'read',
+      })
+      .onConflict((oc) =>
+        oc.columns(['blockId', 'userId']).doUpdateSet({ permission })
+      )
+      .execute();
+
+    return { success: true };
   }
+
 
   @HttpCode(HttpStatus.OK)
   @Post('/info')

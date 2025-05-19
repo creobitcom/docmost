@@ -117,12 +117,12 @@ export interface BlockPermissions {
 }
 
 export interface Blocks {
-  block_id: string;
   block_type: string;
   content: Json;
   createdAt: Generated<Timestamp | null>;
   id: Generated<string>;
   page_id: string | null;
+  parent_id: string;
   updatedAt: Generated<Timestamp | null>;
 }
 

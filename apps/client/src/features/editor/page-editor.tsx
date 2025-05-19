@@ -380,7 +380,7 @@ export default function PageEditor({
     )}
         {editor && editor.isEditable && (
           <div>
-            <EditorBubbleMenu editor={editor} />
+            <EditorBubbleMenu editor={editor} pageId={pageId} />
             <TableMenu editor={editor} />
             <TableCellMenu editor={editor} appendTo={menuContainerRef} />
             <ImageMenu editor={editor} />

@@ -89,7 +89,7 @@ export const assignPermissionToBlock = async ({
   role: string;
   permission?: string;
 }) => {
-  return api.post("/page-permissions", {
+  return api.post("/pages/blockPermissions", {
     pageId,
     blockId,
     userId,

@@ -25,7 +25,7 @@ export class PageBlocksService {
           .insertInto('blocks')
           .values({
             page_id: block.pageId,
-            block_id: block.blockId,
+            parent_id: block.blockId,
             block_type: block.blockType,
             content: sql`cast(${JSON.stringify(block.content)} as jsonb)`,
           })
