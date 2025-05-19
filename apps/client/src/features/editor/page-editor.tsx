@@ -154,8 +154,8 @@ export default function PageEditor({
       extensions,
       content: sanitizedContent(content),
       editable,
-      immediatelyRender: true,
-      shouldRerenderOnTransaction: true,
+      immediatelyRender: false,
+      shouldRerenderOnTransaction: false,
       editorProps: {
         scrollThreshold: 80,
         scrollMargin: 80,
@@ -189,6 +189,7 @@ export default function PageEditor({
           handleFileDrop(view, event, moved, pageId),
       },
       onCreate({ editor }) {
+        console.log("[onCreate]");
         if (editor) {
           // @ts-ignore
           setEditor(editor);
@@ -196,6 +197,7 @@ export default function PageEditor({
         }
       },
       onUpdate({ editor }) {
+        console.log("[onUpdate]");
         if (editor.isEmpty) return;
         const editorJson = editor.getJSON();
         //update local page cache to reduce flickers
@@ -207,6 +209,10 @@ export default function PageEditor({
 
   const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
     const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
+    console.log("[newContent]");
+    console.log(newContent);
+    console.log("[pageData]");
+    console.log(pageData);
 
     if (pageData) {
       queryClient.setQueryData(["pages", slugId], {
@@ -215,7 +221,7 @@ export default function PageEditor({
         updatedAt: new Date(),
       });
     }
-  }, 3000);
+  }, 1000);
 
   const handleActiveCommentEvent = (event) => {
     const { commentId } = event.detail;
