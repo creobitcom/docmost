@@ -105,6 +105,9 @@ export class PageRepo {
     }
 
     const pageBlocks = await this.findPageBlocks(page.id);
+    if (pageBlocks.length === 0) {
+      return { ...page, content: null };
+    }
 
     const pageContent = {
       type: 'doc',
