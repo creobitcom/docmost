@@ -58,7 +58,7 @@ export enum BlockType {
 export const BlockTypes = Object.values(BlockType);
 
 export const UpdateBlockPositions = new Plugin({
-  key: new PluginKey("updateBlockPositionsPlugin"),
+  key: new PluginKey("UpdateBlockPositions"),
 
   appendTransaction(transactions, oldState, newState) {
     if (!transactions.some((tr) => tr.docChanged)) return;

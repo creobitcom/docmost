@@ -7,7 +7,7 @@ import {
   onAuthenticationFailedParameters,
   WebSocketStatus,
 } from "@hocuspocus/provider";
-import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
+import { EditorContent, EditorProvider, Extension, useEditor } from "@tiptap/react";
 import {
   collabExtensions,
   creobitExtentions,
@@ -48,6 +48,7 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
+import { UpdateBlockPositions } from "./editor.namespace";
 
 interface PageEditorProps {
   pageId: string;
