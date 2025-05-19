@@ -59,15 +59,15 @@ export class PersistenceExtension implements Extension {
 
     this.logger.debug('Sending page: ', page);
 
-    // if (page.ydoc) {
-    //   this.logger.debug(`ydoc loaded from db: ${pageId}`);
+    if (page.ydoc) {
+      this.logger.debug(`ydoc loaded from db: ${pageId}`);
 
-    //   const doc = new Y.Doc();
-    //   const dbState = new Uint8Array(page.ydoc);
+      const doc = new Y.Doc();
+      const dbState = new Uint8Array(page.ydoc);
 
-    //   Y.applyUpdate(doc, dbState);
-    //   return doc;
-    // }
+      Y.applyUpdate(doc, dbState);
+      return doc;
+    }
 
     // if no ydoc state in db convert json in page.content to Ydoc.
     if (page.content) {
