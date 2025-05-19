@@ -4,6 +4,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+
+
 import { CreatePageDto } from '../dto/create-page.dto';
 import { UpdatePageDto } from '../dto/update-page.dto';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
@@ -26,6 +28,7 @@ import { SpaceRole } from 'src/common/helpers/types/permission';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
 import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
+import { PageBlocksService } from './page-blocks.service';
 import { MyPageColorDto } from '../dto/update-color.dto';
 
 @Injectable()
@@ -35,6 +38,7 @@ export class PageService {
     private pageMemberRepo: PageMemberRepo,
     private attachmentRepo: AttachmentRepo,
     private readonly syncPageRepo: SynchronizedPageRepo,
+    private readonly PageBlocksService: PageBlocksService,
     @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
@@ -438,6 +442,16 @@ export class PageService {
       await this.pageRepo.deletePage(pageId, trx);
     });
   }
+  async updatePage(id: string, dto: UpdatePageDto) {
+    await this.db.updateTable('pages')
+      .set({ content: dto.content })
+      .where('id', '=', id)
+      .execute();
+
+      await this.PageBlocksService.saveFromTiptapJson(id, dto.content);
+
+  }
+
 
   async getMyPages(
     pagination: PaginationOptions,

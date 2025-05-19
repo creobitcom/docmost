@@ -1,6 +1,5 @@
 import {
   BubbleMenu,
-  BubbleMenuProps,
   isNodeSelection,
   useEditor,
 } from "@tiptap/react";
@@ -12,129 +11,106 @@ import {
   IconStrikethrough,
   IconUnderline,
   IconMessage,
+  IconSearch,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import classes from "./bubble-menu.module.css";
-import { ActionIcon, rem, Tooltip } from "@mantine/core";
+import { ActionIcon, Tooltip, rem } from "@mantine/core";
 import { ColorSelector } from "./color-selector";
 import { NodeSelector } from "./node-selector";
 import { TextAlignmentSelector } from "./text-alignment-selector";
-import {
-  draftCommentIdAtom,
-  showCommentPopupAtom,
-} from "@/features/comment/atoms/comment-atom";
+import { draftCommentIdAtom, showCommentPopupAtom } from "@/features/comment/atoms/comment-atom";
 import { useAtom } from "jotai";
 import { v7 as uuid7 } from "uuid";
 import { isCellSelection, isTextSelected } from "@docmost/editor-ext";
-import { LinkSelector } from "@/features/editor/components/bubble-menu/link-selector.tsx";
+import { LinkSelector } from "@/features/editor/components/bubble-menu/link-selector";
 import { useTranslation } from "react-i18next";
+import { ContextMenu } from "./context-menu";
+import { SearchMenu } from "./search-menu";
 
-export interface BubbleMenuItem {
-  name: string;
-  isActive: () => boolean;
-  command: () => void;
-  icon: typeof IconBold;
-}
-
-type EditorBubbleMenuProps = Omit<BubbleMenuProps, "children" | "editor"> & {
+type EditorBubbleMenuProps = {
   editor: ReturnType<typeof useEditor>;
+  pageId: string;
 };
 
-export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
+export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) => {
   const { t } = useTranslation();
   const [showCommentPopup, setShowCommentPopup] = useAtom(showCommentPopupAtom);
   const [, setDraftCommentId] = useAtom(draftCommentIdAtom);
+
   const showCommentPopupRef = useRef(showCommentPopup);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    showCommentPopupRef.current = showCommentPopup;
-  }, [showCommentPopup]);
-
-  const items: BubbleMenuItem[] = [
-    {
-      name: "Bold",
-      isActive: () => props.editor.isActive("bold"),
-      command: () => props.editor.chain().focus().toggleBold().run(),
-      icon: IconBold,
-    },
-    {
-      name: "Italic",
-      isActive: () => props.editor.isActive("italic"),
-      command: () => props.editor.chain().focus().toggleItalic().run(),
-      icon: IconItalic,
-    },
-    {
-      name: "Underline",
-      isActive: () => props.editor.isActive("underline"),
-      command: () => props.editor.chain().focus().toggleUnderline().run(),
-      icon: IconUnderline,
-    },
-    {
-      name: "Strike",
-      isActive: () => props.editor.isActive("strike"),
-      command: () => props.editor.chain().focus().toggleStrike().run(),
-      icon: IconStrikethrough,
-    },
-    {
-      name: "Code",
-      isActive: () => props.editor.isActive("code"),
-      command: () => props.editor.chain().focus().toggleCode().run(),
-      icon: IconCode,
-    },
-  ];
-
-  const commentItem: BubbleMenuItem = {
-    name: "Comment",
-    isActive: () => props.editor.isActive("comment"),
-    command: () => {
-      const commentId = uuid7();
-
-      props.editor.chain().focus().setCommentDecoration().run();
-      setDraftCommentId(commentId);
-      setShowCommentPopup(true);
-    },
-    icon: IconMessage,
-  };
-
-  const bubbleMenuProps: EditorBubbleMenuProps = {
-    ...props,
-    shouldShow: ({ state, editor }) => {
-      const { selection } = state;
-      const { empty } = selection;
-
-      if (
-        !editor.isEditable ||
-        editor.isActive("image") ||
-        empty ||
-        isNodeSelection(selection) ||
-        isCellSelection(selection) ||
-        showCommentPopupRef?.current
-      ) {
-        return false;
-      }
-      return isTextSelected(editor);
-    },
-    tippyOptions: {
-      moveTransition: "transform 0.15s ease-out",
-      onHide: () => {
-        setIsNodeSelectorOpen(false);
-        setIsTextAlignmentOpen(false);
-        setIsColorSelectorOpen(false);
-        setIsLinkSelectorOpen(false);
-      },
-    },
-  };
+  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
 
   const [isNodeSelectorOpen, setIsNodeSelectorOpen] = useState(false);
   const [isTextAlignmentSelectorOpen, setIsTextAlignmentOpen] = useState(false);
   const [isColorSelectorOpen, setIsColorSelectorOpen] = useState(false);
   const [isLinkSelectorOpen, setIsLinkSelectorOpen] = useState(false);
 
+  useEffect(() => {
+    showCommentPopupRef.current = showCommentPopup;
+  }, [showCommentPopup]);
+
+  const items = [
+    {
+      name: "Bold",
+      isActive: () => editor.isActive("bold"),
+      command: () => editor.chain().focus().toggleBold().run(),
+      icon: IconBold,
+    },
+    {
+      name: "Italic",
+      isActive: () => editor.isActive("italic"),
+      command: () => editor.chain().focus().toggleItalic().run(),
+      icon: IconItalic,
+    },
+    {
+      name: "Underline",
+      isActive: () => editor.isActive("underline"),
+      command: () => editor.chain().focus().toggleUnderline().run(),
+      icon: IconUnderline,
+    },
+    {
+      name: "Strike",
+      isActive: () => editor.isActive("strike"),
+      command: () => editor.chain().focus().toggleStrike().run(),
+      icon: IconStrikethrough,
+    },
+    {
+      name: "Code",
+      isActive: () => editor.isActive("code"),
+      command: () => editor.chain().focus().toggleCode().run(),
+      icon: IconCode,
+    },
+  ];
+
+
   return (
-    <BubbleMenu {...bubbleMenuProps}>
+    <BubbleMenu
+      editor={editor}
+      shouldShow={({ editor, state }) => {
+        const { selection } = state;
+        const { empty } = selection;
+
+        if (
+          !editor.isEditable ||
+          editor.isActive("image") ||
+          empty ||
+          isNodeSelection(selection) ||
+          isCellSelection(selection) ||
+          showCommentPopupRef.current
+        ) {
+          return false;
+        }
+        return isTextSelected(editor);
+      }}
+    >
       <div className={classes.bubbleMenu}>
         <NodeSelector
-          editor={props.editor}
+          editor={editor}
           isOpen={isNodeSelectorOpen}
           setIsOpen={() => {
             setIsNodeSelectorOpen(!isNodeSelectorOpen);
@@ -145,7 +121,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
         />
 
         <TextAlignmentSelector
-          editor={props.editor}
+          editor={editor}
           isOpen={isTextAlignmentSelectorOpen}
           setIsOpen={() => {
             setIsTextAlignmentOpen(!isTextAlignmentSelectorOpen);
@@ -155,27 +131,8 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           }}
         />
 
-        <ActionIcon.Group>
-          {items.map((item, index) => (
-            <Tooltip key={index} label={t(item.name)} withArrow>
-              <ActionIcon
-                key={index}
-                variant="default"
-                size="lg"
-                radius="0"
-                aria-label={t(item.name)}
-                className={clsx({ [classes.active]: item.isActive() })}
-                style={{ border: "none" }}
-                onClick={item.command}
-              >
-                <item.icon style={{ width: rem(16) }} stroke={2} />
-              </ActionIcon>
-            </Tooltip>
-          ))}
-        </ActionIcon.Group>
-
         <LinkSelector
-          editor={props.editor}
+          editor={editor}
           isOpen={isLinkSelectorOpen}
           setIsOpen={() => {
             setIsLinkSelectorOpen(!isLinkSelectorOpen);
@@ -186,7 +143,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
         />
 
         <ColorSelector
-          editor={props.editor}
+          editor={editor}
           isOpen={isColorSelectorOpen}
           setIsOpen={() => {
             setIsColorSelectorOpen(!isColorSelectorOpen);
@@ -196,16 +153,70 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           }}
         />
 
-        <ActionIcon
-          variant="default"
-          size="lg"
-          radius="0"
-          aria-label={t(commentItem.name)}
-          style={{ border: "none" }}
-          onClick={commentItem.command}
-        >
-          <IconMessage size={16} stroke={2} />
-        </ActionIcon>
+        <Tooltip label={t("Comment")} withArrow>
+          <ActionIcon
+            variant="default"
+            size="lg"
+            radius="0"
+            aria-label={t("Comment")}
+            style={{ border: "none" }}
+            onClick={() => {
+              const commentId = uuid7();
+              editor.chain().focus().setCommentDecoration().run();
+              setDraftCommentId(commentId);
+              setShowCommentPopup(true);
+            }}
+          >
+            <IconMessage size={16} stroke={2} />
+          </ActionIcon>
+        </Tooltip>
+
+        <Tooltip label="Search Users" withArrow>
+          <ActionIcon
+            variant="default"
+            size="lg"
+            radius="0"
+            aria-label="Search"
+            style={{ border: "none" }}
+            onClick={() => {
+              setIsSearchOpen(!isSearchOpen);
+              setIsColorSelectorOpen(false);
+              setIsLinkSelectorOpen(false);
+              setIsNodeSelectorOpen(false);
+              setIsTextAlignmentOpen(false);
+            }}
+            ref={searchButtonRef}
+          >
+            <IconSearch size={16} stroke={2} />
+          </ActionIcon>
+        </Tooltip>
+
+        {isSearchOpen && (
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              marginTop: "8px",
+              backgroundColor: "#fff",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              padding: "8px",
+              boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+              width: "250px",
+              zIndex: 10,
+            }}
+          >
+            <SearchMenu
+              editor={editor}
+              pageId={pageId}
+              onSelect={(user) => {
+                console.log("Выбран пользователь:", user);
+                setIsSearchOpen(false);
+              }}
+            />
+          </div>
+        )}
       </div>
     </BubbleMenu>
   );

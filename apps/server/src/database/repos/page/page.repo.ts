@@ -105,7 +105,7 @@ export class PageRepo {
       .selectFrom('blocks')
       .select(['content'])
       .select(['id'])
-      .where('pageId', '=', page.id)
+      .where('page_id', '=', page.id)
       .execute();
 
     if (pageBlocks.length === 0) {

@@ -51,6 +51,7 @@ export function FullEditor({
         isMyPages={isMyPages}
       />
       <MemoizedPageEditor
+        initialContent={content}
         pageId={pageId}
         editable={editable}
         content={content}

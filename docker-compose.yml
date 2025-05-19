@@ -8,6 +8,9 @@ services:
     env_file: .env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/docmost?schema=public
+      - APP_URL: 'http://localhost:3000'
+      - APP_SECRET: '162191bb24b34f179ad00afdee1175d672ffe139259e3c3616b6c4eba82184bb'
+      - REDIS_URL: 'redis://redis:6379'
     depends_on:
       - redis
     ports:
@@ -16,7 +19,17 @@ services:
       - "${POSTGRES_HOST}:host-gateway"
     restart: unless-stopped
     volumes:
-      - ./docmost_data:/app/data/storage
+      - docmost:/app/data/storage
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: docmost
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+    restart: unless-stopped
+    volumes:
+      - db_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7.2-alpine
