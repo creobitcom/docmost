@@ -20,7 +20,7 @@ import { MovePageDto } from '../dto/move-page.dto';
 import { ExpressionBuilder } from 'kysely';
 import { DB } from '@docmost/db/types/db';
 import { generateSlugId } from '../../../common/helpers';
-import { dbOrTx, executeTx } from '@docmost/db/utils';
+import { calculateBlockHash, dbOrTx, executeTx } from '@docmost/db/utils';
 import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
 import { SpaceRole } from 'src/common/helpers/types/permission';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
@@ -278,7 +278,7 @@ export class PageService {
       // The first id is the root page id
       if (pageIds.length > 1) {
         // Update sub pages
-        await this.pageRepo.updatePages(
+        await this.updatePages(
           { spaceId },
           pageIds.filter((id) => id !== rootPage.id),
           trx,
@@ -291,6 +291,103 @@ export class PageService {
         trx,
       );
     });
+  }
+
+  async updatePages(
+    updatePageData: UpdatablePage,
+    pageIds: string[],
+    trx?: KyselyTransaction,
+  ): Promise<void> {
+    for (const pageId of pageIds) {
+      await this.updatePageWithContent(updatePageData, pageId, trx);
+    }
+  }
+
+  async updatePageWithContent(
+    updatePageData: UpdatablePage,
+    pageId: string,
+    trx?: KyselyTransaction,
+  ) {
+    this.logger.debug('Updating page: ', updatePageData);
+
+    const pageUpdateResult = await this.pageRepo.updatePageMetadata(
+      updatePageData,
+      pageId,
+      trx,
+    );
+
+    if (updatePageData.content) {
+      await this.updatePageBlocks(updatePageData, pageId, trx);
+    }
+
+    return pageUpdateResult;
+  }
+
+  async updatePageBlocks(
+    updatePageData: UpdatablePage,
+    pageId: string,
+    trx?: KyselyTransaction,
+  ): Promise<void> {
+    const blocks: {
+      attrs: { blockId: string };
+      type?: string;
+      content?: any[];
+    }[] = (updatePageData?.content as any)?.content;
+
+    if (!blocks || blocks.length === 0) {
+      return;
+    }
+
+    const existingBlocks = await this.pageRepo.getExistingPageBlocks(
+      pageId,
+      trx,
+    );
+
+    const existingBlocksMap = new Map(
+      existingBlocks.map((block) => [block.id, block]),
+    );
+
+    const incomingBlockIds = new Set(
+      blocks.map((block) => {
+        if (!Object.prototype.hasOwnProperty.call(block.attrs, 'blockId')) {
+          this.logger.error('Block missing blockId attribute: ', block);
+        }
+        return block.attrs.blockId;
+      }),
+    );
+    this.logger.debug('Incoming blocks: ', incomingBlockIds);
+
+    const removedBlocks = existingBlocks.filter(
+      (existingBlock) => !incomingBlockIds.has(existingBlock.id),
+    );
+
+    this.logger.debug('Deleting blocks: ', removedBlocks);
+    for (const removedBlock of removedBlocks) {
+      await this.pageRepo.deleteBlock(removedBlock.id, trx);
+    }
+
+    for (const block of blocks) {
+      const blockId = block.attrs.blockId;
+      const existingBlock = existingBlocksMap.get(blockId);
+      const calculatedHash = calculateBlockHash(block);
+
+      if (!existingBlock) {
+        await this.pageRepo.createBlock(
+          block,
+          blockId,
+          pageId,
+          calculatedHash,
+          trx,
+        );
+      } else if (existingBlock.stateHash !== calculatedHash) {
+        await this.pageRepo.updateExistingBlock(
+          block,
+          blockId,
+          calculatedHash,
+          trx,
+        );
+      }
+    }
   }
 
   async movePage(dto: MovePageDto, movedPage: Page) {
@@ -530,7 +627,7 @@ export class PageService {
     );
 
     if (updatePageData.content) {
-      await this.pageRepo.updatePageBlocks(updatePageData, pageId, trx);
+      await this.updatePageBlocks(updatePageData, pageId, trx);
     }
 
     return pageUpdateResult;

@@ -198,9 +198,6 @@ export default function PageEditor({
       onUpdate({ editor }) {
         if (editor.isEmpty) return;
         const editorJson = editor.getJSON();
-        console.log("[editorJson]");
-        console.log(editorJson);
-        console.log(editor);
         //update local page cache to reduce flickers
         debouncedUpdateContent(editorJson);
       },

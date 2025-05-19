@@ -57,8 +57,6 @@ export class PersistenceExtension implements Extension {
       return;
     }
 
-    this.logger.debug('Sending page: ', page);
-
     if (page.ydoc) {
       this.logger.debug(`ydoc loaded from db: ${pageId}`);
 
@@ -72,6 +70,7 @@ export class PersistenceExtension implements Extension {
     // if no ydoc state in db convert json in page.content to Ydoc.
     if (page.content) {
       this.logger.debug(`converting json to ydoc: ${pageId}`);
+      this.logger.debug('Sending page: ', page);
 
       const ydoc = TiptapTransformer.toYdoc(
         page.content,
@@ -96,14 +95,6 @@ export class PersistenceExtension implements Extension {
     const ydocState = Buffer.from(Y.encodeStateAsUpdate(document));
 
     Logger.debug('Document: ', tiptapJson);
-    const documentContent: { type: string; content: [] }[] = tiptapJson.content;
-    if (
-      documentContent.length === 1 &&
-      documentContent[0].type === 'paragraph' &&
-      !Object.prototype.hasOwnProperty.call(documentContent[0], 'content')
-    ) {
-      return;
-    }
 
     let textContent = null;
 

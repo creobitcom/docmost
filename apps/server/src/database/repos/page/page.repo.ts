@@ -3,6 +3,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB, KyselyTransaction } from '../../types/kysely.types';
 import { calculateBlockHash, dbOrTx } from '../../utils';
 import {
+  Block,
   InsertablePage,
   InsertableUserPagePreferences,
   Page,
@@ -103,20 +104,7 @@ export class PageRepo {
       };
     }
 
-    // todo blocks - тут мы добавили id блока
-    const pageBlocks = await db
-      .selectFrom('blocks')
-      .select(['content'])
-      .select(['id'])
-      .where('pageId', '=', page.id)
-      .execute();
-
-    if (pageBlocks.length === 0) {
-      return {
-        ...page,
-        content: null,
-      };
-    }
+    const pageBlocks = await this.findPageBlocks(page.id);
 
     const pageContent = {
       type: 'doc',
@@ -135,34 +123,17 @@ export class PageRepo {
     return { ...page, content: pageContent };
   }
 
-  async updatePages(
-    updatePageData: UpdatablePage,
-    pageIds: string[],
-    trx?: KyselyTransaction,
-  ): Promise<void> {
-    for (const pageId of pageIds) {
-      await this.updatePageWithContent(updatePageData, pageId, trx);
-    }
-  }
-
-  async updatePageWithContent(
-    updatePageData: UpdatablePage,
+  async findPageBlocks(
     pageId: string,
     trx?: KyselyTransaction,
-  ) {
-    this.logger.debug('Updating page: ', updatePageData);
+  ): Promise<Partial<Block>[]> {
+    const db = dbOrTx(this.db, trx);
 
-    const pageUpdateResult = await this.updatePageMetadata(
-      updatePageData,
-      pageId,
-      trx,
-    );
-
-    if (updatePageData.content) {
-      await this.updatePageBlocks(updatePageData, pageId, trx);
-    }
-
-    return pageUpdateResult;
+    return db
+      .selectFrom('blocks')
+      .select(['id', 'content'])
+      .where('pageId', '=', pageId)
+      .execute();
   }
 
   async updatePageMetadata(
@@ -181,68 +152,7 @@ export class PageRepo {
       .executeTakeFirst();
   }
 
-  async updatePageBlocks(
-    updatePageData: UpdatablePage,
-    pageId: string,
-    trx?: KyselyTransaction,
-  ): Promise<void> {
-    const db = dbOrTx(this.db, trx);
-    const blocks: {
-      attrs: { blockId: string };
-      type?: string;
-      content?: any[];
-    }[] = (updatePageData?.content as any)?.content;
-
-    if (!blocks || blocks.length === 0) {
-      return;
-    }
-
-    const existingBlocks = await this.getExistingPageBlocks(pageId, trx);
-    const existingBlocksMap = new Map(
-      existingBlocks.map((block) => [block.id, block]),
-    );
-
-    const incomingBlockIds = new Set(
-      blocks.map((block) => {
-        if (!Object.prototype.hasOwnProperty.call(block.attrs, 'blockId')) {
-          this.logger.error('Block missing blockId attribute: ', block);
-        }
-        return block.attrs.blockId;
-      }),
-    );
-    this.logger.debug('Incoming blocks: ', incomingBlockIds);
-
-    const removedBlocks = existingBlocks.filter(
-      (existingBlock) => !incomingBlockIds.has(existingBlock.id),
-    );
-
-    if (removedBlocks.length > 0) {
-      this.logger.debug('Deleting blocks: ', removedBlocks);
-      await db
-        .deleteFrom('blocks')
-        .where('pageId', '=', pageId)
-        .where(
-          'id',
-          'in',
-          removedBlocks.map((block) => block.id),
-        )
-        .execute();
-    }
-
-    for (const block of blocks) {
-      const blockId = block.attrs.blockId;
-      const existingBlock = existingBlocksMap.get(blockId);
-      const calculatedHash = calculateBlockHash(block);
-
-      if (!existingBlock) {
-        await this.createBlock(block, blockId, pageId, calculatedHash, trx);
-      } else if (existingBlock.stateHash !== calculatedHash) {
-        await this.updateExistingBlock(block, blockId, calculatedHash, trx);
-      }
-    }
-  }
-
-  private async getExistingPageBlocks(
+  async getExistingPageBlocks(
     pageId: string,
     trx?: KyselyTransaction,
   ): Promise<any[]> {
@@ -254,7 +164,7 @@ export class PageRepo {
       .execute();
   }
 
-  private async createBlock(
+  async createBlock(
     block: any,
     blockId: string,
     pageId: string,
@@ -278,7 +188,7 @@ export class PageRepo {
       .execute();
   }
 
-  private async updateExistingBlock(
+  async updateExistingBlock(
     block: any,
     blockId: string,
     calculatedHash: string,
@@ -296,6 +206,11 @@ export class PageRepo {
       })
       .where('id', '=', blockId)
       .execute();
+  }
+
+  async deleteBlock(blockId: string, trx?: KyselyTransaction): Promise<void> {
+    const db = dbOrTx(this.db, trx);
+    await db.deleteFrom('blocks').where('id', '=', blockId).execute();
   }
 
   async insertPage(
