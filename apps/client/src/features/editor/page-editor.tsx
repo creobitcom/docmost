@@ -1,11 +1,5 @@
 import "@/features/editor/styles/index.css";
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import {
@@ -13,12 +7,7 @@ import {
   onAuthenticationFailedParameters,
   WebSocketStatus,
 } from "@hocuspocus/provider";
-import {
-  EditorContent,
-  EditorProvider,
-  Extension,
-  useEditor,
-} from "@tiptap/react";
+import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
 import {
   collabExtensions,
   creobitExtentions,
@@ -59,10 +48,6 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
-import { BlockAttributes } from "@/features/editor/extensions/custom-attributes";
-// import {  v4 as uuidv4 } from "uuid";
-import UniqueId from "tiptap-unique-id";
-import { BlockTypes, UpdateBlockPositions } from "./editor.namespace";
 
 interface PageEditorProps {
   pageId: string;
