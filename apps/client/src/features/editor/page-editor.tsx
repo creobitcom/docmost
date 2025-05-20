@@ -49,6 +49,7 @@ import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
 import { UpdateBlockPositions } from "./editor.namespace";
+import { Loader } from "@mantine/core";
 
 interface PageEditorProps {
   pageId: string;
@@ -325,11 +326,8 @@ export default function PageEditor({
       ></div>
     </div>
   ) : (
-    <EditorProvider
-      editable={false}
-      immediatelyRender={true}
-      extensions={mainExtensions}
-      content={content}
-    ></EditorProvider>
+    <div style={{ marginLeft: 40 }}>
+      <Loader></Loader>
+    </div>
   );
 }
