@@ -17,12 +17,12 @@ export function extractTopLevelBlocks(content: any, pageId: string) {
   if (!Array.isArray(content.content)) return [];
 
   return content.content
-    .filter((block: any) => !!block.attrs?.id)
+    .filter((block: any) => !!block.attrs?.blockId)
     .map((block: any) => {
       const textContent = extractTextFromContent(block.content);
 
       return {
-        blockId: block.attrs.id,
+        blockId: block.attrs.blockId,
         blockType: block.type,
         pageId,
         content: typeof textContent === 'string' ? textContent.trim() : '',

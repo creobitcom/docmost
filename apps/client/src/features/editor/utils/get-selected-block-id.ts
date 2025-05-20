@@ -10,12 +10,12 @@ export const getSelectedBlockId = (editor: Editor): string | null => {
     let foundNode: any = null;
 
     state.doc.nodesBetween(fromPos, fromPos, (node) => {
-      if (node.attrs?.id) {
+      if (node.attrs?.blockId) {
         foundNode = node;
         return false;
       }
       return true;
     });
 
-    return foundNode?.attrs?.id || null;
+    return foundNode?.attrs?.blockId || null;
   };

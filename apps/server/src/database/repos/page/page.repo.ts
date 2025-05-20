@@ -103,8 +103,7 @@ export class PageRepo {
     // todo blocks - тут мы добавили id блока
     const pageBlocks = await db
       .selectFrom('blocks')
-      .select(['content'])
-      .select(['id'])
+      .select(['id','content'])
       .where('page_id', '=', page.id)
       .execute();
 
@@ -115,18 +114,29 @@ export class PageRepo {
     const pageContent = {
       type: 'doc',
       content: pageBlocks.map((block) => {
-        // @ts-ignore
-        if (!block.content?.attrs) {
-          // @ts-ignore
-          block.content.attrs = {};
+        let content: any = block.content;
+
+        // Parse if it's a string
+        if (typeof content === 'string') {
+          try {
+            content = JSON.parse(content);
+          } catch (err) {
+            // If parsing fails, return as is (or log error if needed)
+            return content;
+          }
         }
-        // @ts-ignore
-        block.content.attrs.blockId = block.id;
-        return block.content;
+
+        // Ensure it's an object and has 'attrs'
+        if (typeof content === 'object' && content !== null) {
+          content.attrs = {
+            ...content.attrs,
+            blockId: block.id,
+          };
+        }
+
+        return content;
       }),
     };
-
-    return { ...page, content: pageContent };
   }
 
   async updatePages(
@@ -193,7 +203,7 @@ export class PageRepo {
 
     const existingBlocks = await this.getExistingPageBlocks(pageId, db);
     const existingBlocksMap = new Map(
-      existingBlocks.map((block) => [block.id, block]),
+      existingBlocks.map((block) => [block.id, block])
     );
 
     const incomingBlockIds = new Set(
@@ -229,8 +239,8 @@ export class PageRepo {
   private async getExistingPageBlocks(pageId: string, db: any): Promise<any[]> {
     return db
       .selectFrom('blocks')
-      .select(['id', 'stateHash'])
-      .where('pageId', '=', pageId)
+      .select(['id', sql`content::json as content`]) // PostgreSQL
+      .where('page_id', '=', pageId)
       .execute();
   }
 

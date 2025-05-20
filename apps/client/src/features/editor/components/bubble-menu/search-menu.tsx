@@ -45,14 +45,14 @@ export const SearchMenu = ({ onSelect, editor, pageId }: SearchMenuProps) => {
     let foundNode = null;
 
     state.doc.nodesBetween(fromPos, fromPos, (node) => {
-      if (node.attrs?.id) {
+      if (node.attrs?.blockId) {
         foundNode = node;
         return false;
       }
       return true;
     });
 
-    return foundNode?.attrs?.id;
+    return foundNode?.attrs?.blockId;
   };
 
   const handleSelectUser = async (user: any) => {

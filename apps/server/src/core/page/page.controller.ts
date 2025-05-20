@@ -33,7 +33,6 @@ import {
 } from '../casl/interfaces/space-ability.type';
 import SpaceAbilityFactory from '../casl/abilities/space-ability.factory';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
-
 import { RecentPageDto } from './dto/recent-page.dto';
 import PageAbilityFactory from '../casl/abilities/page-ability.factory';
 import {
@@ -46,19 +45,15 @@ import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
 import { findHighestUserSpaceRole } from '@docmost/db/repos/space/utils';
 import { RemovePageMemberDto } from './dto/remove-page-member.dto';
 import { UpdatePageMemberRoleDto } from './dto/update-page-member-role.dto';
-import { SpaceRole } from 'src/common/helpers/types/permission';
 import { CreateSyncPageDto } from './dto/create-sync-page.dto';
 import { SynchronizedPageService } from './services/synchronized-page.service';
-import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
-import { SaveBlockPermissionDto } from './dto/save-block-permission.dto';
 import { BlockPermissionService } from './services/block-permission.service';
 import { PageBlocksService } from './services/page-blocks.service';
 import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
 import { extractTopLevelBlocks } from './extract-page-blocks';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB } from '@docmost/db/types/kysely.types';
-
 import { MyPageColorDto } from './dto/update-color.dto';
 import { MyPagesDto } from './dto/my-pages.dto';
 

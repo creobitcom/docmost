@@ -60,7 +60,7 @@ import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { updatePageBlocks } from "../../lib/api-client";
 import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-page-blocks";
-
+import { BlockAttributes } from "./extensions/custom-attributes";
 interface PageEditorProps {
   pageId: string;
   editable: boolean;
@@ -194,6 +194,7 @@ export default function PageEditor({
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
       ...creobitExtentions,
+      BlockAttributes,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
