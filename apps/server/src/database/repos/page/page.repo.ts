@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB, KyselyTransaction } from '../../types/kysely.types';
-import { dbOrTx } from '../../utils';
+import { calculateBlockHash, dbOrTx } from '../../utils';
 import {
+  Block,
   InsertablePage,
   InsertableUserPagePreferences,
   Page,
@@ -20,10 +21,14 @@ import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
 
 @Injectable()
 export class PageRepo {
+  private readonly logger: Logger;
+
   constructor(
     @InjectKysely() private readonly db: KyselyDB,
     private spaceMemberRepo: SpaceMemberRepo,
-  ) {}
+  ) {
+    this.logger = new Logger('PageRepo');
+  }
 
   private baseFields: Array<keyof Page> = [
     'id',
@@ -63,7 +68,6 @@ export class PageRepo {
     let query = db
       .selectFrom('pages')
       .select(this.baseFields)
-      .$if(opts?.includeContent, (qb) => qb.select('content'))
       .$if(opts?.includeYdoc, (qb) => qb.select('ydoc'));
 
     if (opts?.includeCreator) {
@@ -92,31 +96,124 @@ export class PageRepo {
       query = query.where('slugId', '=', pageId);
     }
 
-    return query.executeTakeFirst();
+    const page = await query.executeTakeFirst();
+    if (!opts?.includeContent) {
+      return {
+        ...page,
+        content: null,
+      };
+    }
+
+    const pageBlocks = await this.findPageBlocks(page.id);
+    if (pageBlocks.length === 0) {
+      return { ...page, content: null };
+    }
+
+    const pageContent = {
+      type: 'doc',
+      content: pageBlocks.map((block) => {
+        // @ts-ignore
+        if (!block.content?.attrs) {
+          // @ts-ignore
+          block.content.attrs = {};
+        }
+        // @ts-ignore
+        block.content.attrs.blockId = block.id;
+        return block.content;
+      }),
+    };
+
+    return { ...page, content: pageContent };
   }
 
-  async updatePage(
-    updatablePage: UpdatablePage,
+  async findPageBlocks(
     pageId: string,
     trx?: KyselyTransaction,
-  ) {
-    return this.updatePages(updatablePage, [pageId], trx);
+  ): Promise<Partial<Block>[]> {
+    const db = dbOrTx(this.db, trx);
+
+    return db
+      .selectFrom('blocks')
+      .select(['id', 'content'])
+      .where('pageId', '=', pageId)
+      .execute();
   }
 
-  async updatePages(
+  async updatePageMetadata(
     updatePageData: UpdatablePage,
-    pageIds: string[],
+    pageId: string,
     trx?: KyselyTransaction,
-  ) {
-    return dbOrTx(this.db, trx)
+  ): Promise<any> {
+    const db = dbOrTx(this.db, trx);
+    const pageMetadata = { ...updatePageData };
+    delete pageMetadata.content;
+
+    return db
       .updateTable('pages')
-      .set({ ...updatePageData, updatedAt: new Date() })
-      .where(
-        pageIds.some((pageId) => !isValidUUID(pageId)) ? 'slugId' : 'id',
-        'in',
-        pageIds,
-      )
+      .set({ ...pageMetadata, updatedAt: new Date() })
+      .where(isValidUUID(pageId) ? 'id' : 'slugId', '=', pageId)
       .executeTakeFirst();
+  }
+
+  async getExistingPageBlocks(
+    pageId: string,
+    trx?: KyselyTransaction,
+  ): Promise<any[]> {
+    const db = dbOrTx(this.db, trx);
+    return db
+      .selectFrom('blocks')
+      .select(['id', 'stateHash'])
+      .where('pageId', '=', pageId)
+      .execute();
+  }
+
+  async createBlock(
+    block: any,
+    blockId: string,
+    pageId: string,
+    calculatedHash: string,
+    trx?: KyselyTransaction,
+  ): Promise<void> {
+    const db = dbOrTx(this.db, trx);
+    this.logger.debug('Inserting block: ', block);
+
+    await db
+      .insertInto('blocks')
+      .values({
+        id: blockId,
+        pageId: pageId,
+        content: block,
+        blockType: block?.type,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        stateHash: calculatedHash,
+      })
+      .execute();
+  }
+
+  async updateExistingBlock(
+    block: any,
+    blockId: string,
+    calculatedHash: string,
+    trx?: KyselyTransaction,
+  ): Promise<void> {
+    const db = dbOrTx(this.db, trx);
+    this.logger.debug('Updating block: ', block);
+
+    await db
+      .updateTable('blocks')
+      .set({
+        content: block,
+        updatedAt: new Date(),
+        stateHash: calculatedHash,
+      })
+      .where('id', '=', blockId)
+      .execute();
+  }
+
+  async deleteBlock(blockId: string, trx?: KyselyTransaction): Promise<void> {
+    const db = dbOrTx(this.db, trx);
+    await db.deleteFrom('blocks').where('id', '=', blockId).execute();
   }
 
   async insertPage(
@@ -227,7 +324,7 @@ export class PageRepo {
             'slugId',
             'title',
             'icon',
-            'content',
+            // 'content',
             'parentPageId',
             'spaceId',
             'workspaceId',
@@ -241,7 +338,7 @@ export class PageRepo {
                 'p.slugId',
                 'p.title',
                 'p.icon',
-                'p.content',
+                // 'p.content',
                 'p.parentPageId',
                 'p.spaceId',
                 'p.workspaceId',
