@@ -19,6 +19,8 @@ import {
   PageMembers,
   SynchronizedPages,
   UserPagePreferences,
+  Blocks,
+  Json,
 } from './db';
 
 // Workspace
@@ -59,6 +61,11 @@ export type UpdatableGroup = Updateable<Omit<Groups, 'id'>>;
 export type GroupUser = Selectable<GroupUsers>;
 export type InsertableGroupUser = Insertable<GroupUsers>;
 export type UpdatableGroupUser = Updateable<Omit<GroupUsers, 'id'>>;
+
+// Block
+export type Block = Selectable<Blocks>;
+export type InsertableBlock = Insertable<Block>;
+export type UpdatableBlock = Updateable<Block>;
 
 // Page
 export type Page = Selectable<Pages>;

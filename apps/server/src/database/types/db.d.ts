@@ -107,6 +107,16 @@ export interface Billing {
   workspaceId: string;
 }
 
+export interface Blocks {
+  blockType: string | null;
+  content: Json;
+  createdAt: Generated<Timestamp | null>;
+  id: Generated<string>;
+  pageId: string;
+  stateHash: string | null;
+  updatedAt: Generated<Timestamp | null>;
+}
+
 export interface Comments {
   content: Json | null;
   createdAt: Generated<Timestamp>;
@@ -309,6 +319,7 @@ export interface DB {
   authProviders: AuthProviders;
   backlinks: Backlinks;
   billing: Billing;
+  blocks: Blocks;
   comments: Comments;
   groups: Groups;
   groupUsers: GroupUsers;
