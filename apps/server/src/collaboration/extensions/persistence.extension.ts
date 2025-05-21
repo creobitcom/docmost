@@ -57,29 +57,30 @@ export class PersistenceExtension implements Extension {
       return;
     }
 
-    if (page.ydoc) {
-      this.logger.debug(`ydoc loaded from db: ${pageId}`);
+    // if (page.ydoc) {
+    //   this.logger.debug(`ydoc loaded from db: ${pageId}`);
 
-      const doc = new Y.Doc();
-      const dbState = new Uint8Array(page.ydoc);
+    //   const doc = new Y.Doc();
+    //   const dbState = new Uint8Array(page.ydoc);
 
-      Y.applyUpdate(doc, dbState);
-      return doc;
-    }
+    //   Y.applyUpdate(doc, dbState);
+    //   return doc;
+    // }
 
     // if no ydoc state in db convert json in page.content to Ydoc.
-    if (page.content) {
-      this.logger.debug(`converting json to ydoc: ${pageId}`);
+    // if (page.content) {
+    //   this.logger.debug(`converting json to ydoc: ${pageId}`);
+    //   this.logger.debug('Sending document: ', page.content);
 
-      const ydoc = TiptapTransformer.toYdoc(
-        page.content,
-        'default',
-        tiptapExtensions,
-      );
+    //   const ydoc = TiptapTransformer.toYdoc(
+    //     page.content,
+    //     'default',
+    //     tiptapExtensions,
+    //   );
 
-      Y.encodeStateAsUpdate(ydoc);
-      return ydoc;
-    }
+    //   Y.encodeStateAsUpdate(ydoc);
+    //   return ydoc;
+    // }
 
     this.logger.debug(`creating fresh ydoc: ${pageId}`);
     return new Y.Doc();

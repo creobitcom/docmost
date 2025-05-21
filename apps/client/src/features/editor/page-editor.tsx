@@ -16,6 +16,7 @@ import {
 import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
 import {
   collabExtensions,
+  creobitExtentions,
   mainExtensions,
 } from "@/features/editor/extensions/extensions";
 import { useAtom } from "jotai";
@@ -144,11 +145,13 @@ export default function PageEditor({
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
+      ...creobitExtentions,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
   const editor = useEditor(
     {
+      content,
       extensions,
       editable,
       immediatelyRender: true,
@@ -315,11 +318,13 @@ export default function PageEditor({
       ></div>
     </div>
   ) : (
-    <EditorProvider
-      editable={false}
-      immediatelyRender={true}
-      extensions={mainExtensions}
-      content={content}
-    ></EditorProvider>
+    // <EditorProvider
+    //   editable={false}
+    //   immediatelyRender={true}
+    //   extensions={mainExtensions}
+    //   content={content}
+    // ></EditorProvider>
+
+    <div style={{ marginLeft: 40 }}>loading</div>
   );
 }

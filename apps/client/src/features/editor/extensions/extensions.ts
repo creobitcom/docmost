@@ -72,6 +72,64 @@ import i18n from "@/i18n.ts";
 import { MarkdownClipboard } from "@/features/editor/extensions/markdown-clipboard.ts";
 import EmojiCommand from "./emoji-command";
 import { CharacterCount } from "@tiptap/extension-character-count";
+import UniqueId from "tiptap-unique-id";
+import MyUniqueId from "./unique-id";
+
+export enum BlockType {
+  Paragraph = "paragraph",
+  Heading = "heading",
+  Blockquote = "blockquote",
+  CodeBlock = "codeBlock",
+  BulletList = "bulletList",
+  OrderedList = "orderedList",
+  ListItem = "listItem",
+  TaskList = "taskList",
+  TaskItem = "taskItem",
+  HorizontalRule = "horizontalRule",
+  Image = "image",
+  Table = "table",
+  TableRow = "tableRow",
+  TableCell = "tableCell",
+  TableHeader = "tableHeader",
+  Iframe = "iframe",
+  Figure = "figure",
+  N8N = "n8n",
+  StarterKit = "starterKit",
+  Placeholder = "placeholder",
+  TextAlign = "textAlign",
+  Underline = "underline",
+  LinkExtension = "link",
+  Superscript = "superscript",
+  SubScript = "subscript",
+  Highlight = "highlight",
+  Typography = "typography",
+  TrailingNode = "trailingNode",
+  GlobalDragHandle = "globalDragHandle",
+  TextStyle = "textStyle",
+  Color = "color",
+  SlashCommand = "slashCommand",
+  EmojiCommand = "emojiCommand",
+  Comment = "comment",
+  Mention = "mention",
+  MathInline = "mathInline",
+  MathBlock = "mathBlock",
+  Details = "details",
+  DetailsSummary = "detailsSummary",
+  DetailsContent = "detailsContent",
+  Youtube = "youtube",
+  TiptapVideo = "video",
+  Callout = "callout",
+  CustomCodeBlock = "customCodeBlock",
+  Selection = "selection",
+  Attachment = "attachment",
+  Drawio = "drawio",
+  Excalidraw = "excalidraw",
+  Embed = "embed",
+  MarkdownClipboard = "markdownClipboard",
+  CharacterCount = "characterCount",
+}
+
+export const BlockTypes = Object.values(BlockType);
 
 const lowlight = createLowlight(common);
 lowlight.register("mermaid", plaintext);
@@ -212,7 +270,7 @@ export const mainExtensions = [
   MarkdownClipboard.configure({
     transformPastedText: true,
   }),
-  CharacterCount
+  CharacterCount,
 ] as any;
 
 type CollabExtensions = (provider: HocuspocusProvider, user: IUser) => any[];
@@ -228,4 +286,15 @@ export const collabExtensions: CollabExtensions = (provider, user) => [
       color: randomElement(userColors),
     },
   }),
+];
+
+export const creobitExtentions = [
+  MyUniqueId.configure({
+    types: BlockTypes,
+  }),
+  // UniqueId.configure({
+  //   types: BlockTypes,
+  //   attributeName: "blockId",
+  //   createId: () => window.crypto.randomUUID(),
+  // }),
 ];

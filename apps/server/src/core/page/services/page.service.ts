@@ -349,8 +349,13 @@ export class PageService {
 
     const incomingBlockIds = new Set(
       blocks.map((block) => {
+        if (!Object.prototype.hasOwnProperty.call(block, 'attrs')) {
+          this.logger.error('Block missing attributes: ', block);
+          return null;
+        }
         if (!Object.prototype.hasOwnProperty.call(block.attrs, 'blockId')) {
           this.logger.error('Block missing blockId attribute: ', block);
+          return null;
         }
         return block.attrs.blockId;
       }),
@@ -367,7 +372,7 @@ export class PageService {
     }
 
     for (const block of blocks) {
-      const blockId = block.attrs.blockId;
+      const blockId = block?.attrs?.blockId ?? '123';
       const existingBlock = existingBlocksMap.get(blockId);
       const calculatedHash = calculateBlockHash(block);
 

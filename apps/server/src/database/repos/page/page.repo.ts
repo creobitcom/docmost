@@ -180,7 +180,7 @@ export class PageRepo {
     await db
       .insertInto('blocks')
       .values({
-        id: blockId,
+        // id: blockId ?? null,
         pageId: pageId,
         content: block,
         blockType: block?.type,
