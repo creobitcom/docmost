@@ -73,7 +73,6 @@ import { MarkdownClipboard } from "@/features/editor/extensions/markdown-clipboa
 import EmojiCommand from "./emoji-command";
 import { CharacterCount } from "@tiptap/extension-character-count";
 import { BlockTypes, UpdateBlockPositions } from "../editor.namespace";
-import UniqueId from "tiptap-unique-id";
 import { BlockAttributes } from "./custom-attributes";
 import MyUniqueId from "./my-unique-id";
 
@@ -236,11 +235,6 @@ export const collabExtensions: CollabExtensions = (provider, user) => [
 
 export const creobitExtentions = [
   BlockAttributes,
-  // UniqueId.configure({
-  //   attributeName: "blockId",
-  //   types: BlockTypes,
-  //   createId: () => window.crypto.randomUUID(),
-  // }),
   MyUniqueId.configure({
     attributeName: "blockId",
     types: BlockTypes,

@@ -7,12 +7,7 @@ import {
   onAuthenticationFailedParameters,
   WebSocketStatus,
 } from "@hocuspocus/provider";
-import {
-  EditorContent,
-  EditorProvider,
-  Extension,
-  useEditor,
-} from "@tiptap/react";
+import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
 import {
   collabExtensions,
   creobitExtentions,
@@ -53,8 +48,6 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
-import { UpdateBlockPositions } from "./editor.namespace";
-import { Loader } from "@mantine/core";
 
 interface PageEditorProps {
   pageId: string;
@@ -149,13 +142,7 @@ export default function PageEditor({
       ...creobitExtentions,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
-  const sanitizedContent = (content) => {
-    if (!content || !content.content || content.content.length === 0) {
-      return null;
-    }
 
-    return content;
-  };
   const editor = useEditor(
     {
       content,
@@ -331,14 +318,10 @@ export default function PageEditor({
       ></div>
     </div>
   ) : (
-    // <div style={{ marginLeft: 40 }}>
-    //   <Loader></Loader>
-    // </div>
     <EditorProvider
       editable={false}
       immediatelyRender={true}
       extensions={mainExtensions}
-      // content={content}
       content={{ ...content }}
     ></EditorProvider>
   );
