@@ -7,7 +7,12 @@ import {
   onAuthenticationFailedParameters,
   WebSocketStatus,
 } from "@hocuspocus/provider";
-import { EditorContent, EditorProvider, Extension, useEditor } from "@tiptap/react";
+import {
+  EditorContent,
+  EditorProvider,
+  Extension,
+  useEditor,
+} from "@tiptap/react";
 import {
   collabExtensions,
   creobitExtentions,
@@ -153,11 +158,11 @@ export default function PageEditor({
   };
   const editor = useEditor(
     {
+      content,
       extensions,
-      content: sanitizedContent(content),
       editable,
-      immediatelyRender: false,
-      shouldRerenderOnTransaction: false,
+      immediatelyRender: true,
+      shouldRerenderOnTransaction: true,
       editorProps: {
         scrollThreshold: 80,
         scrollMargin: 80,
@@ -326,8 +331,15 @@ export default function PageEditor({
       ></div>
     </div>
   ) : (
-    <div style={{ marginLeft: 40 }}>
-      <Loader></Loader>
-    </div>
+    // <div style={{ marginLeft: 40 }}>
+    //   <Loader></Loader>
+    // </div>
+    <EditorProvider
+      editable={false}
+      immediatelyRender={true}
+      extensions={mainExtensions}
+      // content={content}
+      content={{ ...content }}
+    ></EditorProvider>
   );
 }
