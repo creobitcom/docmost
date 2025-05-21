@@ -75,6 +75,7 @@ import { CharacterCount } from "@tiptap/extension-character-count";
 import { BlockTypes, UpdateBlockPositions } from "../editor.namespace";
 import UniqueId from "tiptap-unique-id";
 import { BlockAttributes } from "./custom-attributes";
+import MyUniqueId from "./my-unique-id";
 
 const lowlight = createLowlight(common);
 lowlight.register("mermaid", plaintext);
@@ -235,7 +236,12 @@ export const collabExtensions: CollabExtensions = (provider, user) => [
 
 export const creobitExtentions = [
   BlockAttributes,
-  UniqueId.configure({
+  // UniqueId.configure({
+  //   attributeName: "blockId",
+  //   types: BlockTypes,
+  //   createId: () => window.crypto.randomUUID(),
+  // }),
+  MyUniqueId.configure({
     attributeName: "blockId",
     types: BlockTypes,
     createId: () => window.crypto.randomUUID(),
@@ -243,7 +249,7 @@ export const creobitExtentions = [
   Extension.create({
     name: "blockPositionUpdater",
     addProseMirrorPlugins() {
-      return [UpdateBlockPositions]
+      return [UpdateBlockPositions];
     },
   }),
 ] as any;
