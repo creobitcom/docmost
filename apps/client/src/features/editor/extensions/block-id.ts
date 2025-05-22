@@ -183,5 +183,3 @@ export const BlockId = new Extension({
     ];
   },
 });
-
-export { BlockId as default };

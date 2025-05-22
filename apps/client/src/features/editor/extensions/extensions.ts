@@ -72,9 +72,9 @@ import i18n from "@/i18n.ts";
 import { MarkdownClipboard } from "@/features/editor/extensions/markdown-clipboard.ts";
 import EmojiCommand from "./emoji-command";
 import { CharacterCount } from "@tiptap/extension-character-count";
-import { BlockTypes, UpdateBlockPositions } from "../editor.namespace";
-import { BlockAttributes } from "./custom-attributes";
-import { BlockId } from "./block-id";
+import { BlockId } from "@/features/editor/extensions/block-id";
+import { BlockPosition } from "@/features/editor/extensions/block-position";
+import { BlockTypes } from "@/features/editor/utils/block-types";
 
 const lowlight = createLowlight(common);
 lowlight.register("mermaid", plaintext);
@@ -239,11 +239,7 @@ export const creobitExtentions = [
     types: BlockTypes,
     createId: () => window.crypto.randomUUID(),
   }),
-  // BlockAttributes,
-  // Extension.create({
-  //   name: "blockPositionUpdater",
-  //   addProseMirrorPlugins() {
-  //     return [UpdateBlockPositions];
-  //   },
-  // }),
+  BlockPosition.configure({
+    types: BlockTypes,
+  }),
 ] as any;
