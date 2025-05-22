@@ -164,6 +164,7 @@ export class PageRepo {
       .selectFrom('blocks')
       .select(['id', 'stateHash'])
       .where('pageId', '=', pageId)
+      .orderBy('position', 'asc')
       .execute();
   }
 
@@ -182,6 +183,7 @@ export class PageRepo {
       .values({
         id: blockId,
         pageId: pageId,
+        position: block?.attrs.position,
         content: block,
         blockType: block?.type,
         createdAt: new Date(),
@@ -203,6 +205,7 @@ export class PageRepo {
     await db
       .updateTable('blocks')
       .set({
+        position: block?.attrs.position,
         content: block,
         updatedAt: new Date(),
         stateHash: calculatedHash,

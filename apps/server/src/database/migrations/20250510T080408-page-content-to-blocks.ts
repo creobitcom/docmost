@@ -29,6 +29,11 @@ export async function up(db: Kysely<any>): Promise<void> {
   }
 
   await db.schema.alterTable('pages').dropColumn('content').execute();
+  await db.schema.alterTable('blocks').addColumn(
+    'position',
+    'integer',
+    (col) => col.notNull().defaultTo(0),
+  ).execute();
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
