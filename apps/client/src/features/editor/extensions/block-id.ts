@@ -1,19 +1,16 @@
 import {
-  Extension as t,
-  findChildren as e,
-  combineTransactionSteps as r,
-  getChangedRanges as n,
-  findChildrenInRange as i,
-  findDuplicates as o,
+  Extension,
+  findChildren,
+  combineTransactionSteps,
+  getChangedRanges,
+  findChildrenInRange,
   findDuplicates,
 } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Slice, Fragment } from "@tiptap/pm/model";
 
-import { Plugin as a, PluginKey as s } from "@tiptap/pm/state";
-
-import { Slice as d, Fragment as p } from "@tiptap/pm/model";
-
-const u = new t({
-  name: "unique-id",
+export const BlockId = new Extension({
+  name: "block-id",
   priority: 99999,
 
   addOptions: () => ({
@@ -29,12 +26,13 @@ const u = new t({
         attributes: {
           [this.options.attributeName]: {
             default: null,
-            parseHTML: (el) => el.getAttribute(this.options.attributeName),
-            renderHTML: (attrs) =>
-              attrs[this.options.attributeName]
+            parseHTML: (element) =>
+              element.getAttribute(this.options.attributeName),
+            renderHTML: (attributes) =>
+              attributes[this.options.attributeName]
                 ? {
                     [this.options.attributeName]:
-                      attrs[this.options.attributeName],
+                      attributes[this.options.attributeName],
                   }
                 : {},
           },
@@ -44,21 +42,21 @@ const u = new t({
   },
 
   onCreate() {
-    const { tr, doc } = this.editor.state;
+    const { tr: transaction, doc } = this.editor.state;
     const { types, attributeName, createId } = this.options;
 
-    for (const { node, pos } of e(
+    for (const { node, pos } of findChildren(
       doc,
       (node) =>
         types.includes(node.type.name) && node.attrs[attributeName] == null,
     )) {
-      tr.setNodeMarkup(pos, undefined, {
+      transaction.setNodeMarkup(pos, undefined, {
         ...node.attrs,
         [attributeName]: createId(),
       });
     }
 
-    this.editor.view.dispatch(tr);
+    this.editor.view.dispatch(transaction);
   },
 
   addProseMirrorPlugins() {
@@ -67,39 +65,43 @@ const u = new t({
     const options = this.options;
 
     return [
-      new a({
-        key: new s("unique-id"),
+      new Plugin({
+        key: new PluginKey("block-id"),
 
         appendTransaction: (transactions, oldState, newState) => {
           const { doc: oldDoc } = oldState;
-          const { doc: newDoc, tr } = newState;
+          const { doc: newDoc, tr: transaction } = newState;
 
-          if (!transactions.some((tx) => tx.docChanged) || oldDoc.eq(newDoc))
+          if (!transactions.some((tr) => tr.docChanged) || oldDoc.eq(newDoc)) {
             return;
+          }
 
-          const { types, attributeName, createId } = this.options;
-          const combinedSteps = r(oldDoc, [...transactions]);
+          const { types, attributeName, createId } = options;
+          const combinedSteps = combineTransactionSteps(oldDoc, [
+            ...transactions,
+          ]);
 
-          for (const { newRange } of n(combinedSteps)) {
-            const nodes = i(newDoc, newRange, (node) =>
+          for (const { newRange } of getChangedRanges(combinedSteps)) {
+            const changedNodes = findChildrenInRange(newDoc, newRange, (node) =>
               types.includes(node.type.name),
             );
-            const existingIds = nodes
+
+            const existingIds = changedNodes
               .map(({ node }) => node.attrs[attributeName])
               .filter((id) => id !== null);
 
-            for (const { node, pos } of nodes) {
-              const currentId = tr.doc.nodeAt(pos)?.attrs[attributeName];
+            for (const { node, pos } of changedNodes) {
+              const currentId =
+                transaction.doc.nodeAt(pos)?.attrs[attributeName];
 
               if (currentId === null) {
-                tr.setNodeMarkup(pos, undefined, {
+                transaction.setNodeMarkup(pos, undefined, {
                   ...node.attrs,
                   [attributeName]: createId(),
                 });
                 continue;
               }
 
-              // TODO: fix ids
               const previousPos = combinedSteps.mapping
                 .invert()
                 .mapResult(pos).pos;
@@ -110,7 +112,7 @@ const u = new t({
                 (!previousNode ||
                   previousNode.attrs[attributeName] !== currentId)
               ) {
-                tr.setNodeMarkup(pos, undefined, {
+                transaction.setNodeMarkup(pos, undefined, {
                   ...node.attrs,
                   [attributeName]: createId(),
                 });
@@ -118,7 +120,7 @@ const u = new t({
             }
           }
 
-          return tr.steps.length ? tr : undefined;
+          return transaction.steps.length ? transaction : undefined;
         },
 
         view(editorView) {
@@ -183,12 +185,12 @@ const u = new t({
                 }
               });
 
-              return p.from(children);
+              return Fragment.from(children);
             };
 
             wasDropOrPaste = false;
 
-            return new d(
+            return new Slice(
               transformFragment(slice.content),
               slice.openStart,
               slice.openEnd,
@@ -200,4 +202,4 @@ const u = new t({
   },
 });
 
-export { u as default };
+export { BlockId as default };
