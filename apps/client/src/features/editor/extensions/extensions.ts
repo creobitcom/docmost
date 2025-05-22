@@ -74,7 +74,7 @@ import EmojiCommand from "./emoji-command";
 import { CharacterCount } from "@tiptap/extension-character-count";
 import { BlockTypes, UpdateBlockPositions } from "../editor.namespace";
 import { BlockAttributes } from "./custom-attributes";
-import MyUniqueId from "./my-unique-id";
+import { BlockId } from "./block-id";
 
 const lowlight = createLowlight(common);
 lowlight.register("mermaid", plaintext);
@@ -234,16 +234,16 @@ export const collabExtensions: CollabExtensions = (provider, user) => [
 ];
 
 export const creobitExtentions = [
-  BlockAttributes,
-  MyUniqueId.configure({
+  BlockId.configure({
     attributeName: "blockId",
     types: BlockTypes,
     createId: () => window.crypto.randomUUID(),
   }),
-  Extension.create({
-    name: "blockPositionUpdater",
-    addProseMirrorPlugins() {
-      return [UpdateBlockPositions];
-    },
-  }),
+  // BlockAttributes,
+  // Extension.create({
+  //   name: "blockPositionUpdater",
+  //   addProseMirrorPlugins() {
+  //     return [UpdateBlockPositions];
+  //   },
+  // }),
 ] as any;

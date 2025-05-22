@@ -1,5 +1,11 @@
 import "@/features/editor/styles/index.css";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import {
@@ -48,6 +54,7 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
+import { Loader } from "@mantine/core";
 
 interface PageEditorProps {
   pageId: string;
@@ -145,7 +152,6 @@ export default function PageEditor({
 
   const editor = useEditor(
     {
-      content,
       extensions,
       editable,
       immediatelyRender: true,
@@ -183,7 +189,6 @@ export default function PageEditor({
           handleFileDrop(view, event, moved, pageId),
       },
       onCreate({ editor }) {
-        console.log("[onCreate]");
         if (editor) {
           // @ts-ignore
           setEditor(editor);
@@ -191,7 +196,6 @@ export default function PageEditor({
         }
       },
       onUpdate({ editor }) {
-        console.log("[onUpdate]");
         if (editor.isEmpty) return;
         const editorJson = editor.getJSON();
         //update local page cache to reduce flickers
@@ -203,10 +207,6 @@ export default function PageEditor({
 
   const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
     const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
-    console.log("[newContent]");
-    console.log(newContent);
-    console.log("[pageData]");
-    console.log(pageData);
 
     if (pageData) {
       queryClient.setQueryData(["pages", slugId], {
@@ -215,7 +215,7 @@ export default function PageEditor({
         updatedAt: new Date(),
       });
     }
-  }, 1000);
+  }, 3000);
 
   const handleActiveCommentEvent = (event) => {
     const { commentId } = event.detail;
@@ -322,7 +322,7 @@ export default function PageEditor({
       editable={false}
       immediatelyRender={true}
       extensions={mainExtensions}
-      content={{ ...content }}
+      content={content}
     ></EditorProvider>
   );
 }

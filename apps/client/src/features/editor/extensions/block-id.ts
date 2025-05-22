@@ -41,24 +41,6 @@ export const BlockId = new Extension({
     ];
   },
 
-  onCreate() {
-    const { tr: transaction, doc } = this.editor.state;
-    const { types, attributeName, createId } = this.options;
-
-    for (const { node, pos } of findChildren(
-      doc,
-      (node) =>
-        types.includes(node.type.name) && node.attrs[attributeName] == null,
-    )) {
-      transaction.setNodeMarkup(pos, undefined, {
-        ...node.attrs,
-        [attributeName]: createId(),
-      });
-    }
-
-    this.editor.view.dispatch(transaction);
-  },
-
   addProseMirrorPlugins() {
     let dragContainer = null;
     let wasDropOrPaste = false;
