@@ -349,8 +349,13 @@ export class PageService {
 
     const incomingBlockIds = new Set(
       blocks.map((block) => {
+        if (!Object.prototype.hasOwnProperty.call(block, 'attrs')) {
+          this.logger.error('Block missing blockId attribute: ', block);
+          return null;
+        }
         if (!Object.prototype.hasOwnProperty.call(block.attrs, 'blockId')) {
           this.logger.error('Block missing blockId attribute: ', block);
+          return null;
         }
         return block.attrs.blockId;
       }),

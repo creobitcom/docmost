@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB, KyselyTransaction } from '../../types/kysely.types';
-import { calculateBlockHash, dbOrTx } from '../../utils';
+import { dbOrTx } from '../../utils';
 import {
   Block,
   InsertablePage,
@@ -14,7 +14,7 @@ import {
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
 import { executeWithPagination } from '@docmost/db/pagination/pagination';
 import { validate as isValidUUID } from 'uuid';
-import { ExpressionBuilder, sql } from 'kysely';
+import { ExpressionBuilder, sql, UpdateResult } from 'kysely';
 import { DB } from '@docmost/db/types/db';
 import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
 import { SpaceMemberRepo } from '@docmost/db/repos/space/space-member.repo';
@@ -143,7 +143,7 @@ export class PageRepo {
     updatePageData: UpdatablePage,
     pageId: string,
     trx?: KyselyTransaction,
-  ): Promise<any> {
+  ): Promise<UpdateResult> {
     const db = dbOrTx(this.db, trx);
     const pageMetadata = { ...updatePageData };
     delete pageMetadata.content;
