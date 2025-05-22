@@ -78,8 +78,7 @@ export class PersistenceExtension implements Extension {
         tiptapExtensions,
       );
 
-      Y.encodeStateAsUpdate(ydoc);
-      return ydoc;
+      return Y.encodeStateAsUpdate(ydoc);
     }
 
     this.logger.debug(`creating fresh ydoc: ${pageId}`);
