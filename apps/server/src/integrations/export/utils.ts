@@ -25,7 +25,6 @@ export function getPageTitle(title: string) {
   return title ? title : 'untitled';
 }
 
-// todo blocks
 export function getProsemirrorContent(content: any) {
   return (
     content ?? {
