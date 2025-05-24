@@ -2,9 +2,17 @@ import "@/features/editor/styles/index.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
-import { HocuspocusProvider } from "@hocuspocus/provider";
-import { useEditor, EditorContent } from "@tiptap/react";
-import { mainExtensions, collabExtensions, creobitExtentions } from "@/features/editor/extensions/extensions";
+import {
+  HocuspocusProvider,
+  onAuthenticationFailedParameters,
+  WebSocketStatus,
+} from "@hocuspocus/provider";
+import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
+import {
+  collabExtensions,
+  creobitExtentions,
+  mainExtensions,
+} from "@/features/editor/extensions/extensions";
 import { useAtom } from "jotai";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
 import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";

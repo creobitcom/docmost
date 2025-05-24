@@ -13,7 +13,7 @@ export enum QueueJob {
 
   DELETE_USER_AVATARS = 'delete-user-avatars',
 
-  PAGE_BACKLINKS = 'page-backlinks',
+  BLOCK_BACKLINKS = 'block-backlinks',
 
   STRIPE_SEATS_SYNC = 'sync-stripe-seats',
   TRIAL_ENDED = 'trial-ended',

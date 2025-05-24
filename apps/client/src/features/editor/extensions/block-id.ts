@@ -1,5 +1,6 @@
 import {
   Extension,
+  findChildren,
   combineTransactionSteps,
   getChangedRanges,
   findChildrenInRange,

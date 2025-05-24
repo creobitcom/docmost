@@ -9,6 +9,7 @@ import {
   InsertableUserPagePreferences,
   Page,
   PageContent,
+  UpdatableBlock,
   UpdatablePage,
   UpdatableUserPagePreferences,
   UserPagePreference,
@@ -85,35 +86,47 @@ export class PageRepo {
     const page = await query.executeTakeFirst();
 
     if (!opts.includeContent) {
-      return { ...page, content: null };
+      return page;
     }
 
-    return this.attachPageContent(page);
+    return this.attachPageContent(page, opts);
   }
 
-  private async attachPageContent(page: Page): Promise<Page> {
+  private async attachPageContent(page: Page, opts: FindPageOptions): Promise<Page> {
     const pageBlocks = await this.findPageBlocks(page.id);
 
     if (pageBlocks.length === 0) {
-      return { ...page, content: null };
+      return page;
     }
+
+    let query = this.buildBasePageQuery(this.db, opts);
+    query = this.addPageCondition(query, page.id);
+
+    if (opts?.includeSpace) {
+      query = query.select((eb) => this.withSpace(eb));
+    }
+
+    if (opts?.withLock && opts?.trx) {
+      query = query.forUpdate();
+    }
+
+
 
     const pageContent = {
       type: 'doc',
       content: pageBlocks.map((block) => {
         // @ts-ignore
-        const blockContent: ContentBlock = { ...block.content };
-
-        if (!blockContent.attrs) {
-          blockContent.attrs = {};
+        if (!block.content?.attrs) {
+          // @ts-ignore
+          block.content.attrs = {};
         }
-
-        blockContent.attrs.blockId = block.id;
-        return blockContent;
+        // @ts-ignore
+        block.content.attrs.blockId = block.id;
+        return block.content;
       }),
     };
 
-    return { ...page, content: pageContent };
+    return { ...page, content: pageContent } as Page;
   }
 
   async findPageBlocks(
@@ -129,29 +142,27 @@ export class PageRepo {
       .execute();
   }
 
-  async updatePageMetadata(
-    updatePageData: UpdatablePage,
+  async updateBlockMetadata(
+    updateBlockData: UpdatableBlock,
     pageId: string,
     trx?: KyselyTransaction,
   ): Promise<UpdateResult> {
     const db = dbOrTx(this.db, trx);
-    const { content, ...pageMetadata } = updatePageData;
+    const blockMetadata = { ...updateBlockData };
+    delete blockMetadata.content;
 
-    let query = db
-      .updateTable('pages')
-      .set({ ...pageMetadata, updatedAt: new Date() });
-
-    query = this.addPageCondition(query, pageId);
-
-    return query.executeTakeFirst();
+    return db
+      .updateTable('blocks')
+      .set({ ...blockMetadata, updatedAt: new Date() })
+      .where('id', '=', pageId)
+      .executeTakeFirst();
   }
 
   async getExistingPageBlocks(
     pageId: string,
     trx?: KyselyTransaction,
-  ): Promise<Partial<Block>[]> {
+  ): Promise<any[]> {
     const db = dbOrTx(this.db, trx);
-
     return db
       .selectFrom('blocks')
       .select(['id', 'stateHash'])
@@ -168,14 +179,14 @@ export class PageRepo {
     trx?: KyselyTransaction,
   ): Promise<void> {
     const db = dbOrTx(this.db, trx);
-    this.logger.debug('Inserting block', { blockId, pageId });
+    this.logger.debug('Inserting block: ', block);
 
     await db
       .insertInto('blocks')
       .values({
         id: blockId,
-        pageId,
-        position: block?.attrs?.position,
+        pageId: pageId,
+        position: block?.attrs.position,
         content: block,
         blockType: block?.type,
         createdAt: new Date(),
@@ -192,12 +203,12 @@ export class PageRepo {
     trx?: KyselyTransaction,
   ): Promise<void> {
     const db = dbOrTx(this.db, trx);
-    this.logger.debug('Updating block', { blockId });
+    this.logger.debug('Updating block: ', block);
 
     await db
       .updateTable('blocks')
       .set({
-        position: block?.attrs?.position,
+        position: block?.attrs.position,
         content: block,
         updatedAt: new Date(),
         stateHash: calculatedHash,
@@ -528,7 +539,6 @@ export class PageRepo {
         'pages.id',
         'pages.slugId',
         'pages.title',
-        'pages.content',
         'pages.parentPageId',
         'pages.spaceId',
         'pages.workspaceId',

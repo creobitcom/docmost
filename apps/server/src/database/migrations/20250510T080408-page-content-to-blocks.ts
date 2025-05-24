@@ -20,9 +20,9 @@ export async function up(db: Kysely<any>): Promise<void> {
         .insertInto('blocks')
         .values({
           pageId: page.id,
-          block_type: block.type,
+          blockType: block.type,
           content: JSON.stringify(block),
-          state_hash: calculateBlockHash(block),
+          stateHash: calculateBlockHash(block),
         })
         .execute();
     }

@@ -88,19 +88,108 @@ export class PersistenceExtension implements Extension {
   }
 
 
-  async onStoreDocument({ documentName, document }) {
-    if (documentName.startsWith('block.')) {
-      const blockId = documentName.split('.')[1];
-      const yjsSnapshot = Buffer.from(Y.encodeStateAsUpdate(document));
-      await this.db
-        .updateTable('blocks')
-        .set({ yjsSnapshot })
-        .where('id', '=', blockId)
-        .execute();
+  async onStoreDocument(data: onStoreDocumentPayload) {
+    const { documentName, document, context } = data;
+
+    // Работает только для блоков
+    if (!documentName.startsWith('block.')) return;
+
+    const blockId = documentName.split('.')[1];
+
+    const tiptapJson = TiptapTransformer.fromYdoc(document, 'default');
+    const yjsSnapshot = Buffer.from(Y.encodeStateAsUpdate(document));
+
+    Logger.debug('Block document: ', tiptapJson);
+
+    let textContent: string = null;
+
+    try {
+      textContent = jsonToText(tiptapJson);
+    } catch (err) {
+      this.logger.warn('jsonToText: ' + err?.['message']);
+    }
+
+    let block: any = null;
+
+    try {
+      await executeTx(this.db, async (trx) => {
+        // Загружаем блок для проверки
+        block = await trx
+          .selectFrom('blocks')
+          .selectAll()
+          .where('id', '=', blockId)
+          .forUpdate()
+          .executeTakeFirst();
+
+        if (!block) {
+          this.logger.error(`Block with id ${blockId} not found`);
           return;
         }
-    // ... (другая логика для других документов, если нужно)
+
+        if (isDeepStrictEqual(tiptapJson, block.content)) {
+          block = null;
+          return;
+        }
+
+        // contributors
+        let contributorIds = undefined;
+        try {
+          const existingContributors = block.contributorIds || [];
+          const contributorSet = this.contributors.get(documentName) ?? new Set();
+          contributorSet.add(block.creatorId);
+          const newContributors = [...contributorSet];
+          contributorIds = Array.from(
+            new Set([...existingContributors, ...newContributors]),
+          );
+          this.contributors.delete(documentName);
+        } catch (err) {
+          this.logger.log('Contributors error:' + err?.['message']);
+        }
+
+        // Обновляем блок
+        await trx
+          .updateTable('blocks')
+          .set({
+            content: tiptapJson,
+            yjsSnapshot,
+            //textContent,
+            //lastUpdatedById: context.user.id,
+            //contributorIds: contributorIds,
+            //updatedAt: new Date(),
+          })
+          .where('id', '=', blockId)
+          .execute();
+
+        this.logger.debug(`Block updated: ${blockId}`);
+      });
+    } catch (err) {
+      this.logger.error(`Failed to update block ${blockId}`, err);
+    }
+
+    if (block) {
+      this.eventEmitter.emit('collab.block.updated', {
+        block: {
+          ...block,
+          content: tiptapJson,
+          lastUpdatedById: context.user.id,
+        },
+      });
+
+      // Mentions (по желанию, если блоки тоже могут содержать ссылки)
+      const mentions = extractMentions(tiptapJson);
+      const pageMentions = extractPageMentions(mentions);
+
+      if (pageMentions.length > 0) {
+        await this.generalQueue.add(QueueJob.BLOCK_BACKLINKS, {
+          blockId,
+          pageId: block.pageId,
+          workspaceId: block.workspaceId,
+          mentions: pageMentions,
+        });
+      }
+    }
   }
+
 
   async onChange(data: onChangePayload) {
     const documentName = data.documentName;
