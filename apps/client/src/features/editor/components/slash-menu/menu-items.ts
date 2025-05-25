@@ -60,6 +60,20 @@ const CommandGroups: SlashMenuGroupedItemsType = {
       },
     },
     {
+      title: "Paragraph Group",
+      description: "Replacement for paragraphs",
+      searchTerms: ["p", "paragraph", "group"],
+      icon: IconTypography,
+      command: ({ editor, range }: CommandProps) => {
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .toggleNode("paragraphGroup", "paragraphGroup")
+          .run();
+      },
+    },
+    {
       title: "To-do list",
       description: "Track tasks with a to-do list.",
       searchTerms: ["todo", "task", "list", "check", "checkbox"],

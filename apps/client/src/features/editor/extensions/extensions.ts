@@ -75,6 +75,8 @@ import { CharacterCount } from "@tiptap/extension-character-count";
 import { BlockId } from "@/features/editor/extensions/block-id";
 import { BlockPosition } from "@/features/editor/extensions/block-position";
 import { BlockTypes } from "@/features/editor/utils/block-types";
+import { ParagraphGroup } from "./paragraph-group";
+import Document from "@tiptap/extension-document";
 
 const lowlight = createLowlight(common);
 lowlight.register("mermaid", plaintext);
@@ -89,7 +91,12 @@ lowlight.register("haskell", haskell);
 lowlight.register("scala", scala);
 
 export const mainExtensions = [
+  Document.configure({
+    // content: "(paragraphGroup | block)+",
+    content: "paragraphGroup+",
+  }),
   StarterKit.configure({
+    document: false,
     history: false,
     dropcursor: {
       width: 3,
@@ -102,6 +109,7 @@ export const mainExtensions = [
       },
     },
   }),
+  ParagraphGroup,
   Placeholder.configure({
     placeholder: ({ node }) => {
       if (node.type.name === "heading") {
