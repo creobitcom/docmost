@@ -152,6 +152,10 @@ export async function changeMemberRole(
   await api.post("/pages/members/change-role", data);
 }
 
+export async function createBlockPermission(data: any): Promise<any> {
+  return api.post("/pages/blockPermission", data);
+}
+
 export async function getMyPages(pageId?: string): Promise<IPagination<IPage>> {
   const req = await api.get("/pages/my-pages", { params: { pageId } });
   return req.data;

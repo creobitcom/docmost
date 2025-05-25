@@ -4,6 +4,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+
+
 import { CreatePageDto } from '../dto/create-page.dto';
 import { UpdatePageDto } from '../dto/update-page.dto';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
@@ -27,6 +29,7 @@ import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
 import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 import { MyPageColorDto } from '../dto/update-color.dto';
+import { PageBlocksService } from './page-blocks.service';
 
 @Injectable()
 export class PageService {
@@ -37,6 +40,7 @@ export class PageService {
     private pageMemberRepo: PageMemberRepo,
     private attachmentRepo: AttachmentRepo,
     private readonly syncPageRepo: SynchronizedPageRepo,
+    private readonly PageBlocksService: PageBlocksService,
     @InjectKysely() private readonly db: KyselyDB,
   ) {
     this.logger = new Logger('PageService');
@@ -154,9 +158,11 @@ export class PageService {
     updatePageDto: UpdatePageDto,
     userId: string,
   ): Promise<Page> {
-    const contributors = new Set<string>(page.contributorIds ?? []);
-    contributors.add(userId);
-    await this.pageRepo.updatePageMetadata(
+    const contributors = new Set<string>(page.contributorIds);
+contributors.add(userId);
+    const contributorIds = Array.from(contributors);
+
+    /*await this.pageRepo.updatePage(
       {
         title: updatePageDto.title,
         icon: updatePageDto.icon,
@@ -165,7 +171,7 @@ export class PageService {
         contributorIds: Array.from(contributors),
       },
       page.id,
-    );
+    );*/
 
     return await this.pageRepo.findById(page.id, {
       includeSpace: true,
@@ -545,6 +551,16 @@ export class PageService {
       await this.pageRepo.deletePage(pageId, trx);
     });
   }
+  async updatePage(id: string, dto: UpdatePageDto) {
+    await this.db.updateTable('pages')
+      .set({ content: dto.content })
+      .where('id', '=', id)
+      .execute();
+
+      await this.PageBlocksService.saveFromTiptapJson(id, dto.content);
+
+  }
+
 
   async getMyPages(
     pagination: PaginationOptions,

@@ -11,6 +11,9 @@ import {
   BadRequestException,
   Logger,
   Query,
+  Param,
+  Put,
+  Inject,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -30,6 +33,7 @@ import {
 } from '../casl/interfaces/space-ability.type';
 import SpaceAbilityFactory from '../casl/abilities/space-ability.factory';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
+
 import { RecentPageDto } from './dto/recent-page.dto';
 import PageAbilityFactory from '../casl/abilities/page-ability.factory';
 import {
@@ -49,11 +53,20 @@ import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { MyPageColorDto } from './dto/update-color.dto';
 import { MyPagesDto } from './dto/my-pages.dto';
+import { SaveBlockPermissionDto } from './dto/save-block-permission.dto';
+import { BlockPermissionService } from './services/block-permission.service';
+import { PageBlocksService } from './services/page-blocks.service';
+import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
+import { extractTopLevelBlocks } from './extract-page-blocks';
+import { InjectKysely } from 'nestjs-kysely';
+import { KyselyDB } from '@docmost/db/types/kysely.types';
+
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
 export class PageController {
   constructor(
+    private readonly pageBlocksService: PageBlocksService,
     private readonly pageService: PageService,
     private readonly pageMemberService: PageMemberService,
     private readonly pageMemberRepo: PageMemberRepo,
@@ -62,7 +75,53 @@ export class PageController {
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
+    private readonly blockPermissionService: BlockPermissionService,
+    @InjectKysely() private readonly db: KyselyDB,
   ) {}
+
+  @HttpCode(HttpStatus.OK)
+  @Post('blocks/:pageId')
+  async updateBlocksForPage(
+    @Param('pageId') pageId: string,
+    @Body() dto: UpdatePageBlocksDto
+  ) {
+    await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks);
+    return { success: true };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('blockPermissions')
+  async assignPermissionToBlock(@Body()
+    dto: { pageId: string; blockId: string; userId: string; role?: string; permission?: string }) {
+    const { pageId, blockId, userId, role, permission } = dto;
+
+    const block = await this.db
+      .selectFrom('blocks')
+      .select(['id'])
+      .where('page_id', '=', pageId)
+      .executeTakeFirst();
+
+    if (!block) {
+      throw new NotFoundException('Block not found for given page and blockId');
+    }
+
+    await this.db
+      .insertInto('blockPermissions')
+      .values({
+        pageId: pageId,
+        blockId: block.id,
+        userId: userId,
+        role: role,
+        permission: permission ?? 'read',
+      })
+      .onConflict((oc) =>
+        oc.columns(['blockId', 'userId']).doUpdateSet({ permission })
+      )
+      .execute();
+
+    return { success: true };
+  }
+
 
   @HttpCode(HttpStatus.OK)
   @Post('/info')
@@ -155,6 +214,16 @@ export class PageController {
     }
 
     Logger.debug(updatePageDto);
+    const updatedPage = await this.pageService.update(
+      page,
+      updatePageDto,
+      user.id,
+    );
+
+    if (updatePageDto.content) {
+      const blocks = extractTopLevelBlocks(updatePageDto.content, updatePageDto.pageId);
+      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, blocks);
+    }
 
     if (page.isSynced) {
       const syncPageData = await this.syncPageService.findByReferenceId(

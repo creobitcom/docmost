@@ -53,20 +53,25 @@ import { IPage } from "@/features/page/types/page.types.ts";
 import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
-import { jwtDecode } from "jwt-decode";
-import { Loader } from "@mantine/core";
+import { updatePageBlocks } from "../../lib/api-client";
+import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-page-blocks";
+
 
 interface PageEditorProps {
   pageId: string;
   editable: boolean;
   content: any;
+  initialContent: any;
 }
 
 export default function PageEditor({
   pageId,
   editable,
-  content,
+  content: _content,
+  initialContent,
 }: PageEditorProps) {
+  const [, setPageId] = useState<string | null>(null);
+  const [content, setContent] = useState(initialContent);
   const collaborationURL = useCollaborationUrl();
   const [currentUser] = useAtom(currentUserAtom);
   const [, setEditor] = useAtom(pageEditorAtom);
@@ -77,7 +82,7 @@ export default function PageEditor({
   const [isLocalSynced, setLocalSynced] = useState(false);
   const [isRemoteSynced, setRemoteSynced] = useState(false);
   const [yjsConnectionStatus, setYjsConnectionStatus] = useAtom(
-    yjsConnectionStatusAtom,
+    yjsConnectionStatusAtom
   );
   const menuContainerRef = useRef(null);
   const documentName = `page.${pageId}`;
@@ -86,15 +91,35 @@ export default function PageEditor({
   const documentState = useDocumentVisibility();
   const [isCollabReady, setIsCollabReady] = useState(false);
   const { pageSlug } = useParams();
+  const collabRetryCount = useRef(0);
   const slugId = extractPageSlugId(pageSlug);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    Id: string;
+  } | null>(null);
+
+  const updatePageBlocksTable = (newContent: any) => {
+    const blocksToUpdate = extractTopLevelBlocks(newContent, pageId);
+    updatePageBlocks(pageId, blocksToUpdate)
+      .then(() => {
+        console.log("PageBlocks обновлены успешно");
+      })
+      .catch((error) => {
+        console.error("Ошибка при обновлении PageBlocks:", error);
+      });
+  };
+
+  const handleContentUpdate = (newContent: any) => {
+    setContent(newContent);
+    updatePageBlocksTable(newContent);
+  };
 
   const localProvider = useMemo(() => {
     const provider = new IndexeddbPersistence(documentName, ydoc);
-
     provider.on("synced", () => {
       setLocalSynced(true);
     });
-
     return provider;
   }, [pageId, ydoc]);
 
@@ -107,11 +132,13 @@ export default function PageEditor({
       connect: false,
       preserveConnection: false,
       onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
-        const payload = jwtDecode(collabQuery?.token);
-        const now = Date.now().valueOf() / 1000;
-        const isTokenExpired = now >= payload.exp;
-        if (isTokenExpired) {
-          refetchCollabToken();
+        collabRetryCount.current += 1;
+        refetchCollabToken().then(() => {
+          collabRetryCount.current = 0;
+        });
+
+        if (collabRetryCount.current > 20) {
+          window.location.reload();
         }
       },
       onStatus: (status) => {
@@ -132,6 +159,22 @@ export default function PageEditor({
     return provider;
   }, [ydoc, pageId, collabQuery?.token]);
 
+  useEffect(() => {
+    setContent(initialContent);
+  }, [initialContent]);
+
+  useEffect(() => {
+    setPageId(pageId);
+  }, [pageId]);
+
+  useEffect(() => {
+    const handleClick = () => {
+      setContextMenu(null);
+    };
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
+
   useLayoutEffect(() => {
     remoteProvider.connect();
     return () => {
@@ -150,9 +193,40 @@ export default function PageEditor({
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
+  const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
+    const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
+
+    if (
+      !newContent ||
+      JSON.stringify(newContent) === JSON.stringify({ type: "doc", content: [] })
+    ) {
+      return;
+    }
+
+    if (pageData) {
+      queryClient.setQueryData(["pages", slugId], {
+        ...pageData,
+        content: newContent,
+      });
+    }
+
+    handleContentUpdate(newContent);
+  }, 3000);
+  const sanitizedContent = (contentFromDb) => {
+    if (
+      !contentFromDb ||
+      !contentFromDb.content ||
+      contentFromDb.content.length === 0
+    ) {
+      return null
+    }
+
+    return contentFromDb
+  }
   const editor = useEditor(
     {
       extensions,
+      content: sanitizedContent(content),
       editable,
       immediatelyRender: true,
       shouldRerenderOnTransaction: true,
@@ -198,24 +272,11 @@ export default function PageEditor({
       onUpdate({ editor }) {
         if (editor.isEmpty) return;
         const editorJson = editor.getJSON();
-        //update local page cache to reduce flickers
         debouncedUpdateContent(editorJson);
       },
     },
-    [pageId, editable, remoteProvider?.status],
+    [pageId, editable, remoteProvider?.status]
   );
-
-  const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
-    const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
-
-    if (pageData) {
-      queryClient.setQueryData(["pages", slugId], {
-        ...pageData,
-        content: newContent,
-        updatedAt: new Date(),
-      });
-    }
-  }, 3000);
 
   const handleActiveCommentEvent = (event) => {
     const { commentId } = event.detail;
@@ -230,10 +291,7 @@ export default function PageEditor({
   useEffect(() => {
     document.addEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
     return () => {
-      document.removeEventListener(
-        "ACTIVE_COMMENT_EVENT",
-        handleActiveCommentEvent,
-      );
+      document.removeEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
     };
   }, []);
 
@@ -267,13 +325,14 @@ export default function PageEditor({
       documentState === "visible" &&
       remoteProvider?.status === WebSocketStatus.Disconnected
     ) {
-      resetIdle();
-      remoteProvider.connect();
-      setTimeout(() => {
-        setIsCollabReady(true);
-      }, 600);
+      const reconnectTimeout = setTimeout(() => {
+        remoteProvider.connect();
+        resetIdle();
+      }, collabRetryCount.current > 2 ? 3000 : 0);
+
+      return () => clearTimeout(reconnectTimeout);
     }
-  }, [isIdle, documentState, remoteProvider]);
+  }, [isIdle, documentState, remoteProvider?.status]);
 
   const isSynced = isLocalSynced && isRemoteSynced;
 
@@ -282,22 +341,40 @@ export default function PageEditor({
       if (
         !isCollabReady &&
         isSynced &&
-        remoteProvider?.status === WebSocketStatus.Connected
+        remoteProvider.status === WebSocketStatus.Connected
       ) {
         setIsCollabReady(true);
       }
-    }, 500);
+    }, 300);
+
     return () => clearTimeout(collabReadyTimeout);
-  }, [isRemoteSynced, isLocalSynced, remoteProvider?.status]);
+  }, [isSynced, isCollabReady, remoteProvider?.status]);
 
   return isCollabReady ? (
     <div>
       <div ref={menuContainerRef}>
         <EditorContent editor={editor} />
+        {contextMenu && (
+      <div
+        style={{
+          position: "absolute",
+          top: contextMenu.y,
+          left: contextMenu.x,
+          background: "#fff",
+          border: "1px solid #ccc",
+          borderRadius: "6px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          zIndex: 9999,
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
 
+      </div>
+    )}
         {editor && editor.isEditable && (
           <div>
-            <EditorBubbleMenu editor={editor} />
+            <EditorBubbleMenu editor={editor} pageId={pageId} />
             <TableMenu editor={editor} />
             <TableCellMenu editor={editor} appendTo={menuContainerRef} />
             <ImageMenu editor={editor} />
@@ -318,7 +395,9 @@ export default function PageEditor({
       ></div>
     </div>
   ) : (
+
     <EditorProvider
+      onUpdate={handleContentUpdate}
       editable={false}
       immediatelyRender={true}
       extensions={mainExtensions}

@@ -135,7 +135,7 @@ export class PageRepo {
     return db
       .selectFrom('blocks')
       .select(['id', 'content'])
-      .where('pageId', '=', pageId)
+      .where('page_id', '=', pageId)
       .execute();
   }
 
@@ -163,7 +163,7 @@ export class PageRepo {
     return db
       .selectFrom('blocks')
       .select(['id', 'stateHash'])
-      .where('pageId', '=', pageId)
+      .where('page_id', '=', pageId)
       .orderBy('position', 'asc')
       .execute();
   }
@@ -182,10 +182,10 @@ export class PageRepo {
       .insertInto('blocks')
       .values({
         id: blockId,
-        pageId: pageId,
+        page_id: pageId,
         position: block?.attrs.position,
         content: block,
-        blockType: block?.type,
+        block_type: block?.type,
         createdAt: new Date(),
         updatedAt: new Date(),
         stateHash: calculatedHash,
