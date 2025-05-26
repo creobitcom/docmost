@@ -167,13 +167,13 @@ export class PersistenceExtension implements Extension {
         },
       });
 
-      const mentions = extractMentions(tiptapJson);
-      const pageMentions = extractPageMentions(mentions);
+      // const mentions = extractMentions(tiptapJson);
+      // const pageMentions = extractPageMentions(mentions);
 
       await this.generalQueue.add(QueueJob.PAGE_BACKLINKS, {
         pageId: pageId,
         workspaceId: page.workspaceId,
-        mentions: pageMentions,
+        mentions: [],
       } as IPageBacklinkJob);
     }
   }
