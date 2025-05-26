@@ -6,7 +6,8 @@
 }
 
 .block-group > * {
-  margin: 0.15em 0;
+  margin-top: 0.15em !important;
+  margin-bottom: 0.15em !important;
 }
 
 .block-group > *:first-child {
