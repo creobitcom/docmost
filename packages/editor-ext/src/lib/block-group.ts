@@ -68,12 +68,7 @@ export const BlockGroup = Node.create({
         ({ commands }) => {
           return commands.insertContent({
             type: this.name,
-            content: [
-              {
-                type: "paragraph",
-                content: [],
-              },
-            ],
+            content: [],
           });
         },
     };

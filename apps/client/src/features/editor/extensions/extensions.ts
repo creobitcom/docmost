@@ -139,7 +139,7 @@ export const mainExtensions = [
     multicolor: true,
   }),
   Typography,
-  // TrailingNode,
+  TrailingNode,
   GlobalDragHandle,
   TextStyle,
   Color,
