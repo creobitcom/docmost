@@ -54,7 +54,6 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
-import { Loader } from "@mantine/core";
 
 interface PageEditorProps {
   pageId: string;
@@ -193,6 +192,13 @@ export default function PageEditor({
           // @ts-ignore
           setEditor(editor);
           editor.storage.pageId = pageId;
+
+          if (content === null) {
+            editor.commands.setContent({
+              type: "blockGroup",
+              content: [{ type: "paragraph" }],
+            });
+          }
         }
       },
       onUpdate({ editor }) {

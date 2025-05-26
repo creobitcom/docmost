@@ -66,7 +66,7 @@ import fortran from "highlight.js/lib/languages/fortran";
 import haskell from "highlight.js/lib/languages/haskell";
 import scala from "highlight.js/lib/languages/scala";
 import mentionRenderItems from "@/features/editor/components/mention/mention-suggestion.ts";
-import { ReactNodeViewRenderer, Extension } from "@tiptap/react";
+import { ReactNodeViewRenderer } from "@tiptap/react";
 import MentionView from "@/features/editor/components/mention/mention-view.tsx";
 import i18n from "@/i18n.ts";
 import { MarkdownClipboard } from "@/features/editor/extensions/markdown-clipboard.ts";
@@ -75,7 +75,7 @@ import { CharacterCount } from "@tiptap/extension-character-count";
 import { BlockId } from "@/features/editor/extensions/block-id";
 import { BlockPosition } from "@/features/editor/extensions/block-position";
 import { BlockTypes } from "@/features/editor/utils/block-types";
-import { ParagraphGroup } from "./paragraph-group";
+import { BlockGroup } from "./block-group";
 import Document from "@tiptap/extension-document";
 
 const lowlight = createLowlight(common);
@@ -91,9 +91,9 @@ lowlight.register("haskell", haskell);
 lowlight.register("scala", scala);
 
 export const mainExtensions = [
-  Document.configure({
-    // content: "(paragraphGroup | block)+",
-    content: "paragraphGroup+",
+  BlockGroup,
+  Document.extend({
+    content: "(block | myBlocks)+",
   }),
   StarterKit.configure({
     document: false,
@@ -109,7 +109,6 @@ export const mainExtensions = [
       },
     },
   }),
-  ParagraphGroup,
   Placeholder.configure({
     placeholder: ({ node }) => {
       if (node.type.name === "heading") {
@@ -140,7 +139,7 @@ export const mainExtensions = [
     multicolor: true,
   }),
   Typography,
-  TrailingNode,
+  // TrailingNode,
   GlobalDragHandle,
   TextStyle,
   Color,

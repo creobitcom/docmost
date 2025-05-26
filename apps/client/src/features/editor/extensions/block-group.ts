@@ -1,19 +1,20 @@
 import { mergeAttributes, Node, wrappingInputRule } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
-    paragraphGroup: {
-      setParagraphGroup: () => ReturnType;
-      toggleParagraphGroup: () => ReturnType;
-      unsetParagraphGroup: () => ReturnType;
+    blockGroup: {
+      setBlockGroup: () => ReturnType;
+      toggleBlockGroup: () => ReturnType;
+      unsetBlockGroup: () => ReturnType;
     };
   }
 }
 
-export const ParagraphGroup = Node.create({
-  name: "paragraphGroup",
+export const BlockGroup = Node.create({
+  name: "blockGroup",
 
-  group: "block",
+  group: "myBlocks",
 
   content: "block*",
 
@@ -30,62 +31,72 @@ export const ParagraphGroup = Node.create({
   parseHTML() {
     return [
       {
-        tag: "div[data-paragraph-group]",
+        tag: "div[data-block-group]",
       },
     ];
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ HTMLAttributes, node }) {
+    const hasContent = node.content.childCount > 0;
+
     return [
       "div",
-      mergeAttributes(HTMLAttributes, { "data-paragraph-group": "true" }),
+      mergeAttributes(HTMLAttributes, {
+        "data-block-group": "true",
+        class: "block-group",
+      }),
       0,
+      // hasContent ? 0 : ["p", { class: "is-empty is-editor-empty" }, 0],
     ];
   },
 
   addCommands() {
     return {
-      setParagraphGroup:
+      setBlockGroup:
         () =>
         ({ commands }) => {
           return commands.wrapIn(this.name);
         },
-      toggleParagraphGroup:
+      toggleBlockGroup:
         () =>
         ({ commands }) => {
           return commands.toggleWrap(this.name);
         },
-      unsetParagraphGroup:
+      unsetBlockGroup:
         () =>
         ({ commands }) => {
           return commands.lift(this.name);
+        },
+      insertBlockGroup:
+        () =>
+        ({ commands }) => {
+          return commands.insertContent({
+            type: this.name,
+            content: [
+              {
+                type: "paragraph",
+                content: ["asdas"],
+              },
+            ],
+          });
         },
     };
   },
 
   addKeyboardShortcuts() {
     return {
-      "Mod-Shift-P": () => this.editor.commands.toggleParagraphGroup(),
-    };
-  },
-
-  addGlobalAttributes() {
-    return [
-      {
-        types: ["paragraphGroup"],
-        attributes: {
-          textAlign: {
-            default: "left",
-            parseHTML: (element) => element.style.textAlign || "left",
-            renderHTML: (attributes) => {
-              if (!attributes.textAlign || attributes.textAlign === "left") {
-                return {};
-              }
-              return { style: `text-align: ${attributes.textAlign}` };
+      "Mod-Shift-P": () => this.editor.commands.toggleBlockGroup(),
+      "Mod-Shift-Enter": () => {
+        return this.editor.commands.insertContent({
+          type: this.name,
+          content: [
+            {
+              type: "paragraph",
+              content: [],
             },
-          },
-        },
+          ],
+        });
       },
-    ];
+    };
   },
 });
