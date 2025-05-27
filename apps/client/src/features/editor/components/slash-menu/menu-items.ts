@@ -61,7 +61,7 @@ const CommandGroups: SlashMenuGroupedItemsType = {
       },
     },
     {
-      title: "Block Container",
+      title: "Block Group",
       description: "Group content blocks",
       searchTerms: ["container", "blocks", "group"],
       icon: IconLayoutGrid,
