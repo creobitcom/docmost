@@ -75,6 +75,7 @@ import { CharacterCount } from "@tiptap/extension-character-count";
 import { BlockId } from "@/features/editor/extensions/block-id";
 import { BlockPosition } from "@/features/editor/extensions/block-position";
 import { BlockTypes } from "@/features/editor/utils/block-types";
+import { SmartEnter } from "@/features/editor/extensions/smart-enter";
 
 const lowlight = createLowlight(common);
 lowlight.register("mermaid", plaintext);
@@ -241,5 +242,8 @@ export const creobitExtentions = [
   }),
   BlockPosition.configure({
     types: BlockTypes,
+  }),
+  SmartEnter.configure({
+    types: ["paragraph"],
   }),
 ] as any;
