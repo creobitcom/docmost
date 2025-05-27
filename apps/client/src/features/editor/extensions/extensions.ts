@@ -37,6 +37,7 @@ import {
   Excalidraw,
   Embed,
   Mention,
+  BlockGroup,
 } from "@docmost/editor-ext";
 import {
   randomElement,
@@ -75,7 +76,6 @@ import { CharacterCount } from "@tiptap/extension-character-count";
 import { BlockId } from "@/features/editor/extensions/block-id";
 import { BlockPosition } from "@/features/editor/extensions/block-position";
 import { BlockTypes } from "@/features/editor/utils/block-types";
-import { BlockGroup } from "./block-group";
 import Document from "@tiptap/extension-document";
 
 const lowlight = createLowlight(common);
@@ -91,9 +91,8 @@ lowlight.register("haskell", haskell);
 lowlight.register("scala", scala);
 
 export const mainExtensions = [
-  BlockGroup,
   Document.extend({
-    content: "(block | myBlocks)+",
+    content: "(block|container)+",
   }),
   StarterKit.configure({
     document: false,
@@ -139,7 +138,7 @@ export const mainExtensions = [
     multicolor: true,
   }),
   Typography,
-  // TrailingNode,
+  TrailingNode,
   GlobalDragHandle,
   TextStyle,
   Color,
@@ -223,6 +222,7 @@ export const mainExtensions = [
     transformPastedText: true,
   }),
   CharacterCount,
+  BlockGroup,
 ] as any;
 
 type CollabExtensions = (provider: HocuspocusProvider, user: IUser) => any[];

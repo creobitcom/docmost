@@ -192,13 +192,6 @@ export default function PageEditor({
           // @ts-ignore
           setEditor(editor);
           editor.storage.pageId = pageId;
-
-          if (content === null) {
-            editor.commands.setContent({
-              type: "blockGroup",
-              content: [{ type: "paragraph" }],
-            });
-          }
         }
       },
       onUpdate({ editor }) {

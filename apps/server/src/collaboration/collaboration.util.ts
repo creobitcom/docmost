@@ -41,7 +41,6 @@ import { generateHTML } from '../common/helpers/prosemirror/html';
 // see:https://github.com/ueberdosis/tiptap/issues/4089
 import { generateJSON } from '@tiptap/html';
 import { Node } from '@tiptap/pm/model';
-import { Logger } from '@nestjs/common';
 
 export const tiptapExtensions = [
   StarterKit.configure({
@@ -95,9 +94,6 @@ export function jsonToText(tiptapJson: JSONContent) {
 }
 
 export function jsonToNode(tiptapJson: JSONContent) {
-  for (const ext of tiptapExtensions) {
-    Logger.debug('Ext name: ', ext?.name ?? ext);
-  }
   return Node.fromJSON(getSchema(tiptapExtensions), tiptapJson);
 }
 

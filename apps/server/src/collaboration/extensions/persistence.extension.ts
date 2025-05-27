@@ -80,8 +80,6 @@ export class PersistenceExtension implements Extension {
 
       Y.encodeStateAsUpdate(ydoc);
       return ydoc;
-
-      // return Y.encodeStateAsUpdate(ydoc);
     }
 
     this.logger.debug(`creating fresh ydoc: ${pageId}`);
@@ -167,13 +165,13 @@ export class PersistenceExtension implements Extension {
         },
       });
 
-      // const mentions = extractMentions(tiptapJson);
-      // const pageMentions = extractPageMentions(mentions);
+      const mentions = extractMentions(tiptapJson);
+      const pageMentions = extractPageMentions(mentions);
 
       await this.generalQueue.add(QueueJob.PAGE_BACKLINKS, {
         pageId: pageId,
         workspaceId: page.workspaceId,
-        mentions: [],
+        mentions: pageMentions,
       } as IPageBacklinkJob);
     }
   }
