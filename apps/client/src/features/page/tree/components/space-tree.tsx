@@ -13,6 +13,7 @@ import classes from "@/features/page/tree/styles/tree.module.css";
 import { ActionIcon, Menu, rem } from "@mantine/core";
 import {
   IconArrowRight,
+  IconCheck,
   IconChevronDown,
   IconChevronRight,
   IconDots,
@@ -21,7 +22,6 @@ import {
   IconFileSymlink,
   IconLink,
   IconPlus,
-  IconPointFilled,
   IconTrash,
   IconUsers,
 } from "@tabler/icons-react";
@@ -375,6 +375,11 @@ function Node({ node, style, dragHandle, tree }: NodeRendererProps<any>) {
           />
         </div>
         <span className={classes.text}>{node.data.name || t("untitled")}</span>
+        {node.data.isSynced && (
+          <div className={classes.syncIndicator} title="Synced">
+            <IconLink size={18} />
+          </div>
+        )}
         <div className={classes.actions}>
           {!tree.props.disableEdit && (
             <CreateNode
@@ -561,7 +566,6 @@ function NodeMenu({ node, treeApi }: NodeMenuProps) {
 
       <CreateSyncPageModal
         originPageId={node.id}
-        currentSpaceSlug={spaceSlug}
         onClose={closeCreateSyncedPageModal}
         open={createSyncedPageModelOpened}
       />

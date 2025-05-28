@@ -133,11 +133,19 @@
   background-color: #22c55e;
 }
 
-.syncIndicator {
+.coloredNode {
   position: absolute;
   height: 100%;
   left: 0;
   top: 0;
   bottom: 0;
   width: 4px;
+}
+
+.syncIndicator {
+  margin-right: 4px;
+  color: var(--success-color); /* or any color you prefer */
+  display: flex;
+  align-items: center;
+  opacity: 0.8;
 }
