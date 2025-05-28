@@ -8,8 +8,10 @@ export enum PageCaslAction {
 export enum PageCaslSubject {
   Member = 'member',
   Page = 'page',
+  Block = 'block',
 }
 
 export type IPageAbility =
   | [PageCaslAction, PageCaslSubject.Member]
-  | [PageCaslAction, PageCaslSubject.Page];
+  | [PageCaslAction, PageCaslSubject.Page]
+  | [PageCaslAction, PageCaslSubject.Block];

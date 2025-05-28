@@ -26,6 +26,8 @@ export async function getPageById(
   pageInput: Partial<IPageInput>,
 ): Promise<IPage & { originPageId?: string; isSyncedPage?: boolean }> {
   const req = await api.post<IPage>("/pages/info", pageInput);
+  console.log("[req.data]");
+  console.log(req.data);
   return req.data;
 }
 
@@ -148,6 +150,10 @@ export async function changeMemberRole(
   data: IChangePageMemberRole,
 ): Promise<void> {
   await api.post("/pages/members/change-role", data);
+}
+
+export async function createBlockPermission(data: any): Promise<any> {
+  return api.post("/pages/blockPermission", data);
 }
 
 export async function getMyPages(pageId?: string): Promise<IPagination<IPage>> {

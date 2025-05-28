@@ -14,9 +14,15 @@ export interface FullEditorProps {
   slugId: string;
   title: string;
   content: string;
+  // blocks: {
+  //   blockIds: string[];
+  //   deletedBlocksId: string[];
+  //   updatedBlocksId: string[];
+  // };
   spaceSlug: string;
   editable: boolean;
   isMyPages?: boolean;
+  initialContent: any;
 }
 
 export function FullEditor({
@@ -46,7 +52,7 @@ export function FullEditor({
         isMyPages={isMyPages}
       />
       <MemoizedPageEditor
-        pageId={pageId}
+        initialContent={content} pageId={pageId}
         editable={editable}
         content={content}
       />

@@ -118,6 +118,15 @@ export interface Blocks {
   updatedAt: Generated<Timestamp | null>;
 }
 
+export interface BlockPermissions {
+  blockId: string;
+  id: Generated<string>;
+  pageId: string;
+  permission: string;
+  role: string;
+  userId: string;
+}
+
 export interface Comments {
   content: Json | null;
   createdAt: Generated<Timestamp>;
@@ -320,6 +329,7 @@ export interface DB {
   authProviders: AuthProviders;
   backlinks: Backlinks;
   billing: Billing;
+  blockPermissions: BlockPermissions;
   blocks: Blocks;
   comments: Comments;
   groups: Groups;

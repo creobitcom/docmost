@@ -26,10 +26,21 @@ import { UserTokenRepo } from './repos/user-token/user-token.repo';
 import { BacklinkRepo } from '@docmost/db/repos/backlink/backlink.repo';
 import { PageMemberRepo } from './repos/page/page-member.repo';
 import { SynchronizedPageRepo } from './repos/page/synchronized_page.repo';
-
+import { BlockPermissionRepo } from './repos/page/block-member.repo';
+import { BlockAbilityFactory } from '../core/casl/abilities/block-ability.factory';
+import { KyselyProvider } from './kysely.provider';
+import { Kysely } from 'kysely';
 // https://github.com/brianc/node-postgres/issues/811
 types.setTypeParser(types.builtins.INT8, (val) => Number(val));
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
+const db = new Kysely({
+  dialect: new PostgresDialect({
+    pool,
+  }),
+});
 @Global()
 @Module({
   imports: [
@@ -63,6 +74,13 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     }),
   ],
   providers: [
+    {
+      provide: Kysely,
+      useValue: db,
+    },
+    KyselyProvider,
+    BlockPermissionRepo,
+    BlockAbilityFactory,
     MigrationService,
     WorkspaceRepo,
     UserRepo,
@@ -80,6 +98,10 @@ types.setTypeParser(types.builtins.INT8, (val) => Number(val));
     SynchronizedPageRepo,
   ],
   exports: [
+    Kysely,
+    KyselyProvider,
+    BlockPermissionRepo,
+    BlockAbilityFactory,
     WorkspaceRepo,
     UserRepo,
     GroupRepo,

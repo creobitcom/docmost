@@ -57,6 +57,7 @@ export default function MyPagesPage() {
         />
 
         <FullEditor
+          initialContent={page.content}
           key={page.id}
           pageId={page.id}
           title={page.title}
