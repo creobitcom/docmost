@@ -16,9 +16,8 @@ declare module "@tiptap/core" {
 export const BlockGroup = Node.create<BlockGroupOptions>({
   name: "blockGroup",
   group: "container",
-  content: "block*",
+  content: "block+",
   defining: true,
-  isolating: true,
 
   addOptions() {
     return {
