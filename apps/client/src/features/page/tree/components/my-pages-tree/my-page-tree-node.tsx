@@ -27,10 +27,11 @@ import {
 import { queryClient } from "@/main.tsx";
 import { useQueryEmit } from "@/features/websocket/use-query-emit.ts";
 import { useTranslation } from "react-i18next";
-import { colorAtom as pageColorsAtom } from "../atoms/tree-color-atom.ts";
-import { personalSpaceIdAtom } from "../atoms/tree-current-space-atom.ts";
+import { personalSpaceIdAtom } from "@/features/page/tree/atoms/tree-current-space-atom.ts";
 import { CreateNode } from "./my-page-tree-create-node.tsx";
 import { MyPageNodeMenu } from "./my-page-tree-node-menu.tsx";
+import { getPageColorAtom } from "@/features/page/tree/atoms/tree-color-atom.ts";
+import { usePageColors } from "../../hooks/use-page-colors.ts";
 
 export function Node({
   node,
@@ -40,15 +41,15 @@ export function Node({
 }: NodeRendererProps<any>) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { loadColors } = usePageColors();
 
   const updatePageMutation = useUpdatePageMutation();
 
   const [treeData, setTreeData] = useAtom(treeDataAtom);
   const [personalSpaceId] = useAtom(personalSpaceIdAtom);
-  const [nodeColors] = useAtom(pageColorsAtom);
-  const [nodeColor, setColor] = useState<string>(
-    nodeColors[node.data.id] || "#4CAF50",
-  );
+  const [nodeColors] = useAtom(getPageColorAtom);
+
+  const [nodeColor, setNodeColor] = useState<string>("");
 
   const emit = useQueryEmit();
   const timerRef = useRef(null);
@@ -56,14 +57,7 @@ export function Node({
   const isPersonalSpace = node.data.spaceId === personalSpaceId;
 
   useEffect(() => {
-    // Assign the color based on the parent page ID or the node ID?
-    // if (node.data.parentPageId) {
-    //   setColor(nodeColors[node.data.parentPageId] || "#4CAF50");
-    // } else {
-    //   setColor(nodeColors[node.data.id] || "#4CAF50");
-    // }
-
-    setColor(nodeColors[node.data.id] || "#4CAF50");
+    setNodeColor(nodeColors(node.data.id) || "#4CAF50");
   }, [nodeColors, node.data.id]);
 
   const prefetchPage = () => {
@@ -92,6 +86,8 @@ export function Node({
     try {
       const newChildren = await getMyPages(node.data.id);
       const childrenTree = buildTree(newChildren.items);
+
+      loadColors(newChildren.items);
 
       const updatedTreeData = appendNodeChildren(
         treeData,

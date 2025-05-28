@@ -1,89 +1,58 @@
 import { NodeApi, TreeApi } from "react-arborist";
-import { useAtom } from "jotai";
-import { useUpdateMyPageColorMutation } from "@/features/page/queries/page-query.ts";
-import { useState } from "react";
+import { useParams } from "react-router-dom";
+import { ActionIcon, Menu, rem } from "@mantine/core";
 import {
-  ActionIcon,
-  Button,
-  ColorPicker,
-  Group,
-  Menu,
-  Modal,
-  rem,
-  Stack,
-} from "@mantine/core";
-import {
-  IconColorPicker,
+  IconArrowRight,
   IconDots,
   IconFileExport,
   IconFileSymlink,
+  IconLink,
   IconTrash,
   IconUsers,
 } from "@tabler/icons-react";
 import { SpaceTreeNode } from "@/features/page/tree/types.ts";
-import { useDisclosure } from "@mantine/hooks";
+import { useClipboard, useDisclosure } from "@mantine/hooks";
+import { buildPageUrl } from "@/features/page/page.utils.ts";
 import { notifications } from "@mantine/notifications";
+import { getAppUrl } from "@/lib/config.ts";
 import { useDeletePageModal } from "@/features/page/hooks/use-delete-page-modal.tsx";
 import { useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
-import PageShareModal from "../../components/share-modal";
-import { colorAtom as pageColorsAtom } from "../atoms/tree-color-atom.ts";
-import CreateSyncPageModal from "../../components/create-sync-page-modal.tsx";
+import PageShareModal from "@/features/page/components/share-modal";
+import MovePageModal from "@/features/page/components/move-page-modal.tsx";
+import CreateSyncPageModal from "@/features/page/components/create-sync-page-modal.tsx";
 
 interface NodeMenuProps {
   node: NodeApi<SpaceTreeNode>;
   treeApi: TreeApi<SpaceTreeNode>;
-  isPersonalSpace: boolean;
 }
 
-export function MyPageNodeMenu({
-  node,
-  treeApi,
-  isPersonalSpace,
-}: NodeMenuProps) {
+export function NodeMenu({ node, treeApi }: NodeMenuProps) {
   const { t } = useTranslation();
+  const clipboard = useClipboard({ timeout: 500 });
+  const { spaceSlug } = useParams();
   const { openDeleteModal } = useDeletePageModal();
-  const updateMyPageColorMutation = useUpdateMyPageColorMutation();
-
-  const [pageColors, setPageColors] = useAtom(pageColorsAtom);
-
-  const [color, setColor] = useState(pageColors[node.data.id]);
 
   const [exportOpened, { open: openExportModal, close: closeExportModal }] =
     useDisclosure(false);
   const [shareOpened, { open: openShareModal, close: closeShareModal }] =
     useDisclosure(false);
+
   const [
-    colorPickerOpened,
-    { open: openColorPicker, close: closeColorPicker },
+    movePageModalOpened,
+    { open: openMovePageModal, close: closeMoveSpaceModal },
   ] = useDisclosure(false);
+
   const [
     createSyncedPageModelOpened,
     { open: openCreateSyncedPageModal, close: closeCreateSyncedPageModal },
   ] = useDisclosure(false);
 
-  const handleColorChange = (newColor: string) => {
-    setColor(newColor);
-  };
-
-  const applyNewColor = () => {
-    updateMyPageColorMutation
-      .mutateAsync({ pageId: node.data.id, color: color })
-      .then(() => {
-        setPageColors((prev) => ({
-          ...prev,
-          [node.data.id]: color,
-        }));
-        notifications.show({ message: t("Color updated") });
-      })
-      .catch(() => {
-        notifications.show({
-          message: t("Failed to update color"),
-          color: "red",
-        });
-      });
-
-    closeColorPicker();
+  const handleCopyLink = () => {
+    const pageUrl =
+      getAppUrl() + buildPageUrl(spaceSlug, node.data.slugId, node.data.name);
+    clipboard.copy(pageUrl);
+    notifications.show({ message: t("Link copied") });
   };
 
   return (
@@ -104,14 +73,14 @@ export function MyPageNodeMenu({
 
         <Menu.Dropdown>
           <Menu.Item
-            leftSection={<IconColorPicker size={16} />}
+            leftSection={<IconLink size={16} />}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              openColorPicker();
+              handleCopyLink();
             }}
           >
-            {t("Change color")}
+            {t("Copy link")}
           </Menu.Item>
 
           <Menu.Item
@@ -123,6 +92,17 @@ export function MyPageNodeMenu({
             }}
           >
             {t("Export page")}
+          </Menu.Item>
+
+          <Menu.Item
+            leftSection={<IconUsers size={16} />}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openShareModal();
+            }}
+          >
+            {t("Share")}
           </Menu.Item>
 
           {!node.data.isSynced ? (
@@ -138,17 +118,17 @@ export function MyPageNodeMenu({
             </Menu.Item>
           ) : null}
 
-          {isPersonalSpace && (
-            <div>
+          {!(treeApi.props.disableEdit as boolean) && (
+            <>
               <Menu.Item
-                leftSection={<IconUsers size={16} />}
+                leftSection={<IconArrowRight size={16} />}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  openShareModal();
+                  openMovePageModal();
                 }}
               >
-                {t("Share")}
+                {t("Move")}
               </Menu.Item>
 
               <Menu.Divider />
@@ -158,60 +138,28 @@ export function MyPageNodeMenu({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  openDeleteModal({
-                    onConfirm: () => treeApi?.delete(node),
-                  });
+                  openDeleteModal({ onConfirm: () => treeApi?.delete(node) });
                 }}
               >
                 {t("Delete")}
               </Menu.Item>
-            </div>
+            </>
           )}
         </Menu.Dropdown>
       </Menu>
 
-      <Modal
-        opened={colorPickerOpened}
-        onClose={closeColorPicker}
-        title={t("Choose a color")}
-        size="sm"
-      >
-        <Stack>
-          <ColorPicker
-            format="hex"
-            value={color}
-            onChange={handleColorChange}
-            swatches={[
-              "#25262b",
-              "#868e96",
-              "#fa5252",
-              "#e64980",
-              "#be4bdb",
-              "#7950f2",
-              "#4c6ef5",
-              "#228be6",
-              "#15aabf",
-              "#12b886",
-              "#40c057",
-              "#82c91e",
-              "#fab005",
-              "#fd7e14",
-            ]}
-          />
-          <Group justify="flex-end" mt="md">
-            <Button variant="outline" onClick={closeColorPicker}>
-              {t("Cancel")}
-            </Button>
-            <Button onClick={() => applyNewColor()}>{t("Apply")}</Button>
-          </Group>
-        </Stack>
-      </Modal>
+      <MovePageModal
+        pageId={node.id}
+        slugId={node.data.slugId}
+        currentSpaceSlug={spaceSlug}
+        onClose={closeMoveSpaceModal}
+        open={movePageModalOpened}
+      />
 
       <CreateSyncPageModal
         originPageId={node.id}
         onClose={closeCreateSyncedPageModal}
         open={createSyncedPageModelOpened}
-        isPersonalSpace={true}
       />
 
       <ExportModal

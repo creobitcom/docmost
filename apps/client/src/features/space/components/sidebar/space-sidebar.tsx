@@ -28,7 +28,7 @@ import { useDisclosure } from "@mantine/hooks";
 import SpaceSettingsModal from "@/features/space/components/settings-modal.tsx";
 import { useGetSpaceBySlugQuery } from "@/features/space/queries/space-query.ts";
 import { getSpaceUrl } from "@/lib/config.ts";
-import SpaceTree from "@/features/page/tree/components/space-tree.tsx";
+import SpaceTree from "@/features/page/tree/components/space-tree/space-tree";
 import { useSpaceAbility } from "@/features/space/permissions/use-space-ability.ts";
 import {
   SpaceCaslAction,

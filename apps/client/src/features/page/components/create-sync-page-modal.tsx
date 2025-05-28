@@ -11,7 +11,7 @@ import { SpaceSelect } from "@/features/space/components/sidebar/space-select.ts
 import { useNavigate } from "react-router-dom";
 import { buildPageUrl } from "../page.utils";
 import { useAtom } from "jotai";
-import { reloadTreeAtom } from "../atoms/reload-tree-atom";
+import { reloadTreeAtom } from "@/features/page/atoms/reload-tree-atom";
 
 interface CreateSyncPageModalProps {
   originPageId: string;
