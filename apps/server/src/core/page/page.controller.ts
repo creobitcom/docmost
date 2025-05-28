@@ -547,8 +547,28 @@ export class PageController {
   async myPages(
     @Query() dto: MyPagesDto,
     @Query() pagination: PaginationOptions,
+    @AuthUser() user: User,
   ) {
-    return this.pageService.getMyPages(pagination, dto.pageId);
+    const pages = await this.pageService.getMyPages(pagination, dto.pageId);
+
+    return {
+      items: await Promise.all(
+        pages.items.map(async (page) => {
+          try {
+            const pageAbility = await this.pageAbility.createForUser(
+              user,
+              page.id,
+            );
+            return pageAbility.can(PageCaslAction.Read, PageCaslSubject.Page)
+              ? page
+              : null;
+          } catch (err) {
+            return null;
+          }
+        }),
+      ).then((items) => items.filter(Boolean)),
+      meta: pages.meta,
+    };
   }
 
   validateIds(dto: RemovePageMemberDto | UpdatePageMemberRoleDto) {
