@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 import { ISpace } from "@/features/space/types/space.types.ts";
 import { SpaceSelect } from "@/features/space/components/sidebar/space-select.tsx";
 import { useNavigate } from "react-router-dom";
-import Page from "@/pages/page/page";
 import { buildPageUrl } from "../page.utils";
 
 interface CreateSyncPageModalProps {
@@ -26,7 +25,6 @@ interface PageOption {
 
 export default function CreateSyncPageModal({
   originPageId,
-  currentSpaceSlug,
   open,
   onClose,
 }: CreateSyncPageModalProps) {
@@ -34,7 +32,7 @@ export default function CreateSyncPageModal({
   const [targetSpace, setTargetSpace] = useState<ISpace>(null);
   const [targetPageId, setTargetPageId] = useState<string>("");
   const [pages, setPages] = useState<PageOption[]>([]);
-  const [isLoadingPages, setIsLoadingPages] = useState<boolean>(false);
+  const [, setIsLoadingPages] = useState<boolean>(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -144,7 +142,6 @@ export default function CreateSyncPageModal({
           </Text>
           <Stack>
             <SpaceSelect
-              value={currentSpaceSlug}
               clearable={false}
               onChange={handleSpaceChange}
               label={t("Select target space")}
