@@ -137,9 +137,6 @@ export default function CreateSyncPageModal({
           <Modal.CloseButton />
         </Modal.Header>
         <Modal.Body>
-          <Text mb="xs" c="dimmed" size="sm">
-            {t("Create a synchronized page in a different space.")}
-          </Text>
           <Stack>
             <SpaceSelect
               clearable={false}
