@@ -19,5 +19,31 @@ export class BlockPermissionService {
       })
       .execute();
   }
+  async canAccessBlock(userId: string, pageId: string, blockId: string, required: 'read' | 'edit' | 'owner') {
+    const result = await this.db.selectFrom('blockPermissions')
+      .select(['permission'])
+      .where('userId', '=', userId)
+      .where('pageId', '=', pageId)
+      .where('blockId', '=', blockId)
+      .executeTakeFirst();
+
+    if (!result) return false;
+
+    const permissionLevels = ['read', 'edit', 'owner'];
+    return (
+      permissionLevels.indexOf(result.permission) >= permissionLevels.indexOf(required)
+    );
+  }
+  async getUserReadableBlockIds(userId: string, pageId: string): Promise<string[]> {
+    const result = await this.db
+      .selectFrom('blockPermissions')
+      .select(['blockId'])
+      .where('userId', '=', userId)
+      .where('pageId', '=', pageId)
+      .where('permission', 'in', ['read', 'edit', 'full']) // допускаем все
+      .execute();
+
+    return result.map(r => r.blockId);
+  }
 }
 

@@ -13,7 +13,7 @@ export class BlockDto {
   pageId: string;
 
   @IsNotEmpty()
-  content: string;
+  content: any;
 }
 
 export class UpdatePageBlocksDto {

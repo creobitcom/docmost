@@ -108,4 +108,12 @@ export const updatePageBlocks = async (pageId: string, blocks: IPageBlock[]) => 
   }
 };
 
+export async function getBlockPermissions({ pageId, blockId }: { pageId: string; blockId: string }) {
+  const res = await fetch(`/api/pages/blockPermissions/${pageId}/${blockId}`);
+  if (!res.ok) throw new Error("Failed to load block permissions");
+
+  const json = await res.json();
+  return json.data;
+}
+
 

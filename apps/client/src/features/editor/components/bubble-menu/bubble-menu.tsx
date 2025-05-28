@@ -15,7 +15,7 @@ import {
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import classes from "./bubble-menu.module.css";
-import { ActionIcon, Tooltip, rem } from "@mantine/core";
+import { ActionIcon, Button, Tooltip, rem } from "@mantine/core";
 import { ColorSelector } from "./color-selector";
 import { NodeSelector } from "./node-selector";
 import { TextAlignmentSelector } from "./text-alignment-selector";
@@ -41,9 +41,10 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
   const showCommentPopupRef = useRef(showCommentPopup);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
 
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [searchModalOpened, setSearchModalOpened] = useState(false);
+
 
   const [isNodeSelectorOpen, setIsNodeSelectorOpen] = useState(false);
   const [isTextAlignmentSelectorOpen, setIsTextAlignmentOpen] = useState(false);
@@ -208,6 +209,8 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
             }}
           >
             <SearchMenu
+              open={searchModalOpened}
+              onClose={() => setSearchModalOpened(false)}
               editor={editor}
               pageId={pageId}
               onSelect={(user) => {
@@ -215,6 +218,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
                 setIsSearchOpen(false);
               }}
             />
+            <Button onClick={() => setSearchModalOpened(true)}>Assign Permission</Button>
           </div>
         )}
       </div>

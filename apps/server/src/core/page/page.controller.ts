@@ -14,6 +14,7 @@ import {
   Param,
   Put,
   Inject,
+  Req,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -79,6 +80,8 @@ export class PageController {
     @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
+
+
   @HttpCode(HttpStatus.OK)
   @Post('blocks/:pageId')
   async updateBlocksForPage(
@@ -88,6 +91,29 @@ export class PageController {
     await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks);
     return { success: true };
   }
+
+  @HttpCode(HttpStatus.OK)
+  @Get('blockPermissions/:pageId/:blockId')
+  async getBlockPermissions(
+    @Param('pageId') pageId: string,
+    @Param('blockId') blockId: string,
+  ) {
+    const permissions = await this.db
+      .selectFrom('blockPermissions')
+      .innerJoin('users', 'users.id', 'blockPermissions.userId')
+      .select((eb) => [
+        'users.id',
+        'users.name',
+        eb.ref('users.avatarUrl').as('avatarUrl'),
+        'blockPermissions.permission',
+      ])
+      .where('blockPermissions.pageId', '=', pageId)
+      .where('blockPermissions.blockId', '=', blockId)
+      .execute();
+
+    return permissions;
+  }
+
 
   @HttpCode(HttpStatus.OK)
   @Post('blockPermissions')
