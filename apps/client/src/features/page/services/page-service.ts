@@ -15,7 +15,6 @@ import {
 } from "@/features/page/types/page.types";
 import { IAttachment, IPagination, QueryParams } from "@/lib/types.ts";
 import { saveAs } from "file-saver";
-import { IChangePassword } from "@/features/auth/types/auth.types";
 
 export async function createPage(data: Partial<IPage>): Promise<IPage> {
   const req = await api.post<IPage>("/pages/create", data);

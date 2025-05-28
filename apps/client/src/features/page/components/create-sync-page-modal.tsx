@@ -10,12 +10,14 @@ import { ISpace } from "@/features/space/types/space.types.ts";
 import { SpaceSelect } from "@/features/space/components/sidebar/space-select.tsx";
 import { useNavigate } from "react-router-dom";
 import { buildPageUrl } from "../page.utils";
+import { useAtom } from "jotai";
+import { reloadTreeAtom } from "../atoms/reload-tree-atom";
 
 interface CreateSyncPageModalProps {
   originPageId: string;
-  currentSpaceSlug: string;
   open: boolean;
   onClose: () => void;
+  isPersonalSpace?: boolean | null;
 }
 
 interface PageOption {
@@ -27,6 +29,7 @@ export default function CreateSyncPageModal({
   originPageId,
   open,
   onClose,
+  isPersonalSpace = false,
 }: CreateSyncPageModalProps) {
   const { t } = useTranslation();
   const [targetSpace, setTargetSpace] = useState<ISpace>(null);
@@ -34,6 +37,7 @@ export default function CreateSyncPageModal({
   const [pages, setPages] = useState<PageOption[]>([]);
   const [, setIsLoadingPages] = useState<boolean>(false);
   const navigate = useNavigate();
+  const [, setReloadTree] = useAtom(reloadTreeAtom);
 
   useEffect(() => {
     if (targetSpace) {
@@ -94,11 +98,11 @@ export default function CreateSyncPageModal({
       return;
     }
 
-    const pageUrl = buildPageUrl(
-      targetSpace.slug,
-      createdPage.slugId,
-      undefined,
-    );
+    setReloadTree((prev) => prev + 1);
+
+    const pageUrl = isPersonalSpace
+      ? `my-pages/${createdPage.id}`
+      : buildPageUrl(targetSpace.slug, createdPage.slugId, undefined);
     navigate(pageUrl);
 
     notifications.show({

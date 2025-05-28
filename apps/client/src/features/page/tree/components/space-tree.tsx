@@ -62,6 +62,7 @@ import ExportModal from "@/components/common/export-modal";
 import PageShareModal from "../../components/share-modal";
 import MovePageModal from "../../components/move-page-modal.tsx";
 import CreateSyncPageModal from "../../components/create-sync-page-modal.tsx";
+import { reloadTreeAtom } from "../../atoms/reload-tree-atom.ts";
 
 interface SpaceTreeProps {
   spaceId: string;
@@ -83,6 +84,7 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
     spaceId,
   });
   const [, setTreeApi] = useAtom<TreeApi<SpaceTreeNode>>(treeApiAtom);
+  const [reloadTree] = useAtom(reloadTreeAtom);
   const treeApiRef = useRef<TreeApi<SpaceTreeNode>>();
   const [openTreeNodes, setOpenTreeNodes] = useAtom<OpenMap>(openTreeNodesAtom);
   const rootElement = useRef<HTMLDivElement>();
@@ -98,6 +100,12 @@ export default function SpaceTree({ spaceId, readOnly }: SpaceTreeProps) {
       fetchNextPage();
     }
   }, [hasNextPage, fetchNextPage, isFetching, spaceId]);
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["root-sidebar-pages"] });
+    setData([]);
+    isDataLoaded.current = false;
+  }, [reloadTree]);
 
   useEffect(() => {
     if (pagesData?.pages && !hasNextPage) {
