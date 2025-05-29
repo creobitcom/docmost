@@ -20,11 +20,11 @@ import { MovePageDto } from '../dto/move-page.dto';
 import { ExpressionBuilder } from 'kysely';
 import { DB } from '@docmost/db/types/db';
 import { generateSlugId } from '../../../common/helpers';
-import { calculateBlockHash, dbOrTx, executeTx } from '@docmost/db/utils';
+import { calculateBlockHash, executeTx } from '@docmost/db/utils';
 import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
 import { SpaceRole } from 'src/common/helpers/types/permission';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
-import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
+import { SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 import { MyPageColorDto } from '../dto/update-color.dto';
 
@@ -548,6 +548,7 @@ export class PageService {
 
   async getMyPages(
     pagination: PaginationOptions,
+    userId: string,
     pageId?: string,
   ): Promise<PaginationResult<SidebarPageResultDto>> {
     const baseQuery = this.db
@@ -581,13 +582,13 @@ export class PageService {
     for (const page of result.items) {
       const preferences = await this.pageRepo.findUserPagePreferences(
         page.id,
-        page.creatorId,
+        userId,
       );
 
       if (!preferences) {
         await this.pageRepo.createUserPagePreferences({
           pageId: page.id,
-          userId: page.creatorId,
+          userId: userId,
           position: page.position,
           color: '#4CAF50',
         });
@@ -608,10 +609,14 @@ export class PageService {
     );
 
     if (!preferences) {
-      throw new NotFoundException(`Preferences not found`);
+      return this.pageRepo.createUserPagePreferences({
+        userId: userId,
+        pageId: dto.pageId,
+        color: dto.color,
+      });
     }
 
-    await this.pageRepo.updateUserPagePreferences({
+    return this.pageRepo.updateUserPagePreferences({
       pageId: dto.pageId,
       userId,
       color: dto.color,

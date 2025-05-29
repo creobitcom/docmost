@@ -357,12 +357,7 @@ export class PageRepo {
   ): Promise<void> {
     await this.db
       .insertInto('userPagePreferences')
-      .values({
-        pageId: preferences.pageId,
-        userId: preferences.userId,
-        position: preferences.position,
-        color: preferences.color,
-      })
+      .values(preferences)
       .execute();
   }
 

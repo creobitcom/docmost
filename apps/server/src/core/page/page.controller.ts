@@ -45,7 +45,6 @@ import { UpdatePageMemberRoleDto } from './dto/update-page-member-role.dto';
 import { SpaceRole } from 'src/common/helpers/types/permission';
 import { CreateSyncPageDto } from './dto/create-sync-page.dto';
 import { SynchronizedPageService } from './services/synchronized-page.service';
-import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { MyPageColorDto } from './dto/update-color.dto';
 import { MyPagesDto } from './dto/my-pages.dto';
@@ -549,7 +548,11 @@ export class PageController {
     @Query() pagination: PaginationOptions,
     @AuthUser() user: User,
   ) {
-    const pages = await this.pageService.getMyPages(pagination, dto.pageId);
+    const pages = await this.pageService.getMyPages(
+      pagination,
+      user.id,
+      dto.pageId,
+    );
 
     return {
       items: await Promise.all(
@@ -594,8 +597,6 @@ export class PageController {
     if (!pageAbility.can(PageCaslAction.Manage, PageCaslSubject.Page)) {
       throw new ForbiddenException();
     }
-
-    Logger.debug(`User ${user.id} is updating page color`);
 
     await this.pageService.updateMyPageColor(dto, user.id);
   }
