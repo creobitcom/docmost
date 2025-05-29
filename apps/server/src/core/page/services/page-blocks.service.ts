@@ -25,7 +25,6 @@ export class PageBlocksService {
           .insertInto('blocks')
           .values({
             page_id: block.pageId,
-            parent_id: block.blockId,
             block_type: block.blockType,
             content: block.content,
           })

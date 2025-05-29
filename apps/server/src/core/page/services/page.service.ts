@@ -169,7 +169,7 @@ export class PageService {
         contributorIds: Array.from(contributors),
       },
       page.id,
-    );*/
+    );
 
     return await this.pageRepo.findById(page.id, {
       includeSpace: true,
