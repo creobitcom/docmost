@@ -12,7 +12,7 @@ export class BlockRepo {
 
   private baseFields: Array<keyof Block> = [
     'id',
-    'page_id',
+    'pageId',
     'content',
   ];
 

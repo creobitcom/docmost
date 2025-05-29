@@ -17,15 +17,15 @@ export class PageBlocksService {
     await this.db.transaction().execute(async (trx) => {
       await trx
         .deleteFrom('blocks')
-        .where('blocks.page_id', '=', pageId)
+        .where('blocks.pageId', '=', pageId)
         .execute();
 
       for (const block of blocks) {
         await trx
           .insertInto('blocks')
           .values({
-            page_id: block.pageId,
-            block_type: block.blockType,
+            pageId: block.pageId,
+            blockType: block.blockType,
             content: block.content,
           })
           .execute();

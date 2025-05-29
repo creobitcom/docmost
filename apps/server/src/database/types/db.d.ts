@@ -108,12 +108,12 @@ export interface Billing {
 }
 
 export interface Blocks {
-  block_type: string | null;
+  blockType: string | null;
   position: number;
   content: Json;
   createdAt: Generated<Timestamp | null>;
   id: Generated<string>;
-  page_id: string;
+  pageId: string;
   stateHash: string | null;
   updatedAt: Generated<Timestamp | null>;
 }
