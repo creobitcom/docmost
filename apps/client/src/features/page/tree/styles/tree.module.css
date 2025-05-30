@@ -116,7 +116,11 @@
 }
 
 [role="treeitem"] {
-  padding-bottom: 2px;
+  padding-top: 0;
+}
+
+[role="treeitem"][aria-level="1"] {
+  padding-top: 2px;
 }
 
 .syncedNode {
@@ -144,7 +148,7 @@
 
 .syncIndicator {
   margin-right: 4px;
-  color: var(--success-color); /* or any color you prefer */
+  color: var(--success-color);
   display: flex;
   align-items: center;
   opacity: 0.8;
