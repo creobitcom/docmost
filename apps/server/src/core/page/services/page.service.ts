@@ -547,8 +547,8 @@ export class PageService {
   }
 
   async getMyPages(
-    pagination: PaginationOptions,
     userId: string,
+    pagination: PaginationOptions,
     pageId?: string,
   ): Promise<PaginationResult<SidebarPageResultDto>> {
     const baseQuery = this.db

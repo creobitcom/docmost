@@ -549,8 +549,8 @@ export class PageController {
     @AuthUser() user: User,
   ) {
     const pages = await this.pageService.getMyPages(
-      pagination,
       user.id,
+      pagination,
       dto.pageId,
     );
 
