@@ -45,11 +45,11 @@ export function Node({
 
   const updatePageMutation = useUpdatePageMutation();
 
+  const [getPageColors] = useAtom(getPageColorAtom);
   const [treeData, setTreeData] = useAtom(treeDataAtom);
   const [personalSpaceId] = useAtom(personalSpaceIdAtom);
-  const [nodeColors] = useAtom(getPageColorAtom);
 
-  const [nodeColor, setNodeColor] = useState<string>("");
+  const [pageColor, setPageColor] = useState<string>("");
 
   const emit = useQueryEmit();
   const timerRef = useRef(null);
@@ -57,8 +57,8 @@ export function Node({
   const isPersonalSpace = node.data.spaceId === personalSpaceId;
 
   useEffect(() => {
-    setNodeColor(nodeColors(node.data.id) || "#4CAF50");
-  }, [nodeColors, node.data.id]);
+    setPageColor(getPageColors(node.data.id) || "#4CAF50");
+  }, [getPageColors, node.data.id]);
 
   const prefetchPage = () => {
     timerRef.current = setTimeout(() => {
@@ -171,7 +171,7 @@ export function Node({
         {!isPersonalSpace && (
           <i
             className={classes.coloredNode}
-            style={{ backgroundColor: nodeColor }}
+            style={{ backgroundColor: pageColor }}
           ></i>
         )}
 
