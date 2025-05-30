@@ -18,13 +18,11 @@ import {
 import { extractPageSlugId } from "@/lib";
 import { useMyPagesTreeMutation } from "@/features/my-pages/tree/hooks/use-tree-mutation.ts";
 import { personalSpaceIdAtom } from "@/features/page/tree/atoms/tree-current-space-atom.ts";
-import { updatePageColorAtom } from "@/features/page/tree/atoms/tree-color-atom.ts";
 import { reloadTreeAtom } from "@/features/page/atoms/reload-tree-atom.ts";
-import { dfs } from "react-arborist/dist/module/utils"; // Consider replacing with your own
+import { dfs } from "react-arborist/dist/module/utils";
 import { queryClient } from "@/main.tsx";
 import { Node } from "./my-page-tree-node.tsx";
 import classes from "@/features/page/tree/styles/tree.module.css";
-import { IPage } from "@/features/page/types/page.types.ts";
 import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import { useAtom } from "jotai";
 import { usePageColors } from "../../hooks/use-page-colors.ts";
@@ -61,15 +59,6 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
   } = useGetMyPagesQuery();
   const { data: currentPage } = usePageQuery({ pageId });
   const { data, setData, controllers } = useMyPagesTreeMutation(spaceId);
-
-  // const loadColors = (pages: IPage[]) => {
-  //   const colors = ["#4CAF50", "#2196F3", "#9C27B0", "#FF9800", "#E91E63"];
-  //   pages.forEach((page) => {
-  //     const color =
-  //       page.color ?? colors[Math.floor(Math.random() * colors.length)];
-  //     setPageColor({ pageId: page.id, color });
-  //   });
-  // };
 
   const focusPage = useCallback((id: string) => {
     setTimeout(() => {
@@ -125,7 +114,6 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
           if (ancestor.id === currentPage.id) return;
           const pages = await getMyPages(ancestor.id);
           const children = buildTree(pages.items);
-          loadColors(pages.items);
 
           flatTreeItems = [
             ...flatTreeItems,

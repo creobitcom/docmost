@@ -70,19 +70,26 @@ export function MyPageNodeMenu({
     setColor(newColor);
   };
 
-  const applyNewColor = () => {
-    updateMyPageColorMutation
-      .mutateAsync({ pageId: node.data.id, color: color })
-      .then(() => {
-        setPageColor({ pageId: node.data.id, color: color });
-        notifications.show({ message: t("Color updated") });
-      })
-      .catch(() => {
-        notifications.show({
-          message: t("Failed to update color"),
-          color: "red",
-        });
+  const applyNewColor = async () => {
+    try {
+      await updateMyPageColorMutation.mutateAsync({
+        pageId: node.data.id,
+        color: color,
       });
+
+      setPageColor({ pageId: node.data.id, color });
+
+      if (node.data.parentPageId !== null) {
+        setPageColor({ pageId: node.data.parentPageId, color });
+      }
+
+      notifications.show({ message: t("Color updated") });
+    } catch {
+      notifications.show({
+        message: t("Failed to update color"),
+        color: "red",
+      });
+    }
 
     closeColorPicker();
   };
