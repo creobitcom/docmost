@@ -27,6 +27,7 @@ import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import { useAtom } from "jotai";
 import { usePageColors } from "../../hooks/use-page-colors.ts";
 import { MoveOrCopyModal } from "../move-or-copy-modal.tsx";
+import { notifications } from "@mantine/notifications";
 
 interface MyPagesTreeProps {
   spaceId: string;
@@ -41,11 +42,6 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
 
   const [, setTreeApi] = useState<TreeApi<SpaceTreeNode> | null>(null);
   const [openTreeNodes, setOpenTreeNodes] = useState({});
-  const [pendingMove, setPendingMove] = useState<{
-    // dragNode: NodeApi<SpaceTreeNode>;
-    parentId: string | null;
-    index: number;
-  } | null>(null);
 
   const [, setPersonalSpaceId] = useAtom(personalSpaceIdAtom);
   const [reloadTree] = useAtom(reloadTreeAtom);
@@ -65,6 +61,63 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
   } = useGetMyPagesQuery();
   const { data: currentPage } = usePageQuery({ pageId });
   const { data, setData, controllers } = useMyPagesTreeMutation(spaceId);
+
+  const [pending, setPending] = useState<{
+    dragIds: string[];
+    dragNodes: NodeApi<SpaceTreeNode>[];
+    parentId: string | null;
+    parentNode: NodeApi<SpaceTreeNode> | null;
+    index: number;
+  } | null>(null);
+
+  const handleMove = (args: {
+    dragIds: string[];
+    dragNodes: NodeApi<SpaceTreeNode>[];
+    parentId: string | null;
+    parentNode: NodeApi<SpaceTreeNode> | null;
+    index: number;
+  }) => {
+    const originalNode = args.dragNodes[0];
+
+    if (!originalNode) return;
+
+    // @ts-ignore
+    const draggedNodeSpaceId = originalNode.data.spaceId;
+    // @ts-ignore
+    const draggedNodeHasParentPage = Boolean(originalNode.data.parentPageId);
+    // @ts-ignore
+    const targetSpaceId = args.parentNode?.data?.spaceId;
+
+    const isMovingToAnotherSpace =
+      draggedNodeSpaceId !== spaceId && draggedNodeHasParentPage;
+    const isTargetInDifferentSpace =
+      args.parentId && draggedNodeSpaceId !== targetSpaceId;
+    const isTargetNotInCurrentSpace =
+      args.parentId && spaceId !== targetSpaceId;
+
+    if (
+      isMovingToAnotherSpace ||
+      isTargetInDifferentSpace ||
+      isTargetNotInCurrentSpace
+    ) {
+      setPending(args);
+    } else {
+      controllers.onMove(args);
+    }
+  };
+
+  const handleConfirm = (action: "move" | "copy") => {
+    if (!pending) return;
+
+    if (action === "move") {
+      controllers.onMove(pending);
+      console.log("[move]");
+    } else if (action === "copy") {
+      controllers.onMove(pending);
+      console.log("[copy]");
+    }
+    setPending(null);
+  };
 
   const focusPage = useCallback((id: string) => {
     setTimeout(() => {
@@ -181,27 +234,19 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
           dndRootElement={rootElement.current}
           onToggle={() => setOpenTreeNodes(treeApiRef.current?.openState || {})}
           initialOpenState={openTreeNodes}
-          onMove={({ parentId, index }) => setPendingMove({ parentId, index })}
+          onMove={(args) => {
+            handleMove(args);
+          }}
         >
           {Node}
         </Tree>
       )}
-      {pendingMove && (
+      {pending && (
         <MoveOrCopyModal
-          opened={!!pendingMove}
-          onClose={() => setPendingMove(null)}
-          dragNodeLabel="123"
-          // dragNodeLabel={pendingMove?.dragNode.data.name ?? ""}
-          onConfirm={(action) => {
-            if (action === "copy") {
-              // handleCopy();
-              console.log("[copy]");
-            } else {
-              // handleMove();
-              console.log("[move]");
-            }
-            setPendingMove(null);
-          }}
+          opened={!!pending}
+          onClose={() => setPending(null)}
+          dragNodeLabel={pending?.dragNodes[0].data.name ?? ""}
+          onConfirm={handleConfirm}
         />
       )}
     </div>

@@ -24,14 +24,7 @@ import { useQueryEmit } from "@/features/websocket/use-query-emit.ts";
 import { notifications } from "@mantine/notifications";
 import { useTranslation } from "react-i18next";
 
-export function useMyPagesTreeMutation<T>(
-  spaceId: string,
-  onRequestMove?: (args: {
-    dragNode: NodeApi<T>;
-    parentId: string | null;
-    index: number;
-  }) => void,
-) {
+export function useMyPagesTreeMutation<T>(spaceId: string) {
   const { t } = useTranslation();
   const [data, setData] = useAtom(treeDataAtom);
   const tree = useMemo(() => new SimpleTree<SpaceTreeNode>(data), [data]);
@@ -116,43 +109,6 @@ export function useMyPagesTreeMutation<T>(
     const originalIndex = originalNode.childIndex;
     // @ts-ignore
     const originalPosition = args.dragNodes[0].data.position;
-
-    const draggedNodeSpaceId = originalNode.data.spaceId;
-    const draggedNodeHasParentPage = Boolean(originalNode.data.parentPageId);
-    // @ts-ignore
-    const targetSpaceId = args.parentNode?.data?.spaceId;
-
-    const isMovingToAnotherSpace =
-      draggedNodeSpaceId !== spaceId && draggedNodeHasParentPage;
-    const isTargetInDifferentSpace =
-      args.parentId && draggedNodeSpaceId !== targetSpaceId;
-    const isTargetNotInCurrentSpace =
-      args.parentId && spaceId !== targetSpaceId;
-
-    if (isMovingToAnotherSpace || isTargetInDifferentSpace) {
-      notifications.show({
-        message: "You cannot move a page to a different space",
-        color: "red",
-      });
-      return;
-    }
-
-    if (isTargetNotInCurrentSpace) {
-      notifications.show({
-        message: "You cannot move a page to a different space",
-        color: "red",
-      });
-      return;
-    }
-
-    const dragNode = args.dragNodes[0];
-    if (onRequestMove) {
-      onRequestMove({
-        dragNode,
-        parentId: args.parentId,
-        index: args.index,
-      });
-    }
 
     tree.move({
       id: draggedNodeId,
