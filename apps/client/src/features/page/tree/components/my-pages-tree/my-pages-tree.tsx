@@ -1,4 +1,4 @@
-import { Tree, TreeApi } from "react-arborist";
+import { NodeApi, Tree, TreeApi } from "react-arborist";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useElementSize, useMergedRef } from "@mantine/hooks";
@@ -26,6 +26,7 @@ import classes from "@/features/page/tree/styles/tree.module.css";
 import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import { useAtom } from "jotai";
 import { usePageColors } from "../../hooks/use-page-colors.ts";
+import { MoveOrCopyModal } from "../move-or-copy-modal.tsx";
 
 interface MyPagesTreeProps {
   spaceId: string;
@@ -40,6 +41,11 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
 
   const [, setTreeApi] = useState<TreeApi<SpaceTreeNode> | null>(null);
   const [openTreeNodes, setOpenTreeNodes] = useState({});
+  const [pendingMove, setPendingMove] = useState<{
+    // dragNode: NodeApi<SpaceTreeNode>;
+    parentId: string | null;
+    index: number;
+  } | null>(null);
 
   const [, setPersonalSpaceId] = useAtom(personalSpaceIdAtom);
   const [reloadTree] = useAtom(reloadTreeAtom);
@@ -175,9 +181,28 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
           dndRootElement={rootElement.current}
           onToggle={() => setOpenTreeNodes(treeApiRef.current?.openState || {})}
           initialOpenState={openTreeNodes}
+          onMove={({ parentId, index }) => setPendingMove({ parentId, index })}
         >
           {Node}
         </Tree>
+      )}
+      {pendingMove && (
+        <MoveOrCopyModal
+          opened={!!pendingMove}
+          onClose={() => setPendingMove(null)}
+          dragNodeLabel="123"
+          // dragNodeLabel={pendingMove?.dragNode.data.name ?? ""}
+          onConfirm={(action) => {
+            if (action === "copy") {
+              // handleCopy();
+              console.log("[copy]");
+            } else {
+              // handleMove();
+              console.log("[move]");
+            }
+            setPendingMove(null);
+          }}
+        />
       )}
     </div>
   );

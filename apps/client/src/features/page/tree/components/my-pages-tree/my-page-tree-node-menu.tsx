@@ -28,10 +28,12 @@ import { useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
 import PageShareModal from "@/features/page/components/share-modal";
 import {
+  getPageColorAtom,
   pageColorAtom,
   updatePageColorAtom,
 } from "@/features/page/tree/atoms/tree-color-atom.ts";
 import CreateSyncPageModal from "@/features/page/components/create-sync-page-modal";
+import PickPageColorModal from "@/features/page/components/pick-page-color-modal";
 
 interface NodeMenuProps {
   node: NodeApi<SpaceTreeNode>;
@@ -48,10 +50,10 @@ export function MyPageNodeMenu({
   const { openDeleteModal } = useDeletePageModal();
   const updateMyPageColorMutation = useUpdateMyPageColorMutation();
 
-  const [pageColors] = useAtom(pageColorAtom);
+  const [pageColors] = useAtom(getPageColorAtom);
   const [, setPageColor] = useAtom(updatePageColorAtom);
 
-  const [color, setColor] = useState(pageColors[node.data.id]);
+  const [color] = useState<string>(pageColors(node.data.id));
 
   const [exportOpened, { open: openExportModal, close: closeExportModal }] =
     useDisclosure(false);
@@ -66,23 +68,14 @@ export function MyPageNodeMenu({
     { open: openCreateSyncedPageModal, close: closeCreateSyncedPageModal },
   ] = useDisclosure(false);
 
-  const handleColorChange = (newColor: string) => {
-    setColor(newColor);
-  };
-
-  const applyNewColor = async () => {
+  const applyNewColor = async (newColor: string) => {
     try {
       await updateMyPageColorMutation.mutateAsync({
         pageId: node.data.id,
-        color: color,
+        color: newColor,
       });
 
-      setPageColor({ pageId: node.data.id, color });
-
-      if (node.data.parentPageId !== null) {
-        setPageColor({ pageId: node.data.parentPageId, color });
-      }
-
+      setPageColor({ pageId: node.data.id, color: newColor });
       notifications.show({ message: t("Color updated") });
     } catch {
       notifications.show({
@@ -90,8 +83,6 @@ export function MyPageNodeMenu({
         color: "red",
       });
     }
-
-    closeColorPicker();
   };
 
   return (
@@ -178,42 +169,12 @@ export function MyPageNodeMenu({
         </Menu.Dropdown>
       </Menu>
 
-      <Modal
-        opened={colorPickerOpened}
+      <PickPageColorModal
+        currentColor={color}
+        open={colorPickerOpened}
         onClose={closeColorPicker}
-        title={t("Choose a color")}
-        size="sm"
-      >
-        <Stack>
-          <ColorPicker
-            format="hex"
-            value={color}
-            onChange={handleColorChange}
-            swatches={[
-              "#25262b",
-              "#868e96",
-              "#fa5252",
-              "#e64980",
-              "#be4bdb",
-              "#7950f2",
-              "#4c6ef5",
-              "#228be6",
-              "#15aabf",
-              "#12b886",
-              "#40c057",
-              "#82c91e",
-              "#fab005",
-              "#fd7e14",
-            ]}
-          />
-          <Group justify="flex-end" mt="md">
-            <Button variant="outline" onClick={closeColorPicker}>
-              {t("Cancel")}
-            </Button>
-            <Button onClick={() => applyNewColor()}>{t("Apply")}</Button>
-          </Group>
-        </Stack>
-      </Modal>
+        onApply={applyNewColor}
+      />
 
       <CreateSyncPageModal
         originPageId={node.id}

@@ -24,7 +24,14 @@ import { useQueryEmit } from "@/features/websocket/use-query-emit.ts";
 import { notifications } from "@mantine/notifications";
 import { useTranslation } from "react-i18next";
 
-export function useMyPagesTreeMutation<T>(spaceId: string) {
+export function useMyPagesTreeMutation<T>(
+  spaceId: string,
+  onRequestMove?: (args: {
+    dragNode: NodeApi<T>;
+    parentId: string | null;
+    index: number;
+  }) => void,
+) {
   const { t } = useTranslation();
   const [data, setData] = useAtom(treeDataAtom);
   const tree = useMemo(() => new SimpleTree<SpaceTreeNode>(data), [data]);
@@ -136,6 +143,15 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
         color: "red",
       });
       return;
+    }
+
+    const dragNode = args.dragNodes[0];
+    if (onRequestMove) {
+      onRequestMove({
+        dragNode,
+        parentId: args.parentId,
+        index: args.index,
+      });
     }
 
     tree.move({
