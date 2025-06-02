@@ -3,12 +3,15 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useElementSize, useMergedRef } from "@mantine/hooks";
 import {
+  useCopyPageMutation,
+  useCreateSyncPageMutation,
   useGetMyPagesQuery,
   usePageQuery,
 } from "@/features/page/queries/page-query.ts";
 import {
   getMyPages,
   getPageBreadcrumbs,
+  movePageToSpace,
 } from "@/features/page/services/page-service.ts";
 import {
   buildTree,
@@ -26,8 +29,7 @@ import classes from "@/features/page/tree/styles/tree.module.css";
 import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import { useAtom } from "jotai";
 import { usePageColors } from "../../hooks/use-page-colors.ts";
-import { MoveOrCopyModal } from "../move-or-copy-modal.tsx";
-import { notifications } from "@mantine/notifications";
+import { MoveOrCopyModal, onMoveActions } from "../move-or-copy-modal.tsx";
 
 interface MyPagesTreeProps {
   spaceId: string;
@@ -61,6 +63,9 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
   } = useGetMyPagesQuery();
   const { data: currentPage } = usePageQuery({ pageId });
   const { data, setData, controllers } = useMyPagesTreeMutation(spaceId);
+
+  const copyPageMutation = useCopyPageMutation();
+  const createSyncPageMutation = useCreateSyncPageMutation();
 
   const [pending, setPending] = useState<{
     dragIds: string[];
@@ -106,16 +111,58 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
     }
   };
 
-  const handleConfirm = (action: "move" | "copy") => {
+  const handleConfirm = (action: onMoveActions) => {
     if (!pending) return;
 
-    if (action === "move") {
-      controllers.onMove(pending);
-      console.log("[move]");
-    } else if (action === "copy") {
-      controllers.onMove(pending);
-      console.log("[copy]");
+    const originPage = pending.dragNodes[0];
+    const originPageId = originPage.id;
+    const parentPageId = pending.parentId;
+    const targetSpaceId = pending.parentNode?.data?.spaceId ?? spaceId;
+
+    console.log("[move page]", {
+      dragedPageId: originPageId,
+      parentPageId,
+      targetSpaceId,
+    });
+
+    switch (action) {
+      case "copy": {
+        copyPageMutation.mutate(
+          {
+            originPageId,
+            spaceId: targetSpaceId,
+            parentPageId,
+          },
+          // {
+          //   onSuccess: (newPage) => {
+          //     controllers.onMove(pending);
+          //     console.log(data);
+          //     const movedPage = data.find((page) => page.id === dragedPageId);
+          //     movedPage.spaceId = targetSpaceId;
+          //     movedPage.parentPageId = parentPageId;
+          //   },
+          // },
+        );
+        break;
+      }
+      case "sync": {
+        createSyncPageMutation.mutate({
+          originPageId: originPageId,
+          spaceId: targetSpaceId,
+          parentPageId,
+        });
+        break;
+      }
+      case "move": {
+        movePageToSpace({
+          pageId: originPageId,
+          spaceId: targetSpaceId,
+          parentPageId,
+        });
+        break;
+      }
     }
+
     setPending(null);
   };
 

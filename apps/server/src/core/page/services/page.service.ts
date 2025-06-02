@@ -263,14 +263,18 @@ export class PageService {
     return result;
   }
 
-  async movePageToSpace(rootPage: Page, spaceId: string) {
+  async movePageToSpace(
+    rootPage: Page,
+    spaceId: string,
+    parentPageId?: string,
+  ) {
     await executeTx(this.db, async (trx) => {
       // Update root page
       const nextPosition = await this.nextPagePosition(spaceId);
       await this.pageRepo.updatePageMetadata(
         {
           spaceId,
-          parentPageId: null,
+          parentPageId: parentPageId ?? null,
           position: nextPosition,
           content: rootPage.content,
         },
@@ -442,6 +446,7 @@ export class PageService {
       throw new BadRequestException('Invalid move position');
     }
 
+    // TODO: проверка прав
     if (dto.parentPageId) {
       const parentPage = await this.pageRepo.findById(dto.parentPageId);
       if (!parentPage) {
@@ -452,14 +457,14 @@ export class PageService {
         throw new BadRequestException('Parent page must be in the same space');
       }
 
-      if (parentPage.spaceId !== dto.personalSpaceId) {
-        throw new BadRequestException();
-      }
+      // if (parentPage.spaceId !== dto.personalSpaceId) {
+      //   throw new BadRequestException();
+      // }
     }
 
-    if (movedPage.spaceId !== dto.personalSpaceId && movedPage.parentPageId) {
-      throw new BadRequestException();
-    }
+    // if (movedPage.spaceId !== dto.personalSpaceId && movedPage.parentPageId) {
+    //   throw new BadRequestException();
+    // }
 
     return this.pageRepo.updateUserPagePreferences({
       position: dto.position,
@@ -690,11 +695,13 @@ export class PageService {
         trx,
       );
 
-      await this.pageRepo.insertContent(
-        copyPage.id,
-        originPage.content as PageContent,
-        trx,
-      );
+      if (originPage.content) {
+        await this.pageRepo.insertContent(
+          copyPage.id,
+          originPage.content as PageContent,
+          trx,
+        );
+      }
 
       await this.pageMemberRepo.insertPageMember(
         {

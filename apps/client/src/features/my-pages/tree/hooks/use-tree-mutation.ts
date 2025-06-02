@@ -98,6 +98,7 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
     parentId: string | null;
     parentNode: NodeApi<T> | null;
     index: number;
+    action?: string;
   }) => {
     const draggedNodeId = args.dragIds[0];
     const originalTreeData = [...tree.data];

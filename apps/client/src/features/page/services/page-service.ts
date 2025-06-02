@@ -164,3 +164,16 @@ export async function updateMyPageColor(
   });
   return req.data;
 }
+
+export async function copyPage(
+  originPageId: string,
+  spaceId: string,
+  parentPageId?: string | null,
+): Promise<IPage> {
+  const req = await api.post("/pages/copy", {
+    originPageId,
+    spaceId,
+    parentPageId,
+  });
+  return req.data;
+}

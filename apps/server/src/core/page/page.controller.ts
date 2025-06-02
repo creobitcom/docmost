@@ -402,7 +402,11 @@ export class PageController {
       throw new ForbiddenException();
     }
 
-    return this.pageService.movePageToSpace(movedPage, dto.spaceId);
+    return this.pageService.movePageToSpace(
+      movedPage,
+      dto.spaceId,
+      dto.parentPageId,
+    );
   }
 
   @HttpCode(HttpStatus.OK)

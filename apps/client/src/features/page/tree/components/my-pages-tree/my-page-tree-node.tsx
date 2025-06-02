@@ -54,7 +54,11 @@ export function Node({
   const emit = useQueryEmit();
   const timerRef = useRef(null);
 
-  const isPersonalSpace = node.data.spaceId === personalSpaceId;
+  const [isPersonalSpace, setIsPersonalSpace] = useState(false);
+
+  useEffect(() => {
+    setIsPersonalSpace(node.data.spaceId === personalSpaceId);
+  }, [node.data.spaceId, personalSpaceId]);
 
   useEffect(() => {
     setPageColor(getPageColors(node.data.id) || "#4CAF50");
