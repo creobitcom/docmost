@@ -7,7 +7,11 @@ import {
 import { CreatePageDto } from '../dto/create-page.dto';
 import { UpdatePageDto } from '../dto/update-page.dto';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
-import { Page, UpdatablePage } from '@docmost/db/types/entity.types';
+import {
+  Page,
+  PageContent,
+  UpdatablePage,
+} from '@docmost/db/types/entity.types';
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
 import {
   executeWithPagination,
@@ -27,6 +31,7 @@ import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
 import { SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 import { MyPageColorDto } from '../dto/update-color.dto';
+import { CopyPageDto } from '../dto/copy-page.dto';
 
 @Injectable()
 export class PageService {
@@ -641,6 +646,70 @@ export class PageService {
     }
 
     return pageUpdateResult;
+  }
+
+  async copyPage(
+    copyPageDto: CopyPageDto,
+    userId: string,
+    workspaceId: string,
+  ) {
+    const { parentPageId, originPageId, spaceId } = copyPageDto;
+
+    if (parentPageId) {
+      const parentPage = await this.pageRepo.findById(parentPageId);
+      if (!parentPage) {
+        throw new NotFoundException(`Parent page "${parentPageId}" not found.`);
+      }
+      if (parentPage.spaceId !== spaceId) {
+        throw new NotFoundException(
+          `Parent page "${parentPageId}" does not belong to space "${spaceId}".`,
+        );
+      }
+    }
+
+    const originPage = await this.pageRepo.findById(originPageId);
+    if (!originPage) {
+      throw new NotFoundException('Origin page not found');
+    }
+
+    const newPage = await executeTx<Page>(this.db, async (trx) => {
+      const position = await this.nextPagePosition(spaceId, parentPageId);
+
+      const copyPage = await this.pageRepo.insertPage(
+        {
+          slugId: generateSlugId(),
+          title: `${originPage.title} - Copy`,
+          position,
+          icon: originPage.icon,
+          parentPageId,
+          spaceId,
+          creatorId: userId,
+          workspaceId,
+          lastUpdatedById: userId,
+        },
+        trx,
+      );
+
+      await this.pageRepo.insertContent(
+        copyPage.id,
+        originPage.content as PageContent,
+        trx,
+      );
+
+      await this.pageMemberRepo.insertPageMember(
+        {
+          userId,
+          pageId: copyPage.id,
+          role: SpaceRole.ADMIN,
+          addedById: userId,
+        },
+        trx,
+      );
+
+      return copyPage;
+    });
+
+    return newPage;
   }
 }
 

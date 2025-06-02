@@ -48,6 +48,7 @@ import { SynchronizedPageService } from './services/synchronized-page.service';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { MyPageColorDto } from './dto/update-color.dto';
 import { MyPagesDto } from './dto/my-pages.dto';
+import { CopyPageDto } from './dto/copy-page.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -599,5 +600,23 @@ export class PageController {
     }
 
     await this.pageService.updateMyPageColor(dto, user.id);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('/copy')
+  async copyPage(
+    @Body() copyPageDto: CopyPageDto,
+    @AuthUser() user: User,
+    @AuthWorkspace() workspace: Workspace,
+  ) {
+    const pageAbility = await this.pageAbility.createForUser(
+      user,
+      copyPageDto.originPageId,
+    );
+    if (!pageAbility.can(PageCaslAction.Read, PageCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    return this.pageService.copyPage(copyPageDto, user.id, workspace.id);
   }
 }
