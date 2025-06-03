@@ -22,7 +22,7 @@ import { AuthUser } from '../../common/decorators/auth-user.decorator';
 import { AuthWorkspace } from '../../common/decorators/auth-workspace.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
-import { SpaceMember, User, Workspace } from '@docmost/db/types/entity.types';
+import { User, Workspace } from '@docmost/db/types/entity.types';
 import { SidebarPageDto } from './dto/sidebar-page.dto';
 import {
   SpaceCaslAction,
@@ -42,7 +42,6 @@ import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
 import { findHighestUserSpaceRole } from '@docmost/db/repos/space/utils';
 import { RemovePageMemberDto } from './dto/remove-page-member.dto';
 import { UpdatePageMemberRoleDto } from './dto/update-page-member-role.dto';
-import { SpaceRole } from 'src/common/helpers/types/permission';
 import { CreateSyncPageDto } from './dto/create-sync-page.dto';
 import { SynchronizedPageService } from './services/synchronized-page.service';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
@@ -110,9 +109,6 @@ export class PageController {
         throw new NotFoundException('Origin page not found');
       }
       page.content = originPage.content;
-      page.id = originPage.id;
-      page.title = originPage.title;
-      page.icon = originPage.icon;
     }
 
     return { ...page, membership };
