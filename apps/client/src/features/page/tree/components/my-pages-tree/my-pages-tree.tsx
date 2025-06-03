@@ -3,15 +3,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { useElementSize, useMergedRef } from "@mantine/hooks";
 import {
-  useCopyPageMutation,
-  useCreateSyncPageMutation,
   useGetMyPagesQuery,
   usePageQuery,
 } from "@/features/page/queries/page-query.ts";
 import {
   getMyPages,
   getPageBreadcrumbs,
-  movePageToSpace,
 } from "@/features/page/services/page-service.ts";
 import {
   buildTree,
@@ -30,6 +27,15 @@ import { SpaceTreeNode } from "@/features/page/tree/types.ts";
 import { useAtom } from "jotai";
 import { usePageColors } from "../../hooks/use-page-colors.ts";
 import { MoveOrCopyModal, onMoveActions } from "../move-or-copy-modal.tsx";
+import { notifications } from "@mantine/notifications";
+
+type MoveArgs = {
+  dragIds: string[];
+  dragNodes: NodeApi<SpaceTreeNode>[];
+  parentId: string | null;
+  parentNode: NodeApi<SpaceTreeNode> | null;
+  index: number;
+};
 
 interface MyPagesTreeProps {
   spaceId: string;
@@ -64,106 +70,42 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
   const { data: currentPage } = usePageQuery({ pageId });
   const { data, setData, controllers } = useMyPagesTreeMutation(spaceId);
 
-  const copyPageMutation = useCopyPageMutation();
-  const createSyncPageMutation = useCreateSyncPageMutation();
+  const [pendingMovePage, setPendingMovePage] = useState<MoveArgs | null>(null);
 
-  const [pending, setPending] = useState<{
-    dragIds: string[];
-    dragNodes: NodeApi<SpaceTreeNode>[];
-    parentId: string | null;
-    parentNode: NodeApi<SpaceTreeNode> | null;
-    index: number;
-  } | null>(null);
+  const handlePageMove = (args: MoveArgs) => {
+    const originPage = args.dragNodes[0];
+    if (!originPage) return;
 
-  const handleMove = (args: {
-    dragIds: string[];
-    dragNodes: NodeApi<SpaceTreeNode>[];
-    parentId: string | null;
-    parentNode: NodeApi<SpaceTreeNode> | null;
-    index: number;
-  }) => {
-    const originalNode = args.dragNodes[0];
-
-    if (!originalNode) return;
-
-    // @ts-ignore
-    const draggedNodeSpaceId = originalNode.data.spaceId;
-    // @ts-ignore
-    const draggedNodeHasParentPage = Boolean(originalNode.data.parentPageId);
-    // @ts-ignore
-    const targetSpaceId = args.parentNode?.data?.spaceId;
-
-    const isMovingToAnotherSpace =
-      draggedNodeSpaceId !== spaceId && draggedNodeHasParentPage;
-    const isTargetInDifferentSpace =
-      args.parentId && draggedNodeSpaceId !== targetSpaceId;
-    const isTargetNotInCurrentSpace =
-      args.parentId && spaceId !== targetSpaceId;
-
-    if (
-      isMovingToAnotherSpace ||
-      isTargetInDifferentSpace ||
-      isTargetNotInCurrentSpace
+    let canBeMoved = false;
+    if (!originPage.data.parentPageId && !args.parentNode) {
+      canBeMoved = true;
+    } else if (originPage.data?.parentPageId === args?.parentId) {
+      canBeMoved = true;
+    } else if (
+      args.parentNode &&
+      originPage.data.spaceId === args?.parentNode.data.spaceId
     ) {
-      setPending(args);
-    } else {
+      canBeMoved = true;
+    }
+
+    if (canBeMoved) {
       controllers.onMove(args);
+    } else {
+      setPendingMovePage(args);
     }
   };
 
   const handleConfirm = (action: onMoveActions) => {
-    if (!pending) return;
-
-    const originPage = pending.dragNodes[0];
-    const originPageId = originPage.id;
-    const parentPageId = pending.parentId;
-    const targetSpaceId = pending.parentNode?.data?.spaceId ?? spaceId;
-
-    console.log("[move page]", {
-      dragedPageId: originPageId,
-      parentPageId,
-      targetSpaceId,
-    });
-
-    switch (action) {
-      case "copy": {
-        copyPageMutation.mutate(
-          {
-            originPageId,
-            spaceId: targetSpaceId,
-            parentPageId,
-          },
-          // {
-          //   onSuccess: (newPage) => {
-          //     controllers.onMove(pending);
-          //     console.log(data);
-          //     const movedPage = data.find((page) => page.id === dragedPageId);
-          //     movedPage.spaceId = targetSpaceId;
-          //     movedPage.parentPageId = parentPageId;
-          //   },
-          // },
-        );
-        break;
-      }
-      case "sync": {
-        createSyncPageMutation.mutate({
-          originPageId: originPageId,
-          spaceId: targetSpaceId,
-          parentPageId,
-        });
-        break;
-      }
-      case "move": {
-        movePageToSpace({
-          pageId: originPageId,
-          spaceId: targetSpaceId,
-          parentPageId,
-        });
-        break;
-      }
+    if (!pendingMovePage) {
+      notifications.show({
+        message: "Failed to move page",
+        color: "red",
+      });
+      return;
     }
 
-    setPending(null);
+    controllers.onMove(pendingMovePage, action);
+    setPendingMovePage(null);
   };
 
   const focusPage = useCallback((id: string) => {
@@ -282,17 +224,17 @@ export default function MyPagesTree({ spaceId, readOnly }: MyPagesTreeProps) {
           onToggle={() => setOpenTreeNodes(treeApiRef.current?.openState || {})}
           initialOpenState={openTreeNodes}
           onMove={(args) => {
-            handleMove(args);
+            handlePageMove(args);
           }}
         >
           {Node}
         </Tree>
       )}
-      {pending && (
+      {pendingMovePage && (
         <MoveOrCopyModal
-          opened={!!pending}
-          onClose={() => setPending(null)}
-          dragNodeLabel={pending?.dragNodes[0].data.name ?? ""}
+          opened={!!pendingMovePage}
+          onClose={() => setPendingMovePage(null)}
+          dragNodeLabel={pendingMovePage?.dragNodes[0].data.name ?? ""}
           onConfirm={handleConfirm}
         />
       )}

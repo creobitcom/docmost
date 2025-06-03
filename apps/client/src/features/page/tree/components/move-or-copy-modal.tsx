@@ -18,7 +18,7 @@ export function MoveOrCopyModal({
   dragNodeLabel,
 }: MoveOrCopyModalProps) {
   const { t } = useTranslation();
-  const [action, setAction] = useState<"move" | "copy" | "sync">("move");
+  const [action, setAction] = useState<onMoveActions>("move");
 
   return (
     <Modal.Root
