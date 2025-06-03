@@ -1,11 +1,5 @@
 import "@/features/editor/styles/index.css";
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import {
@@ -59,12 +53,14 @@ interface PageEditorProps {
   pageId: string;
   editable: boolean;
   content: any;
+  syncPageOriginId?: string | null;
 }
 
 export default function PageEditor({
   pageId,
   editable,
   content,
+  syncPageOriginId,
 }: PageEditorProps) {
   const collaborationURL = useCollaborationUrl();
   const [currentUser] = useAtom(currentUserAtom);
@@ -75,11 +71,11 @@ export default function PageEditor({
   const ydoc = useMemo(() => new Y.Doc(), [pageId]);
   const [isLocalSynced, setLocalSynced] = useState(false);
   const [isRemoteSynced, setRemoteSynced] = useState(false);
-  const [yjsConnectionStatus, setYjsConnectionStatus] = useAtom(
-    yjsConnectionStatusAtom,
-  );
+  const [, setYjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
   const menuContainerRef = useRef(null);
-  const documentName = `page.${pageId}`;
+  const documentName = syncPageOriginId
+    ? `page.${syncPageOriginId}`
+    : `page.${pageId}`;
   const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
   const { isIdle, resetIdle } = useIdle(FIVE_MINUTES, { initialState: false });
   const documentState = useDocumentVisibility();

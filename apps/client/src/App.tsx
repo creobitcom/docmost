@@ -70,7 +70,10 @@ export default function App() {
           />
 
           <Route path={"/my-pages"} element={<MyPagesHome />} />
-          <Route path={"/my-pages/:pageSlug"} element={<MyPagesPage />} />
+          <Route
+            path={"/my-pages/:pageSlug"}
+            element={<Page isMyPages={true} />}
+          />
 
           <Route path={"/settings"}>
             <Route path={"account/profile"} element={<AccountSettings />} />

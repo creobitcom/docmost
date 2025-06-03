@@ -97,9 +97,8 @@ export class PageController {
       permissions: pageAbility.rules,
     };
 
-    const syncPage = await this.syncPageService.findByReferenceId(page.id);
-
-    if (syncPage) {
+    if (page.isSynced) {
+      const syncPage = await this.syncPageService.findByReferenceId(page.id);
       const originPage = await this.pageRepo.findById(syncPage.originPageId, {
         includeContent: true,
         includeLastUpdatedBy: true,
@@ -109,6 +108,7 @@ export class PageController {
         throw new NotFoundException('Origin page not found');
       }
       page.content = originPage.content;
+      return { ...page, membership, originPageId: originPage.id };
     }
 
     return { ...page, membership };
