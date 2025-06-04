@@ -124,14 +124,88 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
     if (!originNode) return;
 
     const originalTreeData = [...tree.data];
+
+    const targetSpaceId =
+      parentNode?.data?.spaceId ??
+      (originNode.data.parentPageId && originNode.data.parentPageId !== "ROOT"
+        ? spaceId
+        : originNode.data.spaceId);
+
+    if (action === "copy" || action === "sync") {
+      try {
+        let created: IPage | null = null;
+
+        if (action === "copy") {
+          created = await copyPageMutation.mutateAsync({
+            originPageId: originPageId,
+            spaceId: targetSpaceId,
+            parentPageId: parentId,
+          });
+        } else {
+          created = await createSyncPageMutation.mutateAsync({
+            originPageId: originPageId,
+            spaceId: targetSpaceId,
+            parentPageId: parentId,
+          });
+        }
+
+        if (!created) {
+          throw new Error("Failed to create a new page");
+        }
+
+        const newNodeData: SpaceTreeNode = {
+          id: created.id,
+          slugId: created.slugId ?? "",
+          name: created.title ?? "",
+          position: created.position,
+          spaceId: created.spaceId,
+          parentPageId: created.parentPageId,
+          children: [],
+          isSynced: action === "sync",
+          hasChildren: false,
+        };
+
+        tree.create({ parentId, index, data: newNodeData });
+        setData(tree.data);
+
+        loadColors([
+          {
+            id: created.id,
+            spaceId: created.spaceId,
+            parentPageId: created.parentPageId,
+          },
+        ]);
+
+        notifications.show({
+          message: t("Page moved successfully"),
+          color: "green",
+        });
+
+        setTimeout(() => {
+          emit({
+            operation: "addTreeNode",
+            spaceId,
+            payload: {
+              parentId,
+              index,
+              data: newNodeData,
+            },
+          });
+        }, 50);
+      } catch (error) {
+        notifications.show({
+          message: t("Failed to move a page"),
+          color: "red",
+        });
+
+        setData(originalTreeData);
+      }
+      return;
+    }
+
     const originalParentId = originNode.parent.data.id;
     const originalIndex = originNode.childIndex;
     const originalPosition = dragNodes[0].data.position;
-    const targetSpaceId =
-      parentNode?.data?.spaceId ??
-      (originalParentId && originalParentId !== "ROOT"
-        ? spaceId
-        : originNode.data.spaceId);
 
     moveNodeInTree(originPageId, parentId, index);
 
@@ -149,19 +223,31 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
         parentId,
         newPosition,
       );
+
       updateNodeSpaceAndParent(originPageId, targetSpaceId, parentId);
       loadColors([
         { id: originPageId, spaceId: targetSpaceId, parentPageId: parentId },
       ]);
-      notifySuccess();
+      notifications.show({
+        message: t("Page moved successfully"),
+        color: "green",
+      });
     } catch (error) {
-      handleMoveError(
-        originPageId,
-        originalTreeData,
-        originalParentId,
-        originalIndex,
-        originalPosition,
-      );
+      notifications.show({
+        message: t("Failed to move a page"),
+        color: "red",
+      });
+
+      setData(originalTreeData);
+      tree.move({
+        id: originPageId,
+        parentId: originalParentId,
+        index: originalIndex,
+      });
+      tree.update({
+        id: originPageId,
+        changes: { position: originalPosition } as any,
+      });
     }
 
     setData(tree.data);

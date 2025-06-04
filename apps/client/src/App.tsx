@@ -27,7 +27,6 @@ import Security from "@/ee/security/pages/security.tsx";
 import License from "@/ee/licence/pages/license.tsx";
 import { useRedirectToCloudSelect } from "@/ee/hooks/use-redirect-to-cloud-select.tsx";
 import MyPagesHome from "./pages/my-pages/my-pages-home";
-import MyPagesPage from "./pages/my-pages/my-pages-page";
 
 export default function App() {
   const { t } = useTranslation();
