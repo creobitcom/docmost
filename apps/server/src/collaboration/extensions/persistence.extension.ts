@@ -37,28 +37,56 @@ export class PersistenceExtension implements Extension {
     @InjectKysely() private readonly db: KyselyDB,
     private eventEmitter: EventEmitter2,
     @InjectQueue(QueueName.GENERAL_QUEUE) private generalQueue: Queue,
-  ) {
-    this.logger.warn('[DIAG][init] PersistenceExtension constructed, gateway=' + !!this['gateway']);
-  }
+  ) {}
 
   async onLoadDocument({ documentName }) {
     if (documentName.startsWith('block.')) {
       const blockId = documentName.split('.')[1];
+  
       const block = await this.db
         .selectFrom('blocks')
-        .select(['yjsSnapshot'])
+        .select(['yjsSnapshot', 'content']) // важно выбрать content тоже
         .where('id', '=', blockId)
         .executeTakeFirst();
-      if (block && block.yjsSnapshot) {
+  
+      if (!block) {
+        this.logger.warn(`block not found: ${blockId}`);
+        return new Y.Doc();
+      }
+  
+      // 1. Если есть yjsSnapshot → восстановить ydoc из него
+      if (block.yjsSnapshot) {
+        this.logger.debug(`ydoc loaded from db: ${blockId}`);
         const doc = new Y.Doc();
-        Y.applyUpdate(doc, new Uint8Array(block.yjsSnapshot));
+        const dbState = new Uint8Array(block.yjsSnapshot);
+        Y.applyUpdate(doc, dbState);
         return doc;
-      } else {
+      }
+  
+      // 2. Если нет snapshot, но есть JSON content → сконвертировать
+      if (block.content) {
+        this.logger.debug(`converting json to ydoc: ${blockId}`);
+        this.logger.debug('Sending block: ', block);
+  
+        const ydoc = TiptapTransformer.toYdoc(
+          block.content,
+          'default',
+          tiptapExtensions,
+        );
+  
+        // Сразу прогоняем через encode/decode чтобы привести к единому виду
+        const encoded = Y.encodeStateAsUpdate(ydoc);
+        const doc = new Y.Doc();
+        Y.applyUpdate(doc, encoded);
+        return doc;
+      }
+  
+      // 3. Если нет вообще ничего → новый документ
+      this.logger.debug(`creating fresh ydoc: ${blockId}`);
       return new Y.Doc();
     }
-    }
-    // ... (другая логика для других документов, если нужно)
   }
+  
 
   async onStoreDocument({ documentName, document }) {
     if (documentName.startsWith('block.')) {

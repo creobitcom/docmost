@@ -1,4 +1,6 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import "@/features/editor/styles/index.css";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -10,6 +12,7 @@ import { useCollabToken } from "@/features/auth/queries/auth-query.tsx";
 import { TiptapTransformer } from "@hocuspocus/transformer";
 import { useDebouncedCallback } from '@mantine/hooks';
 import { EditorBubbleMenu } from "@/features/editor/components/bubble-menu/bubble-menu";
+import { yjsConnectionStatusAtom } from "./atoms/editor-atoms";
 
 function getTokenFromCollabQuery(collabQuery: any): string | undefined {
   if (!collabQuery) return undefined;
@@ -54,12 +57,15 @@ async function deleteBlock(pageId: string, blockId: string) {
 
 
 
-function BlockEditor({ block, editable, onBlockCreated, onBlockDeleted, allBlocks, saveBlocksToServer }) {
+ function BlockEditor({ block, editable, onBlockCreated, onBlockDeleted, allBlocks, saveBlocksToServer, pageId, syncPageOriginId }: { block: any, editable: boolean, onBlockCreated: (block: any) => void, onBlockDeleted: (blockId: string) => void, allBlocks: any[], saveBlocksToServer: (pageId: string, blocks: any[]) => void, pageId: string, syncPageOriginId?: string | null }) {
   const [currentUser] = useAtom(currentUserAtom);
   const ydoc = useMemo(() => new Y.Doc(), [block.id]);
   const collaborationURL = useCollaborationUrl();
+  const documentName = syncPageOriginId
+  ? `page.${syncPageOriginId}`
+  : `page.${pageId}`;
   const { data: collabQuery } = useCollabToken();
-
+  const [, setYjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
   const token = getTokenFromCollabQuery(collabQuery);
   if (!token) return null;
 
