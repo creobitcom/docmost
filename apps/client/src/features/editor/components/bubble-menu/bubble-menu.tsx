@@ -109,7 +109,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           const pageInfo = pageData.data;
 
           // Проверяем разные варианты имени поля creator
-          const creatorId = pageInfo?.creator_id || pageInfo?.creatorId || pageInfo?.creator?.id;
+          const creatorId = pageInfo?.creatorId || pageInfo?.creatorId || pageInfo?.creator?.id;
           const isCreator = creatorId === currentUser?.user?.id;
           setIsPageCreator(isCreator);
 

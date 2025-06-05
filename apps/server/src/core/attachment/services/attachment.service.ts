@@ -248,7 +248,7 @@ export class AttachmentService {
         fileSize: preparedFile.fileSize,
         mimeType: preparedFile.mimeType,
         fileExt: preparedFile.fileExtension,
-        creatorId: userId,
+        creator_id: userId,
         workspaceId: workspaceId,
         pageId: pageId,
         spaceId: spaceId,
@@ -296,7 +296,7 @@ export class AttachmentService {
       const userAvatars = await this.db
         .selectFrom('attachments')
         .select(['id', 'filePath'])
-        .where('creatorId', '=', userId)
+        .where('creator_id', '=', userId)
         .where('type', '=', AttachmentType.Avatar)
         .execute();
 

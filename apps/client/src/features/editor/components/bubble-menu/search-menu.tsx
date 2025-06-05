@@ -145,7 +145,7 @@ export function SearchMenu({ opened, onClose, pageId, blockId: externalBlockId }
           const pageInfo = pageData.data;
 
           // Используем creatorId напрямую для определения создателя
-          const creatorId = pageInfo?.creator_id || pageInfo?.creatorId || pageInfo?.creator?.id;
+          const creatorId = pageInfo?.creatorId || pageInfo?.creatorId || pageInfo?.creator?.id;
           setIsPageCreator(creatorId === currentUser?.user?.id);
 
           // Проверяем права администратора

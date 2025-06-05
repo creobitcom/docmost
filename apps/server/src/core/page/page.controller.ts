@@ -156,11 +156,11 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creator_id'))
       .where('id', '=', pageId)
       .executeTakeFirst();
 
-    const isCreator = (page as any)?.creatorId === user.id;
+    const isCreator = (page as any)?.creator_id === user.id;
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -217,11 +217,11 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creator_id'))
       .where('id', '=', pageId)
       .executeTakeFirst();
 
-    const isCreator = (page as any)?.creatorId === user.id;
+    const isCreator = (page as any)?.creator_id === user.id;
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -278,11 +278,11 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creator_id'))
       .where('id', '=', dto.pageId)
       .executeTakeFirst();
 
-    const isCreator = (page as any)?.creatorId === user.id;
+    const isCreator = (page as any)?.creator_id === user.id;
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -353,7 +353,7 @@ export class PageController {
     }
 
     // Добавляем alias для совместимости клиентского кода: creator_id
-    const creator_id = (page as any)?.creator_id ?? (page as any)?.creatorId ?? null;
+    const creator_id = (page as any)?.creator_id ?? (page as any)?.creator_id ?? null;
     return { ...page, creator_id, blocks, membership };
   }
 

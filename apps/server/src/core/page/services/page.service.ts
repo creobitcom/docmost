@@ -767,7 +767,7 @@ export class PageService {
           icon: originPage.icon,
           parentPageId,
           spaceId,
-          creatorId: userId,
+          creator_id: userId,
           workspaceId,
           lastUpdatedById: userId,
         },

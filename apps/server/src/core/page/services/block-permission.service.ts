@@ -135,7 +135,7 @@ export class BlockPermissionService {
         'b.blockType',
         'b.content',
         'b.position',
-        'p.creator_id as creatorId',
+        'p.creator_id as creator_id',
         'bp.permission as userPermission',
         'bp_public.permission as publicPermission',
         (eb) =>
@@ -173,7 +173,7 @@ export class BlockPermissionService {
     const hasDirectPageAccess = pageMember?.source === 'manual';
 
     return blocks.map((block) => {
-      const userIsCreator = block.creatorId === userId;
+      const userIsCreator = block.creator_id === userId;
 
       // Если пользователь — создатель страницы, всегда owner-доступ
       if (userIsCreator) {

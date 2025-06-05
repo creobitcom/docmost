@@ -28,7 +28,7 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface Attachments {
-  creatorId: string;
+  creator_id: string;
   deletedAt: Timestamp | null;
   fileExt: string;
   fileName: string;
