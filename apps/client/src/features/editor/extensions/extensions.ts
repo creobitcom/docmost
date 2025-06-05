@@ -67,7 +67,7 @@ import fortran from "highlight.js/lib/languages/fortran";
 import haskell from "highlight.js/lib/languages/haskell";
 import scala from "highlight.js/lib/languages/scala";
 import mentionRenderItems from "@/features/editor/components/mention/mention-suggestion.ts";
-import { ReactNodeViewRenderer } from "@tiptap/react";
+import { ReactNodeViewRenderer, Extension } from "@tiptap/react";
 import MentionView from "@/features/editor/components/mention/mention-view.tsx";
 import i18n from "@/i18n.ts";
 import { MarkdownClipboard } from "@/features/editor/extensions/markdown-clipboard.ts";

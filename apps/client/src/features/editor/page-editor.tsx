@@ -54,6 +54,7 @@ import { useParams } from "react-router-dom";
 import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
+import { Loader } from "@mantine/core";
 
 interface PageEditorProps {
   pageId: string;
