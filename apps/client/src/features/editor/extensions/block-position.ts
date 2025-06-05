@@ -45,7 +45,6 @@ export const BlockPosition = Extension.create({
                 node.content.size === 0 &&
                 node.attrs.position == null
               ) {
-                // console.log("[position ext]", newState.doc);
                 return;
               }
 
