@@ -1,11 +1,5 @@
 import "@/features/editor/styles/index.css";
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import {
@@ -55,17 +49,18 @@ import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
 import { Loader } from "@mantine/core";
-import { useAccessibleBlocks } from '@/hooks/useAccessibleBlocks';
-import { PlaceholderBlock } from './extensions/PlaceholderBlock';
-import { ReadOnlyBlockExtension } from './extensions/read-only-extension'
-import { useMantineTheme } from '@mantine/core';
-import { useMantineColorScheme } from '@mantine/core';
+import { useAccessibleBlocks } from "@/hooks/useAccessibleBlocks";
+import { PlaceholderBlock } from "./extensions/PlaceholderBlock";
+import { ReadOnlyBlockExtension } from "./extensions/read-only-extension";
+import { useMantineTheme } from "@mantine/core";
+import { useMantineColorScheme } from "@mantine/core";
 
 interface PageEditorProps {
   pageId: string;
   editable: boolean;
   content: any;
   initialContent: any;
+  syncPageOriginId?: string | null;
 }
 
 export default function PageEditor({
@@ -73,6 +68,8 @@ export default function PageEditor({
   editable,
   content: _content,
   initialContent,
+  content,
+  syncPageOriginId,
 }: PageEditorProps) {
   const [, setPageId] = useState<string | null>(null);
   const [content, setContent] = useState(initialContent);
@@ -86,10 +83,13 @@ export default function PageEditor({
   const [isLocalSynced, setLocalSynced] = useState(false);
   const [isRemoteSynced, setRemoteSynced] = useState(false);
   const [yjsConnectionStatus, setYjsConnectionStatus] = useAtom(
-    yjsConnectionStatusAtom
+    yjsConnectionStatusAtom,
   );
+  const [, setYjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
   const menuContainerRef = useRef(null);
-  const documentName = `page.${pageId}`;
+  const documentName = syncPageOriginId
+    ? `page.${syncPageOriginId}`
+    : `page.${pageId}`;
   const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
   const { isIdle, resetIdle } = useIdle(FIVE_MINUTES, { initialState: false });
   const documentState = useDocumentVisibility();
@@ -106,7 +106,7 @@ export default function PageEditor({
     data: accessibleBlocks = [],
     isLoading: isLoadingAccessibleBlocks,
     error: accessibleBlocksError,
-  } = useAccessibleBlocks(pageId, currentUser?.user.id ?? '');
+  } = useAccessibleBlocks(pageId, currentUser?.user.id ?? "");
   const initialHash = React.useRef(window.location.hash);
   const theme = useMantineTheme();
   const { colorScheme } = useMantineColorScheme();
@@ -214,14 +214,14 @@ export default function PageEditor({
       !contentFromDb.content ||
       contentFromDb.content.length === 0
     ) {
-      return null
+      return null;
     }
 
-    return contentFromDb
-  }
-  console.log('accessibleBlocks:', accessibleBlocks);
+    return contentFromDb;
+  };
+  console.log("accessibleBlocks:", accessibleBlocks);
   if (!Array.isArray(accessibleBlocks)) {
-    console.error('accessibleBlocks is not an array:', accessibleBlocks);
+    console.error("accessibleBlocks is not an array:", accessibleBlocks);
   }
 
   const editorContent = useMemo(() => {
@@ -234,23 +234,22 @@ export default function PageEditor({
           attrs: {
             ...block.content.attrs,
             blockId: block.id,
-            userPermission: block.userPermission ?? 'none',
+            userPermission: block.userPermission ?? "none",
           },
         };
       }
 
       return {
-        type: 'placeholder',
+        type: "placeholder",
         attrs: {
           blockId: block.id,
-          userPermission: 'none',
+          userPermission: "none",
         },
       };
     });
   }, [accessibleBlocks]);
 
-
-console.log("editorContent:",editorContent)
+  console.log("editorContent:", editorContent);
 
   const editor = useEditor(
     {
@@ -303,13 +302,13 @@ console.log("editorContent:",editorContent)
         debouncedUpdateContent(editorJson);
       },
     },
-    [pageId, editable, remoteProvider?.status]
+    [pageId, editable, remoteProvider?.status],
   );
 
   useEffect(() => {
     if (editor && editorContent.length) {
       editor.commands.setContent({
-        type: 'doc',
+        type: "doc",
         content: editorContent,
       });
     }
@@ -318,9 +317,9 @@ console.log("editorContent:",editorContent)
   useEffect(() => {
     if (!editor) return;
 
-    const blockId = initialHash.current?.replace('#', '');
+    const blockId = initialHash.current?.replace("#", "");
     if (!blockId) {
-      console.log('Нет blockId для фокуса');
+      console.log("Нет blockId для фокуса");
       return;
     }
 
@@ -337,7 +336,6 @@ console.log("editorContent:",editorContent)
         return true;
       });
 
-
       if (pos !== null) {
         editor.commands.setTextSelection(pos);
         editor.commands.focus();
@@ -346,10 +344,9 @@ console.log("editorContent:",editorContent)
 
         setTimeout(() => {
           if (domNode) {
-            domNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            domNode.scrollIntoView({ behavior: "smooth", block: "center" });
           }
         }, 50);
-
       } else {
         console.warn(`Блок с blockId=${blockId} не найден в документе`);
       }
@@ -358,21 +355,17 @@ console.log("editorContent:",editorContent)
     return () => clearTimeout(timer);
   }, [editor]);
 
-
-
-
-
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
       const el = document.getElementById(hash.slice(1));
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     };
 
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
   const handleActiveCommentEvent = (event) => {
@@ -388,19 +381,19 @@ console.log("editorContent:",editorContent)
   useEffect(() => {
     if (editor && editorContent.length) {
       editor.commands.setContent({
-        type: 'doc',
+        type: "doc",
         content: editorContent,
       });
     }
   }, [editor, editorContent]);
 
-
-
-
   useEffect(() => {
     document.addEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
     return () => {
-      document.removeEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
+      document.removeEventListener(
+        "ACTIVE_COMMENT_EVENT",
+        handleActiveCommentEvent,
+      );
     };
   }, []);
 
@@ -434,10 +427,13 @@ console.log("editorContent:",editorContent)
       documentState === "visible" &&
       remoteProvider?.status === WebSocketStatus.Disconnected
     ) {
-      const reconnectTimeout = setTimeout(() => {
-        remoteProvider.connect();
-        resetIdle();
-      }, collabRetryCount.current > 2 ? 3000 : 0);
+      const reconnectTimeout = setTimeout(
+        () => {
+          remoteProvider.connect();
+          resetIdle();
+        },
+        collabRetryCount.current > 2 ? 3000 : 0,
+      );
 
       return () => clearTimeout(reconnectTimeout);
     }
@@ -460,29 +456,26 @@ console.log("editorContent:",editorContent)
   }, [isSynced, isCollabReady, remoteProvider?.status]);
   //console.log("userId для useAccessibleBlocks:", currentUser?.user.id);
 
-
-  return  isCollabReady ? (
+  return isCollabReady ? (
     <div>
       <div ref={menuContainerRef}>
         <EditorContent editor={editor} />
         {contextMenu && (
-      <div
-        style={{
-          position: "absolute",
-          top: contextMenu.y,
-          left: contextMenu.x,
-          background: "#fff",
-          border: "1px solid #ccc",
-          borderRadius: "6px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          zIndex: 9999,
-        }}
-        onClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => e.preventDefault()}
-      >
-
-      </div>
-    )}
+          <div
+            style={{
+              position: "absolute",
+              top: contextMenu.y,
+              left: contextMenu.x,
+              background: "#fff",
+              border: "1px solid #ccc",
+              borderRadius: "6px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              zIndex: 9999,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+          ></div>
+        )}
         {editor && editor.isEditable && (
           <div>
             <EditorBubbleMenu editor={editor} pageId={pageId} />
@@ -506,7 +499,6 @@ console.log("editorContent:",editorContent)
       ></div>
     </div>
   ) : (
-
     <EditorProvider
       onUpdate={handleContentUpdate}
       editable={false}

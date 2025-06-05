@@ -123,6 +123,7 @@ export interface IMovePage {
 export interface IMovePageToSpace {
   pageId: string;
   spaceId: string;
+  parentPageId?: string | null;
 }
 
 export interface ICreateSynchronizedPage {
@@ -160,4 +161,10 @@ export interface IExportPageParams {
 export enum ExportFormat {
   HTML = "html",
   Markdown = "markdown",
+}
+
+export interface CopyPageParams {
+  originPageId: string;
+  spaceId: string;
+  parentPageId?: string | null;
 }
