@@ -26,6 +26,12 @@ export function usePageColors() {
         const rootPageColor = getPageColor(rootPageId);
         setPageColor({ pageId: page.id, color: rootPageColor });
 
+        for (const [childId, rootId] of childRootMap) {
+          if (page.id === rootId) {
+            childRootMap.set(childId, rootPageId);
+          }
+        }
+
         return;
       }
 
@@ -33,7 +39,8 @@ export function usePageColors() {
         childRootMap.delete(page.id);
       }
 
-      if (getPageColor(page.id)) {
+      const existingColor = getPageColor(page.id);
+      if (existingColor === page.color) {
         return;
       }
 

@@ -11,9 +11,8 @@ export const updatePageColorAtom = atom(
     if (childRootMap.has(pageId)) {
       const rootPageId = childRootMap.get(pageId);
       newColors.set(rootPageId, color);
-    } else {
-      newColors.set(pageId, color);
     }
+    newColors.set(pageId, color);
     set(pageColorAtom, newColors);
   },
 );

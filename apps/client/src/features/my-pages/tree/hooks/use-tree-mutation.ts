@@ -352,37 +352,6 @@ export function useMyPagesTreeMutation<T>(spaceId: string) {
     tree.update({ id, changes: { spaceId, parentPageId: parentId } });
   }
 
-  function notifySuccess() {
-    notifications.show({
-      message: t("Page moved successfully"),
-      color: "green",
-    });
-  }
-
-  function handleMoveError(
-    id: string,
-    originalData: SpaceTreeNode[],
-    originalParentId: string,
-    originalIndex: number,
-    originalPosition: string,
-  ) {
-    notifications.show({
-      message: t("Failed to move a page"),
-      color: "red",
-    });
-
-    setData(originalData);
-    tree.move({
-      id,
-      parentId: originalParentId,
-      index: originalIndex,
-    });
-    tree.update({
-      id,
-      changes: { position: originalPosition } as any,
-    });
-  }
-
   function emitMove(
     id: string,
     parentId: string | null,

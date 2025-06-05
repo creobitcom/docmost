@@ -30,7 +30,10 @@ import { useTranslation } from "react-i18next";
 import { personalSpaceIdAtom } from "@/features/page/tree/atoms/tree-current-space-atom.ts";
 import { CreateNode } from "./my-page-tree-create-node.tsx";
 import { MyPageNodeMenu } from "./my-page-tree-node-menu.tsx";
-import { getPageColorAtom } from "@/features/page/tree/atoms/tree-color-atom.ts";
+import {
+  childRootMap,
+  getPageColorAtom,
+} from "@/features/page/tree/atoms/tree-color-atom.ts";
 import { usePageColors } from "../../hooks/use-page-colors.ts";
 
 export function Node({
@@ -57,8 +60,13 @@ export function Node({
   const [isPersonalSpace, setIsPersonalSpace] = useState(false);
 
   useEffect(() => {
-    setIsPersonalSpace(node.data.spaceId === personalSpaceId);
-  }, [node.data.spaceId, personalSpaceId]);
+    let rootPage = node;
+    while (rootPage.level > 0) {
+      rootPage = rootPage?.parent;
+    }
+
+    setIsPersonalSpace(rootPage.data.spaceId === personalSpaceId);
+  }, [node.parent, personalSpaceId, node.tree]);
 
   useEffect(() => {
     setPageColor(getPageColors(node.data.id) || "#4CAF50");
