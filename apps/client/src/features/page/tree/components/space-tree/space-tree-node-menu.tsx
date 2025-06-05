@@ -61,6 +61,7 @@ export function NodeMenu({ node, treeApi }: NodeMenuProps) {
         <Menu.Target>
           <ActionIcon
             variant="transparent"
+            size={18}
             c="gray"
             onClick={(e) => {
               e.preventDefault();

@@ -26,6 +26,7 @@ import { useTranslation } from "react-i18next";
 import { PageArrow } from "./space-tree-page-arrow";
 import { CreateNode } from "./space-tree-create-node";
 import { NodeMenu } from "./space-tree-node-menu";
+import { Group } from "@mantine/core";
 
 export function Node({
   node,
@@ -179,7 +180,7 @@ export function Node({
             <IconLink size={18} />
           </div>
         )}
-        <div className={classes.actions}>
+        <Group gap="xs" className={classes.actions}>
           {!tree.props.disableEdit && (
             <CreateNode
               node={node}
@@ -188,7 +189,7 @@ export function Node({
             />
           )}
           <NodeMenu node={node} treeApi={tree} />
-        </div>
+        </Group>
       </div>
     </>
   );

@@ -27,6 +27,7 @@ export function CreateNode({ node, treeApi, onExpandTree }: CreateNodeProps) {
     <ActionIcon
       variant="transparent"
       c="gray"
+      size={18}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();

@@ -3,6 +3,7 @@ import {
   ColorInput,
   Group,
   Menu,
+  rem,
   Text,
   Tooltip,
   UnstyledButton,
@@ -153,7 +154,10 @@ export function SpaceSidebar() {
                     onClick={handleCreatePage}
                     aria-label={t("Create page")}
                   >
-                    <IconPlus />
+                    <IconPlus
+                      style={{ width: rem(20), height: rem(20) }}
+                      stroke={2}
+                    />
                   </ActionIcon>
                 </Tooltip>
 
@@ -210,7 +214,10 @@ function SpaceMenu({ spaceId, onSpaceSettings }: SpaceMenuProps) {
               size={18}
               aria-label={t("Space menu")}
             >
-              <IconDots />
+              <IconDots
+                style={{ width: rem(20), height: rem(20) }}
+                stroke={2}
+              />
             </ActionIcon>
           </Tooltip>
         </Menu.Target>

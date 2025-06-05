@@ -57,6 +57,8 @@ export function MyPagesSidebar() {
                   <IconPlus />
                 </ActionIcon>
               </Tooltip>
+
+              <MyPagesMenu onSpaceSettings={null} />
             </Group>
           </Group>
 

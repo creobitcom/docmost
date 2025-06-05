@@ -90,6 +90,7 @@ export function MyPageNodeMenu({
       <Menu shadow="md" width={200}>
         <Menu.Target>
           <ActionIcon
+            size={18}
             variant="transparent"
             c="gray"
             onClick={(e) => {

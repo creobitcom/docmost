@@ -4,7 +4,7 @@ import { useUpdatePageMutation } from "@/features/page/queries/page-query.ts";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import classes from "@/features/page/tree/styles/tree.module.css";
-import { ActionIcon } from "@mantine/core";
+import { ActionIcon, Group } from "@mantine/core";
 import {
   IconChevronDown,
   IconChevronRight,
@@ -30,10 +30,7 @@ import { useTranslation } from "react-i18next";
 import { personalSpaceIdAtom } from "@/features/page/tree/atoms/tree-current-space-atom.ts";
 import { CreateNode } from "./my-page-tree-create-node.tsx";
 import { MyPageNodeMenu } from "./my-page-tree-node-menu.tsx";
-import {
-  childRootMap,
-  getPageColorAtom,
-} from "@/features/page/tree/atoms/tree-color-atom.ts";
+import { getPageColorAtom } from "@/features/page/tree/atoms/tree-color-atom.ts";
 import { usePageColors } from "../../hooks/use-page-colors.ts";
 
 export function Node({
@@ -208,7 +205,7 @@ export function Node({
             <IconLink size={18} />
           </div>
         )}
-        <div className={classes.actions}>
+        <Group gap="xs" className={classes.actions}>
           {!tree.props.disableEdit && (
             <CreateNode
               node={node}
@@ -221,7 +218,7 @@ export function Node({
             treeApi={tree}
             isPersonalSpace={isPersonalSpace}
           />
-        </div>
+        </Group>
       </div>
     </>
   );
