@@ -672,7 +672,9 @@ export class PageService {
       }
     }
 
-    const originPage = await this.pageRepo.findById(originPageId);
+    const originPage = await this.pageRepo.findById(originPageId, {
+      includeContent: true,
+    });
     if (!originPage) {
       throw new NotFoundException('Origin page not found');
     }
