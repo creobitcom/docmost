@@ -96,7 +96,7 @@ export class GroupRepo {
     const insertableGroup: InsertableGroup = {
       name: DefaultGroup.EVERYONE,
       isDefault: true,
-      creatorId: userId,
+      creator_id: userId,
       workspaceId: workspaceId,
     };
 

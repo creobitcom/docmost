@@ -10,7 +10,7 @@ export const handlePaste = (
   view: EditorView,
   event: ClipboardEvent,
   pageId: string,
-  creatorId?: string,
+  creator_id?: string,
 ) => {
   const clipboardData = event.clipboardData.getData("text/plain");
 
@@ -34,7 +34,7 @@ export const handlePaste = (
       return false;
     }
 
-    createMentionAction(url, view, pos, creatorId);
+    createMentionAction(url, view, pos, creator_id);
     return true;
   }
 

@@ -35,7 +35,7 @@ export class SearchService {
         'title',
         'icon',
         'parentPageId',
-        'creatorId',
+        'creator_id',
         'createdAt',
         'updatedAt',
         sql<number>`ts_rank(tsv, to_tsquery(${searchQuery}))`.as('rank'),
@@ -48,8 +48,8 @@ export class SearchService {
         qb.where('spaceId', '=', searchParams.spaceId),
       )
       .where('tsv', '@@', sql<string>`to_tsquery(${searchQuery})`)
-      .$if(Boolean(searchParams.creatorId), (qb) =>
-        qb.where('creatorId', '=', searchParams.creatorId),
+      .$if(Boolean(searchParams.creator_id), (qb) =>
+        qb.where('creator_id', '=', searchParams.creator_id),
       )
       .orderBy('rank', 'desc')
       .limit(searchParams.limit | 20)

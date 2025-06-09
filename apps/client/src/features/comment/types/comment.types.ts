@@ -6,7 +6,7 @@ export interface IComment {
   content: string;
   selection?: string;
   type?: string;
-  creatorId: string;
+  creator_id: string;
   pageId: string;
   parentCommentId?: string;
   resolvedById?: string;

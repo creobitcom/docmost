@@ -93,7 +93,7 @@ const MentionList = forwardRef<any, MentionListProps>((props, ref) => {
             label: item.label,
             entityType: "user",
             entityId: item.entityId,
-            creatorId: currentUser?.user.id,
+            creator_id: currentUser?.user.id,
           });
         }
         if (item.entityType === "page") {
@@ -103,7 +103,7 @@ const MentionList = forwardRef<any, MentionListProps>((props, ref) => {
             entityType: "page",
             entityId: item.entityId,
             slugId: item.slugId,
-            creatorId: currentUser?.user.id,
+            creator_id: currentUser?.user.id,
           });
         }
       }

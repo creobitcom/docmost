@@ -6,7 +6,7 @@ export interface MentionNode {
   label: string;
   entityType: 'user' | 'page';
   entityId: string;
-  creatorId: string;
+  creator_id: string;
 }
 
 export function extractMentions(prosemirrorJson: any) {
@@ -24,7 +24,7 @@ export function extractMentions(prosemirrorJson: any) {
           label: node.attrs.label,
           entityType: node.attrs.entityType,
           entityId: node.attrs.entityId,
-          creatorId: node.attrs.creatorId,
+          creator_id: node.attrs.creator_id,
         });
       }
     }

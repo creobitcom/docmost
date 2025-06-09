@@ -52,7 +52,7 @@ export class PageHistoryRepo {
         content: page.content,
         icon: page.icon,
         coverPhoto: page.coverPhoto,
-        lastUpdatedById: page.lastUpdatedById ?? page.creatorId,
+        lastUpdatedById: page.lastUpdatedById ?? page.creator_id,
         spaceId: page.spaceId,
         workspaceId: page.workspaceId,
       },

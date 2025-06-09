@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SaveBlockPermissionDto } from '../dto/save-block-permission.dto';
 import { KyselyDB } from '@docmost/db/types/kysely.types';
 import { InjectKysely } from 'nestjs-kysely';
+import { sql } from 'kysely';
 
 @Injectable()
 export class BlockPermissionService {
@@ -17,33 +18,64 @@ export class BlockPermissionService {
         role: dto.role,
         permission: dto.permission,
       })
+      .onConflict((oc) =>
+        oc.columns(['blockId', 'userId']).doUpdateSet({
+          role: (eb) => eb.ref('excluded.role'),
+          permission: (eb) => eb.ref('excluded.permission'),
+        })
+      )
       .execute();
   }
-  async canAccessBlock(userId: string, pageId: string, blockId: string, required: 'read' | 'edit' | 'owner') {
-    const result = await this.db.selectFrom('blockPermissions')
-      .select(['permission'])
-      .where('userId', '=', userId)
-      .where('pageId', '=', pageId)
-      .where('blockId', '=', blockId)
-      .executeTakeFirst();
 
-    if (!result) return false;
+async getAccessiblePageBlocks(pageId: string, userId: string) {
+  console.log('[PageService] Получение доступных блоков для страницы:', pageId, 'пользователя:', userId);
 
-    const permissionLevels = ['read', 'edit', 'owner'];
-    return (
-      permissionLevels.indexOf(result.permission) >= permissionLevels.indexOf(required)
-    );
-  }
-  async getUserReadableBlockIds(userId: string, pageId: string): Promise<string[]> {
-    const result = await this.db
-      .selectFrom('blockPermissions')
-      .select(['blockId'])
-      .where('userId', '=', userId)
-      .where('pageId', '=', pageId)
-      .where('permission', 'in', ['read', 'edit', 'full']) // допускаем все
-      .execute();
+  const blocks = await this.db
+    .selectFrom('blocks as b')
+    .leftJoin('blockPermissions as bp', (join) =>
+      join.onRef('b.id', '=', 'bp.blockId').on('bp.userId', '=', sql.lit(userId))
+    )
+    .leftJoin('blockPermissions as bp_public', (join) =>
+      join.onRef('b.id', '=', 'bp_public.blockId').on('bp_public.permission', '=', sql.lit('public'))
+    )
+    .innerJoin('pages as p', 'p.id', 'b.pageId')
+    .select([
+      'b.id',
+      'b.pageId',
+      'b.blockType',
+      'b.content',
+      'b.position',
+      'p.creator_id as creatorId',
+      'bp.permission as userPermission',
+      'bp_public.permission as publicPermission',
+      (eb) =>
+        eb
+          .selectFrom('blockPermissions')
+          .select(eb.fn.countAll().as('count'))
+          .whereRef('blockPermissions.blockId', '=', 'b.id')
+          .as('permissionCount'),
+    ])
+    .where('b.pageId', '=', pageId)
+    .orderBy('b.position')
+    .execute();
 
-    return result.map(r => r.blockId);
-  }
+  const result = blocks.map((block) => {
+    const hasAccess =
+      !!block.userPermission ||
+      !!block.publicPermission ||
+      block.creatorId === userId ||
+      block.permissionCount === 0;
+
+    return {
+      id: block.id,
+      pageId: block.pageId,
+      blockType: block.blockType,
+      position: block.position,
+      userPermission: block.userPermission ?? block.publicPermission ?? (block.creatorId === userId ? 'owner' : null),
+      content: hasAccess ? block.content : null,
+    };
+  });
+
+  return result;
 }
-
+}

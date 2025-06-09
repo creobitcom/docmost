@@ -90,7 +90,7 @@ export class PageService {
           icon: createPageDto.icon,
           parentPageId: parentPageId,
           spaceId: createPageDto.spaceId,
-          creatorId: userId,
+          creator_id: userId,
           workspaceId: workspaceId,
           lastUpdatedById: userId,
         },
@@ -212,7 +212,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creatorId',
+        'creator_id',
         'isSynced',
       ])
       .orderBy('position', 'asc')
@@ -241,7 +241,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creatorId',
+        'creator_id',
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
@@ -549,14 +549,50 @@ export class PageService {
       await this.pageRepo.deletePage(pageId, trx);
     });
   }
-  async updatePage(id: string, dto: UpdatePageDto) {
+  async updatePage(id: string, dto: UpdatePageDto, userId: string) {
     await this.db.updateTable('pages')
       .set({ content: dto.content })
       .where('id', '=', id)
       .execute();
 
-      await this.PageBlocksService.saveFromTiptapJson(id, dto.content);
+      await this.PageBlocksService.saveFromTiptapJson(id, dto.content, userId);
 
+  }
+
+  async getAllBlocksOfPage(pageId: string, userId: string) {
+    const allBlocks = await this.db
+    .selectFrom('blocks')
+    .select(['id', 'pageId', 'blockType', 'position', 'content']) // <= строки
+    .where('pageId', '=', pageId)
+    .orderBy('position', 'asc')
+    .execute();
+
+    const permissions = await this.db
+      .selectFrom('blockPermissions')
+      .select(['blockId', 'permission'])
+      .where('pageId', '=', pageId)
+      .where('userId', '=', userId)
+      .execute();
+
+    const permissionMap = new Map(permissions.map(p => [p.blockId, p.permission]));
+
+    return allBlocks.map(block => {
+      const userPermission = permissionMap.get(block.id);
+
+      if (!userPermission) {
+        return {
+          id: block.id,
+          blockType: block.blockType,
+          position: block.position,
+          userPermission: null,
+        };
+      }
+
+      return {
+        ...block,
+        userPermission,
+      };
+    });
   }
 
 
@@ -574,7 +610,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creatorId',
+        'creator_id',
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
@@ -595,13 +631,13 @@ export class PageService {
     for (const page of result.items) {
       const preferences = await this.pageRepo.findUserPagePreferences(
         page.id,
-        page.creatorId,
+        page.creator_id,
       );
 
       if (!preferences) {
         await this.pageRepo.createUserPagePreferences({
           pageId: page.id,
-          userId: page.creatorId,
+          userId: page.creator_id,
           position: page.position,
           color: '#4CAF50',
         });

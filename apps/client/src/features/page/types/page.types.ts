@@ -22,7 +22,7 @@ export interface IPage {
   icon: string;
   coverPhoto: string;
   parentPageId: string;
-  creatorId: string;
+  creator_id: string;
   spaceId: string;
   workspaceId: string;
   isLocked: boolean;

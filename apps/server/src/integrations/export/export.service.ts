@@ -264,7 +264,7 @@ export class ExportService {
         'id',
         'slugId',
         'title',
-        'creatorId',
+        'creator_id',
         'spaceId',
         'workspaceId',
       ])

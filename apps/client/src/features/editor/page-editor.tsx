@@ -55,8 +55,12 @@ import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
 import { Loader } from "@mantine/core";
-import { updatePageBlocks } from "../../lib/api-client";
+import { updatePageBlocks, usePage } from "../../lib/api-client";
 import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-page-blocks";
+import { useAccessibleBlocks } from '@/hooks/useAccessibleBlocks';
+import { useAllPageBlocks } from "@/hooks/useAllPageBlocks";
+import { PlaceholderBlock } from './extensions/PlaceholderBlock';
+import { readOnlyExtensions } from './extensions/extensionsMap'
 
 
 interface PageEditorProps {
@@ -100,6 +104,25 @@ export default function PageEditor({
     y: number;
     Id: string;
   } | null>(null);
+  const {
+    data: accessibleBlocks = [],
+    isLoading: isLoadingAccessibleBlocks,
+    error: accessibleBlocksError,
+  } = useAccessibleBlocks(pageId, currentUser?.user.id ?? '');
+
+  useEffect(() => {
+    console.log('userId для useAccessibleBlocks:', currentUser?.user.id);
+    console.log('isLoadingAccessibleBlocks:', isLoadingAccessibleBlocks);
+    console.log('accessibleBlocksError:', accessibleBlocksError);
+    console.log('accessibleBlocks:', accessibleBlocks);
+  }, [accessibleBlocks, isLoadingAccessibleBlocks, accessibleBlocksError]);
+
+  const { data } = useAllPageBlocks(pageId);
+  const allBlocks = data?.blocks ?? [];
+
+
+
+
 
   const updatePageBlocksTable = (newContent: any) => {
     const blocksToUpdate = extractTopLevelBlocks(newContent, pageId);
@@ -192,6 +215,8 @@ export default function PageEditor({
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
       ...creobitExtentions,
+      ...readOnlyExtensions,
+      PlaceholderBlock,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
@@ -225,10 +250,43 @@ export default function PageEditor({
 
     return contentFromDb
   }
+  console.log('accessibleBlocks:', accessibleBlocks);
+  if (!Array.isArray(accessibleBlocks)) {
+    console.error('accessibleBlocks is not an array:', accessibleBlocks);
+  }
+
+  const editorContent = useMemo(() => {
+    if (!Array.isArray(accessibleBlocks)) return [];
+
+    return accessibleBlocks.map((block) => {
+      if (block.content) {
+        return {
+          ...block.content,
+          attrs: {
+            ...block.content.attrs,
+            id: block.id,
+            userPermission: block.userPermission ?? null,
+          },
+        };
+      }
+
+      return {
+        type: 'placeholder',
+        attrs: {
+          id: block.id,
+          userPermission: 'none',
+        },
+      };
+    });
+  }, [accessibleBlocks]);
+
+
+
+
   const editor = useEditor(
     {
       extensions,
-      content: sanitizedContent(content),
+      content: sanitizedContent(editorContent),
       editable,
       immediatelyRender: true,
       shouldRerenderOnTransaction: true,
@@ -291,6 +349,18 @@ export default function PageEditor({
   };
 
   useEffect(() => {
+    if (editor && editorContent.length) {
+      editor.commands.setContent({
+        type: 'doc',
+        content: editorContent,
+      });
+    }
+  }, [editor, editorContent]);
+
+
+
+
+  useEffect(() => {
     document.addEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
     return () => {
       document.removeEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
@@ -351,8 +421,17 @@ export default function PageEditor({
 
     return () => clearTimeout(collabReadyTimeout);
   }, [isSynced, isCollabReady, remoteProvider?.status]);
+  console.log("userId для useAccessibleBlocks:", currentUser?.user.id);
 
-  return isCollabReady ? (
+  if (isLoadingAccessibleBlocks) {
+    return <p>Загрузка доступных блоков...</p>;
+  }
+
+  if (accessibleBlocksError) {
+    return <p>Ошибка загрузки блоков: {String(accessibleBlocksError)}</p>;
+  }
+
+  return  isCollabReady ? (
     <div>
       <div ref={menuContainerRef}>
         <EditorContent editor={editor} />

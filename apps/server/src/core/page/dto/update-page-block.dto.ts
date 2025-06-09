@@ -1,4 +1,4 @@
-import { IsArray, IsNotEmpty, IsObject, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsNotEmpty, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class BlockDto {
@@ -12,7 +12,7 @@ export class BlockDto {
   @IsString()
   pageId: string;
 
-  @IsNotEmpty()
+  @IsArray()
   content: any;
 }
 

@@ -57,7 +57,7 @@ export class CommentService {
       selection: createCommentDto?.selection?.substring(0, 250),
       type: 'inline',
       parentCommentId: createCommentDto?.parentCommentId,
-      creatorId: userId,
+      creator_id: userId,
       workspaceId: workspaceId,
     });
 
@@ -94,7 +94,7 @@ export class CommentService {
       throw new NotFoundException('Comment not found');
     }
 
-    if (comment.creatorId !== authUser.id) {
+    if (comment.creator_id !== authUser.id) {
       throw new ForbiddenException('You can only edit your own comments');
     }
 
@@ -120,7 +120,7 @@ export class CommentService {
       throw new NotFoundException('Comment not found');
     }
 
-    if (comment.creatorId !== authUser.id) {
+    if (comment.creator_id !== authUser.id) {
       throw new ForbiddenException('You can only delete your own comments');
     }
 

@@ -76,7 +76,7 @@ export class ImportService {
           ydoc: await this.createYdoc(prosemirrorJson),
           position: pagePosition,
           spaceId: spaceId,
-          creatorId: userId,
+          creator_id: userId,
           workspaceId: workspaceId,
           lastUpdatedById: userId,
         });

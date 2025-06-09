@@ -29,7 +29,7 @@ export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface Attachments {
   createdAt: Generated<Timestamp>;
-  creatorId: string;
+  creator_id: string;
   deletedAt: Timestamp | null;
   fileExt: string;
   fileName: string;
@@ -58,7 +58,7 @@ export interface AuthAccounts {
 export interface AuthProviders {
   allowSignup: Generated<boolean>;
   createdAt: Generated<Timestamp>;
-  creatorId: string | null;
+  creator_id: string | null;
   deletedAt: Timestamp | null;
   id: Generated<string>;
   isEnabled: Generated<boolean>;
@@ -130,7 +130,7 @@ export interface BlockPermissions {
 export interface Comments {
   content: Json | null;
   createdAt: Generated<Timestamp>;
-  creatorId: string | null;
+  creator_id: string | null;
   deletedAt: Timestamp | null;
   editedAt: Timestamp | null;
   id: Generated<string>;
@@ -144,7 +144,7 @@ export interface Comments {
 
 export interface Groups {
   createdAt: Generated<Timestamp>;
-  creatorId: string | null;
+  creator_id: string | null;
   deletedAt: Timestamp | null;
   description: string | null;
   id: Generated<string>;
@@ -196,7 +196,7 @@ export interface Pages {
   contributorIds: Generated<string[] | null>;
   coverPhoto: string | null;
   createdAt: Generated<Timestamp>;
-  creatorId: string | null;
+  creator_id: string | null;
   deletedAt: Timestamp | null;
   deletedById: string | null;
   icon: string | null;
@@ -230,7 +230,7 @@ export interface SpaceMembers {
 
 export interface Spaces {
   createdAt: Generated<Timestamp>;
-  creatorId: string | null;
+  creator_id: string | null;
   defaultRole: Generated<string>;
   deletedAt: Timestamp | null;
   description: string | null;

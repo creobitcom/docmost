@@ -9,7 +9,7 @@ export interface IPageSearch {
   icon: string;
   parentPageId: string;
   slugId: string;
-  creatorId: string;
+  creator_id: string;
   createdAt: Date;
   updatedAt: Date;
   rank: string;

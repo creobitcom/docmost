@@ -83,7 +83,7 @@ export class SpaceService {
       {
         name: createSpaceDto.name ?? 'untitled space',
         description: createSpaceDto.description ?? '',
-        creatorId: userId,
+        creator_id: userId,
         workspaceId: workspaceId,
         slug: createSpaceDto.slug,
       },
@@ -168,7 +168,7 @@ export class SpaceService {
         {
           name: `${user.name}'s Space`,
           workspaceId: workspaceId,
-          creatorId: user.id,
+          creator_id: user.id,
           slug: `${user.id}-space`,
           visibility: SpaceVisibility.PERSONAL,
         },

@@ -8,23 +8,23 @@ export type LinkFn = (
   url: string,
   view: EditorView,
   pos: number,
-  creatorId: string,
+  creator_id: string,
 ) => void;
 
 export interface InternalLinkOptions {
   validateFn: (url: string, view: EditorView) => boolean;
-  onResolveLink: (linkedPageId: string, creatorId: string) => Promise<any>;
+  onResolveLink: (linkedPageId: string, creator_id: string) => Promise<any>;
 }
 
 export const handleInternalLink =
   ({ validateFn, onResolveLink }: InternalLinkOptions): LinkFn =>
-  async (url: string, view, pos, creatorId) => {
+  async (url: string, view, pos, creator_id) => {
     const validated = validateFn(url, view);
     if (!validated) return;
 
     const linkedPageId = extractPageSlugId(url);
 
-    await onResolveLink(linkedPageId, creatorId).then(
+    await onResolveLink(linkedPageId, creator_id).then(
       (page: IPage) => {
         const { schema } = view.state;
 
@@ -34,7 +34,7 @@ export const handleInternalLink =
           entityType: "page",
           entityId: page.id,
           slugId: page.slugId,
-          creatorId: creatorId,
+          creator_id: creator_id,
         });
 
         if (!node) return;

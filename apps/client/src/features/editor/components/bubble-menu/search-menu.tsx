@@ -19,9 +19,10 @@ import { useWorkspaceMembersQuery } from "@/features/workspace/queries/workspace
 import { Editor } from "@tiptap/react";
 import { notifications } from "@mantine/notifications";
 import { assignPermissionToBlock } from "@/lib/api-client";
-import { getBlockPermissions } from "@/lib/api-client";
+import { getBlockPermissions, getPagePermissions } from "@/lib/api-client";
 import { Tooltip, ActionIcon } from '@mantine/core';
 import { IconLink } from '@tabler/icons-react';
+
 
 interface ItemProps extends React.ComponentPropsWithoutRef<"div"> {
   label: string;
@@ -51,6 +52,13 @@ interface SearchMenuProps {
 }
 
 interface BlockPermission {
+  userId: string;
+  name: string;
+  permission: "read" | "edit" | "owner";
+  avatarUrl?: string;
+}
+
+interface PagePermission {
   userId: string;
   name: string;
   permission: "read" | "edit" | "owner";
@@ -95,7 +103,9 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
   const [search, setSearch] = useState("");
   const [debounced] = useDebouncedValue(search, 300);
   const [blockPermissions, setBlockPermissions] = useState<BlockPermission[]>([]);
-
+  // Новое состояние для прав страницы:
+  const [pagePermissions, setPagePermissions] = useState<PagePermission[] | null>(null);
+  const [loadingPagePerms, setLoadingPagePerms] = useState(false);
   const [selectedPermissionsMap, setSelectedPermissionsMap] = useState<
     Record<string, "read" | "edit" | "owner">
   >({});
@@ -150,9 +160,28 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
     return foundNode?.attrs?.blockId;
   };
   const blockId = getBlockId();
-
+    // Новая функция для загрузки прав на страницу
+    const fetchPagePermissions = async () => {
+      setLoadingPagePerms(true);
+      try {
+        const perms = await getPagePermissions({ pageId });
+        setPagePermissions(
+          perms.map((item: any) => ({
+            userId: item.id,
+            name: item.name,
+            avatarUrl: item.avatarUrl,
+            permission: item.permission,
+          }))
+        );
+        notifications.show({ message: "Page permissions loaded", color: "green" });
+      } catch (e) {
+        notifications.show({ message: "Failed to load page permissions", color: "red" });
+      } finally {
+        setLoadingPagePerms(false);
+      }
+    };
   const handleSelectUserWithPermission = async (user: any) => {
-    const blockId = getBlockId();
+    //const blockId = getBlockId();
 
     if (!blockId || !pageId) {
       notifications.show({
@@ -236,6 +265,36 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
       yOffset="10vh"
       zIndex={10000}
     >
+      {/* --- Новый блок: права доступа на страницу --- */}
+      {pagePermissions && (
+        <>
+          <Divider my="md" />
+          <Text size="sm" fw={500} mb="xs">
+            Page Permissions
+          </Text>
+          {loadingPagePerms ? (
+            <Loader size="sm" />
+          ) : pagePermissions.length === 0 ? (
+            <Text size="xs" color="dimmed">
+              No permissions found for this page.
+            </Text>
+          ) : (
+            <Stack gap="xs" maw={400}>
+              {pagePermissions.map((perm) => (
+                <Group key={perm.userId} gap="sm" justify="apart" wrap="nowrap">
+                  <Group gap="xs" wrap="nowrap">
+                    <Avatar src={perm.avatarUrl} size="sm" />
+                    <Text size="sm">{perm.name}</Text>
+                  </Group>
+                  <Text size="sm" color="dimmed" tt="capitalize" fw={600}>
+                    {perm.permission}
+                  </Text>
+                </Group>
+              ))}
+            </Stack>
+          )}
+        </>
+      )}
       {blockPermissions.length > 0 && (
         <>
           <Text size="sm" fw={500} mt="md" mb="xs">
@@ -331,7 +390,6 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
                   value={permission}
                   onChange={(value) => {
                     if (value === "delete") {
-                      // Если пользователь в списке прав — удаляем
                       if (blockPermissions.find((p) => p.userId === user.id)) {
                         handleRemovePermission(user.id);
                       }

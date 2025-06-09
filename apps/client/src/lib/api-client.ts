@@ -2,6 +2,8 @@ import axios, { AxiosInstance } from "axios";
 import APP_ROUTE from "@/lib/app-route.ts";
 import { isCloud } from "@/lib/config.ts";
 import {IPageBlock} from '../../../server/src/database/types/page-block.types'
+import { useQuery } from '@tanstack/react-query';
+
 const api: AxiosInstance = axios.create({
   baseURL: "/api",
   withCredentials: true,
@@ -116,4 +118,32 @@ export async function getBlockPermissions({ pageId, blockId }: { pageId: string;
   return json.data;
 }
 
+const fetchPage = async (pageId: string) => {
+  const { data } = await axios.get(`/api/pages/${pageId}`);
+  return data;
+};
 
+export const usePage = (pageId: string) => {
+  return useQuery({
+    queryKey: ['page', pageId],
+    queryFn: () => fetchPage(pageId),
+    enabled: !!pageId,
+  });
+};
+
+export async function getPagePermissions({ pageId }: { pageId: string }) {
+  const response = await fetch(`/api/pages/${pageId}/blockPermissions`);
+  if (!response.ok) throw new Error("Failed to fetch page permissions");
+  return response.json();
+}
+
+export async function getAccessibleBlocks(pageId: string, userId: string) {
+  const res = await fetch(`/api/pages/${pageId}/blockPermissions?userId=${userId}`);
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch accessible blocks");
+  }
+
+  const json = await res.json();
+  return json.data;
+}

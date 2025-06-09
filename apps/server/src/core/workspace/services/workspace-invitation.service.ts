@@ -222,7 +222,7 @@ export class WorkspaceInvitationService {
           {
             name: `${newUser.name}'s Space`,
             workspaceId,
-            creatorId: newUser.id,
+            creator_id: newUser.id,
             slug: `${newUser.id}-space`,
             visibility: SpaceVisibility.PERSONAL,
           },

@@ -51,7 +51,7 @@ export class SynchronizedPageService {
           icon: originPage.icon,
           parentPageId: parentPageId,
           spaceId: createPageDto.spaceId,
-          creatorId: userId,
+          creator_id: userId,
           workspaceId: workspaceId,
           lastUpdatedById: userId,
           isSynced: true,

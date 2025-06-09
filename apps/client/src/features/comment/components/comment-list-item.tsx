@@ -82,7 +82,7 @@ function CommentListItem({ comment }: CommentListItemProps) {
                 <ResolveComment commentId={comment.id} pageId={comment.pageId} resolvedAt={comment.resolvedAt} />
               )*/}
 
-              {currentUser?.user?.id === comment.creatorId && (
+              {currentUser?.user?.id === comment.creator_id && (
                 <CommentMenu
                   onEditComment={handleEditToggle}
                   onDeleteComment={handleDeleteComment}

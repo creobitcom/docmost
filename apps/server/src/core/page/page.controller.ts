@@ -54,13 +54,15 @@ import { cpSync } from 'fs-extra';
 import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { MyPageColorDto } from './dto/update-color.dto';
 import { MyPagesDto } from './dto/my-pages.dto';
-import { SaveBlockPermissionDto } from './dto/save-block-permission.dto';
 import { BlockPermissionService } from './services/block-permission.service';
 import { PageBlocksService } from './services/page-blocks.service';
 import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
 import { extractTopLevelBlocks } from './extract-page-blocks';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB } from '@docmost/db/types/kysely.types';
+interface Request {
+  user: { id: string };
+}
 
 
 @UseGuards(JwtAuthGuard)
@@ -86,11 +88,40 @@ export class PageController {
   @Post('blocks/:pageId')
   async updateBlocksForPage(
     @Param('pageId') pageId: string,
-    @Body() dto: UpdatePageBlocksDto
+    @Body() dto: UpdatePageBlocksDto,
+    @Req() req: Request,
   ) {
-    await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks);
+    const userId = req.user.id;
+    await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks, userId);
     return { success: true };
   }
+
+
+
+  @HttpCode(HttpStatus.OK)
+  @Get(':pageId/blockPermissions')
+  async getAccessibleBlocks(
+    @Param('pageId') pageId: string,
+    @Query('userId') userId: string,
+  ) {
+    if (!userId) {
+      console.warn('[BlockPermissions] userId is missing in query!');
+      throw new BadRequestException('userId is required');
+    }
+
+    return this.blockPermissionService.getAccessiblePageBlocks(pageId, userId);
+  }
+
+  @Get(':id/blocks')
+  async getAllPageBlocks(@Param('id') pageId: string, @Req() req: Request) {
+    const userId = req.user.id;
+    const result = await this.pageService.getAllBlocksOfPage(pageId, userId);
+    return { data: result, success: true };
+  }
+
+
+
+
 
   @HttpCode(HttpStatus.OK)
   @Get('blockPermissions/:pageId/:blockId')
@@ -131,20 +162,13 @@ export class PageController {
       throw new NotFoundException('Block not found for given page and blockId');
     }
 
-    await this.db
-      .insertInto('blockPermissions')
-      .values({
-        pageId: pageId,
-        blockId: block.id,
-        userId: userId,
-        role: role,
-        permission: permission ?? 'read',
-      })
-      .onConflict((oc) =>
-        oc.columns(['blockId', 'userId']).doUpdateSet({ permission })
-      )
-      .execute();
-
+    await this.blockPermissionService.saveBlockPermission({
+      pageId,
+      blockId,
+      userId,
+      role,
+      permission,
+    });
     return { success: true };
   }
 
@@ -248,7 +272,7 @@ export class PageController {
 
     if (updatePageDto.content) {
       const blocks = extractTopLevelBlocks(updatePageDto.content, updatePageDto.pageId);
-      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, blocks);
+      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, blocks, user.id);
     }
 
     if (page.isSynced) {

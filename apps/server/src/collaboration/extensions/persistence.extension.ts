@@ -130,7 +130,7 @@ export class PersistenceExtension implements Extension {
         try {
           const existingContributors = page.contributorIds || [];
           const contributorSet = this.contributors.get(documentName);
-          contributorSet.add(page.creatorId);
+          contributorSet.add(page.creator_id);
           const newContributors = [...contributorSet];
           contributorIds = Array.from(
             new Set([...existingContributors, ...newContributors]),
