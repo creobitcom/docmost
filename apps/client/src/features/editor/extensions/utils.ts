@@ -11,3 +11,5 @@ export const userColors = [
 export function randomElement(array: Array<any>) {
   return array[Math.floor(Math.random() * array.length)];
 }
+
+export { clsx as cn } from 'clsx'

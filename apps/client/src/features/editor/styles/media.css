@@ -38,4 +38,9 @@
     line-height: var(--mantine-line-height-md);
   }
 }
+.tiptap-read-only-context [data-user-permission="read"] {
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: text;
+}
 

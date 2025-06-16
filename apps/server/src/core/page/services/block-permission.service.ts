@@ -59,22 +59,27 @@ async getAccessiblePageBlocks(pageId: string, userId: string) {
     .orderBy('b.position')
     .execute();
 
-  const result = blocks.map((block) => {
-    const hasAccess =
-      !!block.userPermission ||
-      !!block.publicPermission ||
-      block.creatorId === userId ||
-      block.permissionCount === 0;
+    const result = blocks.map((block) => {
+      const hasAccess =
+        !!block.userPermission ||
+        !!block.publicPermission ||
+        block.creatorId === userId ||
+        block.permissionCount === 0;
 
-    return {
-      id: block.id,
-      pageId: block.pageId,
-      blockType: block.blockType,
-      position: block.position,
-      userPermission: block.userPermission ?? block.publicPermission ?? (block.creatorId === userId ? 'owner' : null),
-      content: hasAccess ? block.content : null,
-    };
-  });
+      return {
+        id: block.id,
+        pageId: block.pageId,
+        blockType: block.blockType,
+        position: block.position,
+        hasAccess,
+        userPermission:
+          block.userPermission ??
+          block.publicPermission ??
+          (block.creatorId === userId ? 'owner' : null),
+        content: hasAccess ? block.content : null,
+      };
+    });
+
 
   return result;
 }

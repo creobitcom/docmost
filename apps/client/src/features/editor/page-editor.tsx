@@ -60,8 +60,7 @@ import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-
 import { useAccessibleBlocks } from '@/hooks/useAccessibleBlocks';
 import { useAllPageBlocks } from "@/hooks/useAllPageBlocks";
 import { PlaceholderBlock } from './extensions/PlaceholderBlock';
-import { readOnlyExtensions } from './extensions/extensionsMap'
-
+import { ReadOnlyBlockExtension } from './extensions/read-only-extension'
 
 interface PageEditorProps {
   pageId: string;
@@ -116,9 +115,6 @@ export default function PageEditor({
     console.log('accessibleBlocksError:', accessibleBlocksError);
     console.log('accessibleBlocks:', accessibleBlocks);
   }, [accessibleBlocks, isLoadingAccessibleBlocks, accessibleBlocksError]);
-
-  const { data } = useAllPageBlocks(pageId);
-  const allBlocks = data?.blocks ?? [];
 
 
 
@@ -215,8 +211,8 @@ export default function PageEditor({
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
       ...creobitExtentions,
-      ...readOnlyExtensions,
       PlaceholderBlock,
+      ReadOnlyBlockExtension,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
 
@@ -259,13 +255,13 @@ export default function PageEditor({
     if (!Array.isArray(accessibleBlocks)) return [];
 
     return accessibleBlocks.map((block) => {
-      if (block.content) {
+      if (block.hasAccess && block.content) {
         return {
           ...block.content,
           attrs: {
             ...block.content.attrs,
-            id: block.id,
-            userPermission: block.userPermission ?? null,
+            blockId: block.id,
+            userPermission: block.userPermission ?? 'none',
           },
         };
       }
@@ -273,7 +269,7 @@ export default function PageEditor({
       return {
         type: 'placeholder',
         attrs: {
-          id: block.id,
+          blockId: block.id,
           userPermission: 'none',
         },
       };
@@ -281,7 +277,7 @@ export default function PageEditor({
   }, [accessibleBlocks]);
 
 
-
+console.log("editorContent:",editorContent)
 
   const editor = useEditor(
     {

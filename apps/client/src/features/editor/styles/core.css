@@ -154,16 +154,15 @@
     pointer-events: none;
     user-select: none;
   }
-  .read-only-block {
-    background-color: #f0f0f0;
-    color: #999;
-    pointer-events: none; /* запретить взаимодействие мышью */
-    user-select: none; /* запретить выделение */
-    position: relative;
-  }
+
   .resize-cursor {
     cursor: ew-resize;
     cursor: col-resize;
+  }
+  .tiptap-read-only-context [data-user-permission="read"] {
+    opacity: 0.6;
+    pointer-events: none;
+    user-select: text;
   }
 
   .alignLeft {

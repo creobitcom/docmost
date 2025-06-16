@@ -41,3 +41,8 @@
   pointer-events: none;
   user-select: none;
 }
+.tiptap-read-only-context [data-user-permission="read"] {
+  opacity: 0.6;
+  pointer-events: none;
+  user-select: text;
+}
