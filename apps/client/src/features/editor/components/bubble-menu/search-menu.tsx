@@ -19,9 +19,11 @@ import { useWorkspaceMembersQuery } from "@/features/workspace/queries/workspace
 import { Editor } from "@tiptap/react";
 import { notifications } from "@mantine/notifications";
 import { assignPermissionToBlock } from "@/lib/api-client";
-import { getBlockPermissions, getPagePermissions } from "@/lib/api-client";
+import { getBlockPermissions, getPagePermissions, removeBlockPermission, updateBlockPermission } from "@/lib/api-client";
 import { Tooltip, ActionIcon } from '@mantine/core';
 import { IconLink } from '@tabler/icons-react';
+import { getPageInfo } from "@/lib/api-client";
+import axios from "axios";
 
 
 interface ItemProps extends React.ComponentPropsWithoutRef<"div"> {
@@ -65,15 +67,26 @@ interface PagePermission {
   avatarUrl?: string;
 }
 
-export function CopyBlockLinkButton({ pageId, blockId }: { pageId: string; blockId: string }) {
+export function CopyBlockLinkButton({
+  spaceSlug,
+  pageSlug,
+  pageTitle,
+  blockId,
+}: {
+  spaceSlug: string;
+  pageSlug: string;
+  pageTitle: string;
+  blockId: string;
+}) {
   const handleCopy = async () => {
-    const url = `${window.location.origin}/pages/${pageId}#block-${blockId}`;
+    const encodedTitle = encodeURIComponent(pageTitle ?? "");
+    const url = `${window.location.origin}/s/${spaceSlug}/p/${encodedTitle}-${pageSlug}#${blockId}`;
 
     try {
       await navigator.clipboard.writeText(url);
-      notifications.show({ message: 'Link copied to clipboard', color: 'green' });
+      notifications.show({ message: "Link copied to clipboard", color: "green" });
     } catch (err) {
-      notifications.show({ message: 'Failed to copy link', color: 'red' });
+      notifications.show({ message: "Failed to copy link", color: "red" });
     }
   };
 
@@ -92,6 +105,9 @@ export function CopyBlockLinkButton({ pageId, blockId }: { pageId: string; block
 }
 
 
+
+
+
 const permissionOptions = [
   { label: "Owner", value: "owner" },
   { label: "Edit", value: "edit" },
@@ -103,9 +119,28 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
   const [search, setSearch] = useState("");
   const [debounced] = useDebouncedValue(search, 300);
   const [blockPermissions, setBlockPermissions] = useState<BlockPermission[]>([]);
-  // Новое состояние для прав страницы:
+  const [spaceId, setSpaceId] = useState<string | null>(null);
   const [pagePermissions, setPagePermissions] = useState<PagePermission[] | null>(null);
   const [loadingPagePerms, setLoadingPagePerms] = useState(false);
+  const [pageSlug, setPageSlug] = useState<string | null>(null);
+  const [spaceSlug, setSpaceSlug] = useState<string | null>(null);
+  const [pageTitle, setPageTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPageInfo = async () => {
+      try {
+        const res = await getPageInfo(pageId);
+        setSpaceSlug(res.spaceSlug);
+        setPageSlug(res.pageSlug);
+        setPageTitle(res.pageTitle);
+      } catch (e) {
+        console.error("Failed to fetch page info:", e);
+      }
+    };
+
+    fetchPageInfo();
+  }, [pageId]);
+
   const [selectedPermissionsMap, setSelectedPermissionsMap] = useState<
     Record<string, "read" | "edit" | "owner">
   >({});
@@ -160,26 +195,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
     return foundNode?.attrs?.blockId;
   };
   const blockId = getBlockId();
-    // Новая функция для загрузки прав на страницу
-    const fetchPagePermissions = async () => {
-      setLoadingPagePerms(true);
-      try {
-        const perms = await getPagePermissions({ pageId });
-        setPagePermissions(
-          perms.map((item: any) => ({
-            userId: item.id,
-            name: item.name,
-            avatarUrl: item.avatarUrl,
-            permission: item.permission,
-          }))
-        );
-        notifications.show({ message: "Page permissions loaded", color: "green" });
-      } catch (e) {
-        notifications.show({ message: "Failed to load page permissions", color: "red" });
-      } finally {
-        setLoadingPagePerms(false);
-      }
-    };
+
   const handleSelectUserWithPermission = async (user: any) => {
     //const blockId = getBlockId();
 
@@ -233,27 +249,79 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
     }
   };
 
-  const handleChangePermission = (userId: string, permission: "read" | "edit" | "owner") => {
-    setSelectedPermissionsMap((prev) => ({
-      ...prev,
-      [userId]: permission,
-    }));
+  const handleChangePermission = async (
+    userId: string,
+    permission: "read" | "edit" | "owner"
+  ) => {
+    if (!blockId) return;
 
-    setBlockPermissions((prev) =>
-      prev.map((p) => (p.userId === userId ? { ...p, permission } : p))
-    );
+    const user = data?.items.find((u) => u.id === userId);
 
-    notifications.show({ message: `Permission changed to ${permission}`, color: "green" });
+    if (!user) {
+      notifications.show({
+        message: "User not found in workspace",
+        color: "red",
+      });
+      return;
+    }
+
+    try {
+      await updateBlockPermission({
+        userId,
+        pageId,
+        blockId,
+        permission,
+        role: user.role,
+      });
+
+      setSelectedPermissionsMap((prev) => ({
+        ...prev,
+        [userId]: permission,
+      }));
+
+      setBlockPermissions((prev) =>
+        prev.map((p) =>
+          p.userId === userId
+            ? { ...p, permission, role: user.role }
+            : p
+        )
+      );
+
+      notifications.show({
+        message: `Permission changed to ${permission}`,
+        color: "green",
+      });
+    } catch (e) {
+      notifications.show({
+        message: "Failed to update permission",
+        color: "red",
+      });
+    }
   };
 
-  const handleRemovePermission = (userId: string) => {
-    setBlockPermissions((prev) => prev.filter((p) => p.userId !== userId));
-    setSelectedPermissionsMap((prev) => {
-      const copy = { ...prev };
-      delete copy[userId];
-      return copy;
-    });
-    notifications.show({ message: "Access removed", color: "blue" });
+
+
+  const handleRemovePermission = async (userId: string) => {
+    if (!blockId) return;
+
+    try {
+      await removeBlockPermission({
+        pageId,
+        blockId,
+        userId,
+      });
+
+      setBlockPermissions((prev) => prev.filter((p) => p.userId !== userId));
+      setSelectedPermissionsMap((prev) => {
+        const copy = { ...prev };
+        delete copy[userId];
+        return copy;
+      });
+
+      notifications.show({ message: "Access removed", color: "blue" });
+    } catch (e) {
+      notifications.show({ message: "Failed to remove permission", color: "red" });
+    }
   };
 
   return (
@@ -420,7 +488,12 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
             onClick={onClose}>
             Close
           </Button>
-          <CopyBlockLinkButton pageId={pageId} blockId={blockId!} />
+          <CopyBlockLinkButton
+            spaceSlug={spaceSlug}
+            pageSlug={pageSlug}
+            pageTitle={pageTitle}
+            blockId={blockId}
+          />
         </Group>
     </Modal>
   );

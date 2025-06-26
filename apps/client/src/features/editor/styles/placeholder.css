@@ -31,16 +31,34 @@
   }
 }
 .placeholder-block {
-  background-color: #f8f8f8;
-  border-left: 4px solid #ccc;
-  color: #888;
   font-style: italic;
   padding: 0.75rem 1rem;
   margin: 0.5rem 0;
   border-radius: 0.25rem;
   pointer-events: none;
   user-select: none;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  border-left: 4px solid;
 }
+
+.read-only-hidden-paragraph {
+  display: none !important;
+}
+
+
+.placeholder-block--light {
+  background-color: #f8f8f8;
+  border-color: #ccc;
+  color: #888;
+}
+
+.placeholder-block.placeholder-block--dark {
+  background-color: #2a2a2a !important;
+  border-color: #555 !important;
+  color: #aaa !important;
+}
+
+
 .tiptap-read-only-context [data-user-permission="read"] {
   opacity: 0.6;
   pointer-events: none;

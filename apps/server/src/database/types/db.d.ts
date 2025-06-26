@@ -28,8 +28,7 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface Attachments {
-  createdAt: Generated<Timestamp>;
-  creator_id: string;
+  creatorId: string;
   deletedAt: Timestamp | null;
   fileExt: string;
   fileName: string;
@@ -187,6 +186,7 @@ export interface PageMembers {
   id: Generated<string>;
   pageId: string;
   role: string;
+  source: Generated<string | null>;
   updatedAt: Generated<Timestamp>;
   userId: string | null;
 }
@@ -222,6 +222,15 @@ export interface SpaceMembers {
   deletedAt: Timestamp | null;
   groupId: string | null;
   id: Generated<string>;
+  role: string;
+  spaceId: string;
+  updatedAt: Generated<Timestamp>;
+  userId: string | null;
+}
+
+export interface Spaces {
+  createdAt: Generated<Timestamp>;
+  creator_id: string | null;
   role: string;
   spaceId: string;
   updatedAt: Generated<Timestamp>;

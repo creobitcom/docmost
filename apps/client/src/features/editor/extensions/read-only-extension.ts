@@ -2,6 +2,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from 'prosemirror-state'
 import { NodeSelection } from 'prosemirror-state'
 import { BlockTypes } from '../editor.namespace'
+import { ReadOnlyPlaceholderPlugin } from './ReadOnlyPlaceholderPlugin'
 
 export const ReadOnlyBlockExtension = Extension.create({
   name: 'readOnlyBlock',
@@ -47,7 +48,6 @@ export const ReadOnlyBlockExtension = Extension.create({
           },
 
           handleDOMEvents: {
-            // блокируем драг
             dragstart: (view, event) => {
               const pos = view.posAtDOM(event.target as Node, 0)
               const $pos = view.state.doc.resolve(pos)
@@ -66,6 +66,7 @@ export const ReadOnlyBlockExtension = Extension.create({
           },
         },
       }),
+      ReadOnlyPlaceholderPlugin,
     ]
   },
 })

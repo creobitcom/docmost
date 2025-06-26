@@ -6,6 +6,12 @@ export const PlaceholderBlock = Node.create({
   group: 'block',
   atom: true,
 
+  addOptions() {
+    return {
+      themeMode: 'light', // default
+    };
+  },
+
   addAttributes() {
     return {
       id: { default: null },
@@ -18,13 +24,17 @@ export const PlaceholderBlock = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    const themeClass = this.options.themeMode === 'dark'
+      ? 'placeholder-block--dark'
+      : 'placeholder-block--light';
+
     return [
       'div',
       mergeAttributes(HTMLAttributes, {
         'data-placeholder-block': 'true',
-        class: 'placeholder-block',
+        class: `placeholder-block ${themeClass}`,
       }),
       '🔒 У вас нет доступа к этому блоку',
     ];
-  },
+  }
 });

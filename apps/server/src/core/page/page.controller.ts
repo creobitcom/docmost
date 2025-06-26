@@ -15,6 +15,7 @@ import {
   Put,
   Inject,
   Req,
+  Delete,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -148,30 +149,45 @@ export class PageController {
 
   @HttpCode(HttpStatus.OK)
   @Post('blockPermissions')
-  async assignPermissionToBlock(@Body()
-    dto: { pageId: string; blockId: string; userId: string; role?: string; permission?: string }) {
-    const { pageId, blockId, userId, role, permission } = dto;
+  async assignPermissionToBlock(@Body() dto: {
+    pageId: string;
+    blockId: string;
+    userId: string;
+    role?: string;
+    permission?: string;
+  }) {
+    const { pageId, blockId, userId, role = 'reader', permission = 'read' } = dto;
 
+    // check: does block exist on current page
     const block = await this.db
       .selectFrom('blocks')
       .select(['id'])
       .where('pageId', '=', pageId)
+      .where('id', '=', blockId)
       .executeTakeFirst();
 
     if (!block) {
       throw new NotFoundException('Block not found for given page and blockId');
     }
 
-    await this.blockPermissionService.saveBlockPermission({
+    // Cascade permission save
+    await this.blockPermissionService.updateBlockPermission({
       pageId,
       blockId,
       userId,
       role,
-      permission,
+      permission: permission as 'read' | 'edit' | 'owner',
     });
+
     return { success: true };
   }
 
+
+  @HttpCode(HttpStatus.OK)
+  @Delete('blockPermissions')
+  deleteBlockPermission(@Body() dto: { pageId: string; blockId: string; userId: string }) {
+    return this.blockPermissionService.deleteBlockPermission(dto);
+  }
 
   @HttpCode(HttpStatus.OK)
   @Post('/info')
@@ -206,6 +222,7 @@ export class PageController {
       role: userPageRole,
       permissions: pageAbility.rules,
     };
+    const blocks = await this.blockPermissionService.getAccessiblePageBlocks(page.id, user.id);
 
     const syncPage = await this.syncPageService.findByReferenceId(page.id);
 
@@ -224,7 +241,7 @@ export class PageController {
       page.icon = originPage.icon;
     }
 
-    return { ...page, membership };
+    return { ...page, blocks, membership };
   }
 
   @HttpCode(HttpStatus.OK)

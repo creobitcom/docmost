@@ -55,12 +55,11 @@ import { extractPageSlugId } from "@/lib";
 import { FIVE_MINUTES } from "@/lib/constants.ts";
 import { jwtDecode } from "jwt-decode";
 import { Loader } from "@mantine/core";
-import { updatePageBlocks, usePage } from "../../lib/api-client";
-import { extractTopLevelBlocks } from "../../../../server/src/core/page/extract-page-blocks";
 import { useAccessibleBlocks } from '@/hooks/useAccessibleBlocks';
-import { useAllPageBlocks } from "@/hooks/useAllPageBlocks";
 import { PlaceholderBlock } from './extensions/PlaceholderBlock';
 import { ReadOnlyBlockExtension } from './extensions/read-only-extension'
+import { useMantineTheme } from '@mantine/core';
+import { useMantineColorScheme } from '@mantine/core';
 
 interface PageEditorProps {
   pageId: string;
@@ -108,32 +107,12 @@ export default function PageEditor({
     isLoading: isLoadingAccessibleBlocks,
     error: accessibleBlocksError,
   } = useAccessibleBlocks(pageId, currentUser?.user.id ?? '');
-
-  useEffect(() => {
-    console.log('userId для useAccessibleBlocks:', currentUser?.user.id);
-    console.log('isLoadingAccessibleBlocks:', isLoadingAccessibleBlocks);
-    console.log('accessibleBlocksError:', accessibleBlocksError);
-    console.log('accessibleBlocks:', accessibleBlocks);
-  }, [accessibleBlocks, isLoadingAccessibleBlocks, accessibleBlocksError]);
-
-
-
-
-
-  const updatePageBlocksTable = (newContent: any) => {
-    const blocksToUpdate = extractTopLevelBlocks(newContent, pageId);
-    updatePageBlocks(pageId, blocksToUpdate)
-      .then(() => {
-        console.log("PageBlocks обновлены успешно");
-      })
-      .catch((error) => {
-        console.error("Ошибка при обновлении PageBlocks:", error);
-      });
-  };
+  const initialHash = React.useRef(window.location.hash);
+  const theme = useMantineTheme();
+  const { colorScheme } = useMantineColorScheme();
 
   const handleContentUpdate = (newContent: any) => {
     setContent(newContent);
-    updatePageBlocksTable(newContent);
   };
 
   const localProvider = useMemo(() => {
@@ -205,13 +184,14 @@ export default function PageEditor({
       localProvider.destroy();
     };
   }, [remoteProvider, localProvider]);
-
   const extensions = useMemo(() => {
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
       ...creobitExtentions,
-      PlaceholderBlock,
+      PlaceholderBlock.configure({
+        themeMode: colorScheme,
+      }),
       ReadOnlyBlockExtension,
     ];
   }, [ydoc, pageId, remoteProvider, currentUser?.user]);
@@ -219,22 +199,15 @@ export default function PageEditor({
   const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
     const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
 
-    if (
-      !newContent ||
-      JSON.stringify(newContent) === JSON.stringify({ type: "doc", content: [] })
-    ) {
-      return;
-    }
-
     if (pageData) {
       queryClient.setQueryData(["pages", slugId], {
         ...pageData,
         content: newContent,
+        updatedAt: new Date(),
       });
     }
-
-    handleContentUpdate(newContent);
   }, 3000);
+
   const sanitizedContent = (contentFromDb) => {
     if (
       !contentFromDb ||
@@ -282,7 +255,6 @@ console.log("editorContent:",editorContent)
   const editor = useEditor(
     {
       extensions,
-      content: sanitizedContent(editorContent),
       editable,
       immediatelyRender: true,
       shouldRerenderOnTransaction: true,
@@ -333,6 +305,75 @@ console.log("editorContent:",editorContent)
     },
     [pageId, editable, remoteProvider?.status]
   );
+
+  useEffect(() => {
+    if (editor && editorContent.length) {
+      editor.commands.setContent({
+        type: 'doc',
+        content: editorContent,
+      });
+    }
+  }, [editor, editorContent]);
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const blockId = initialHash.current?.replace('#', '');
+    if (!blockId) {
+      console.log('Нет blockId для фокуса');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      let pos: number | null = null;
+      let foundNode = null;
+
+      editor.state.doc.descendants((node, posInDoc) => {
+        if (node.attrs.blockId === blockId) {
+          pos = posInDoc;
+          foundNode = node;
+          return false;
+        }
+        return true;
+      });
+
+
+      if (pos !== null) {
+        editor.commands.setTextSelection(pos);
+        editor.commands.focus();
+
+        const domNode = editor.view.dom.querySelector(`[blockid="${blockId}"]`);
+
+        setTimeout(() => {
+          if (domNode) {
+            domNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 50);
+
+      } else {
+        console.warn(`Блок с blockId=${blockId} не найден в документе`);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [editor]);
+
+
+
+
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      const el = document.getElementById(hash.slice(1));
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   const handleActiveCommentEvent = (event) => {
     const { commentId } = event.detail;
@@ -417,15 +458,8 @@ console.log("editorContent:",editorContent)
 
     return () => clearTimeout(collabReadyTimeout);
   }, [isSynced, isCollabReady, remoteProvider?.status]);
-  console.log("userId для useAccessibleBlocks:", currentUser?.user.id);
+  //console.log("userId для useAccessibleBlocks:", currentUser?.user.id);
 
-  if (isLoadingAccessibleBlocks) {
-    return <p>Загрузка доступных блоков...</p>;
-  }
-
-  if (accessibleBlocksError) {
-    return <p>Ошибка загрузки блоков: {String(accessibleBlocksError)}</p>;
-  }
 
   return  isCollabReady ? (
     <div>
@@ -478,7 +512,7 @@ console.log("editorContent:",editorContent)
       editable={false}
       immediatelyRender={true}
       extensions={mainExtensions}
-      content={content}
+      content={sanitizedContent(editorContent)}
     ></EditorProvider>
   );
 }

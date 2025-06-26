@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { getAccessibleBlocks } from '@/lib/api-client';
 import axios from 'axios';
 
 export const useAccessibleBlocks = (pageId: string, userId: string) => {

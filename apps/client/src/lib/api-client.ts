@@ -100,15 +100,6 @@ export const assignPermissionToBlock = async ({
   });
 };
 
-export const updatePageBlocks = async (pageId: string, blocks: IPageBlock[]) => {
-  console.log('📤 Sending blocks:', blocks);
-  try {
-    const response = await axios.post(`/api/pages/blocks/${pageId}`, { blocks });
-    return response.data;
-  } catch (error) {
-    throw new Error('Ошибка при обновлении блоков страницы');
-  }
-};
 
 export async function getBlockPermissions({ pageId, blockId }: { pageId: string; blockId: string }) {
   const res = await fetch(`/api/pages/blockPermissions/${pageId}/${blockId}`);
@@ -118,32 +109,55 @@ export async function getBlockPermissions({ pageId, blockId }: { pageId: string;
   return json.data;
 }
 
-const fetchPage = async (pageId: string) => {
-  const { data } = await axios.get(`/api/pages/${pageId}`);
-  return data;
-};
-
-export const usePage = (pageId: string) => {
-  return useQuery({
-    queryKey: ['page', pageId],
-    queryFn: () => fetchPage(pageId),
-    enabled: !!pageId,
-  });
-};
-
 export async function getPagePermissions({ pageId }: { pageId: string }) {
   const response = await fetch(`/api/pages/${pageId}/blockPermissions`);
   if (!response.ok) throw new Error("Failed to fetch page permissions");
   return response.json();
 }
 
-export async function getAccessibleBlocks(pageId: string, userId: string) {
-  const res = await fetch(`/api/pages/${pageId}/blockPermissions?userId=${userId}`);
+export async function removeBlockPermission({ pageId, blockId, userId }: { pageId: string; blockId: string; userId: string }) {
+  return axios.delete('/api/pages/blockPermissions', {
+    data: { pageId, blockId, userId },
+  });
+}
 
-  if (!res.ok) {
-    throw new Error("Failed to fetch accessible blocks");
-  }
+export async function updateBlockPermission({
+  pageId,
+  blockId,
+  userId,
+  permission,
+  role,
+}: {
+  pageId: string;
+  blockId: string;
+  userId: string;
+  permission: 'read' | 'edit' | 'owner';
+  role: string;
+}) {
+  return axios.post('/api/pages/blockPermissions', {
+    pageId,
+    blockId,
+    userId,
+    permission,
+    role,
+  });
+}
 
-  const json = await res.json();
-  return json.data;
+export async function getPageInfo(pageId: string): Promise<{
+  pageId: string;
+  pageTitle: string;
+  pageSlug: string;
+  spaceSlug: string;
+}> {
+  const { data } = await api.post("/pages/info", {
+    pageId,
+    includeSpace: true,
+  });
+
+  return {
+    pageId: data.id,
+    pageTitle: data.title,
+    pageSlug: data.slugId,
+    spaceSlug: data.space?.slug,
+  };
 }

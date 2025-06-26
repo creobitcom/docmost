@@ -5,8 +5,14 @@ import {
   PageCaslSubject,
 } from "../permissions/permissions.type";
 import { usePageBreadcrumbsQuery } from "../queries/page-query";
+export interface IAccessibleBlock {
+  id: string;
+  userPermission: 'read' | 'edit' | 'owner' | 'none';
+  hasAccess: boolean;
+}
 
 export interface IPage {
+  blocks?: IAccessibleBlock[];
   id: string;
   slugId: string;
   title: string;
