@@ -18,31 +18,36 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { useWorkspaceMembersQuery } from "@/features/workspace/queries/workspace-query";
 import { Editor } from "@tiptap/react";
 import { notifications } from "@mantine/notifications";
-import { assignPermissionToBlock } from "@/lib/api-client";
-import { getBlockPermissions, getPagePermissions, removeBlockPermission, updateBlockPermission } from "@/lib/api-client";
-import { Tooltip, ActionIcon } from '@mantine/core';
-import { IconLink } from '@tabler/icons-react';
-import { getPageInfo } from "@/lib/api-client";
-import axios from "axios";
-
+import { Tooltip, ActionIcon } from "@mantine/core";
+import { IconLink } from "@tabler/icons-react";
+import { usePageQuery } from "@/features/page/queries/page-query";
+import {
+  assignPermissionToBlock,
+  getBlockPermissions,
+  getPagePermissions,
+  removeBlockPermission,
+  updateBlockPermission,
+} from "@/features/page/services/page-service";
 
 interface ItemProps extends React.ComponentPropsWithoutRef<"div"> {
   label: string;
   value: string;
 }
 
-const SelectItem = forwardRef<HTMLDivElement, ItemProps>(({ label, value, ...others }, ref) => (
-  <div
-    ref={ref}
-    {...others}
-    style={{
-      padding: 8,
-      color: value === "delete" ? "#fa5252" : undefined,
-    }}
-  >
-    <Text size="sm">{label}</Text>
-  </div>
-));
+const SelectItem = forwardRef<HTMLDivElement, ItemProps>(
+  ({ label, value, ...others }, ref) => (
+    <div
+      ref={ref}
+      {...others}
+      style={{
+        padding: 8,
+        color: value === "delete" ? "#fa5252" : undefined,
+      }}
+    >
+      <Text size="sm">{label}</Text>
+    </div>
+  ),
+);
 SelectItem.displayName = "SelectItem";
 
 interface SearchMenuProps {
@@ -84,7 +89,10 @@ export function CopyBlockLinkButton({
 
     try {
       await navigator.clipboard.writeText(url);
-      notifications.show({ message: "Link copied to clipboard", color: "green" });
+      notifications.show({
+        message: "Link copied to clipboard",
+        color: "green",
+      });
     } catch (err) {
       notifications.show({ message: "Failed to copy link", color: "red" });
     }
@@ -104,10 +112,6 @@ export function CopyBlockLinkButton({
   );
 }
 
-
-
-
-
 const permissionOptions = [
   { label: "Owner", value: "owner" },
   { label: "Edit", value: "edit" },
@@ -115,31 +119,36 @@ const permissionOptions = [
   { label: "Удалить доступ", value: "delete" },
 ];
 
-export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMenuProps) => {
+export const SearchMenu = ({
+  open,
+  onClose,
+  onSelect,
+  editor,
+  pageId,
+}: SearchMenuProps) => {
+  const { data: page, isLoading: isPageLoading } = usePageQuery({ pageId });
   const [search, setSearch] = useState("");
   const [debounced] = useDebouncedValue(search, 300);
-  const [blockPermissions, setBlockPermissions] = useState<BlockPermission[]>([]);
-  const [spaceId, setSpaceId] = useState<string | null>(null);
-  const [pagePermissions, setPagePermissions] = useState<PagePermission[] | null>(null);
+  const [blockPermissions, setBlockPermissions] = useState<BlockPermission[]>(
+    [],
+  );
+  const [pagePermissions, setPagePermissions] = useState<
+    PagePermission[] | null
+  >(null);
   const [loadingPagePerms, setLoadingPagePerms] = useState(false);
   const [pageSlug, setPageSlug] = useState<string | null>(null);
   const [spaceSlug, setSpaceSlug] = useState<string | null>(null);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchPageInfo = async () => {
-      try {
-        const res = await getPageInfo(pageId);
-        setSpaceSlug(res.spaceSlug);
-        setPageSlug(res.pageSlug);
-        setPageTitle(res.pageTitle);
-      } catch (e) {
-        console.error("Failed to fetch page info:", e);
-      }
-    };
+    if (!page && isPageLoading) {
+      return;
+    }
 
-    fetchPageInfo();
-  }, [pageId]);
+    setSpaceSlug(page?.space.slug);
+    setPageSlug(page.slugId);
+    setPageTitle(page.title);
+  }, [page, isPageLoading]);
 
   const [selectedPermissionsMap, setSelectedPermissionsMap] = useState<
     Record<string, "read" | "edit" | "owner">
@@ -157,17 +166,33 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
       if (!blockId) return;
 
       try {
-        const result = await getBlockPermissions({ pageId, blockId });
-          setBlockPermissions(
-            result.map((item) => ({
-              userId: item.id,
-              name: item.name,
-              avatarUrl: item.avatarUrl,
-              permission: item.permission,
-            }))
-          );
+        const blockPerms = await getBlockPermissions({ pageId, blockId });
+        setBlockPermissions(
+          blockPerms.map((item) => ({
+            userId: item.id,
+            name: item.name,
+            avatarUrl: item.avatarUrl,
+            permission: item.permission,
+          })),
+        );
+
+        setLoadingPagePerms(true);
+        const pagePerms = await getPagePermissions({ pageId });
+        setPagePermissions(
+          pagePerms.map((item) => ({
+            userId: item.id,
+            name: item.name,
+            avatarUrl: item.avatarUrl,
+            permission: item.permission,
+          })),
+        );
       } catch (err) {
-        notifications.show({ message: "Failed to load permissions", color: "red" });
+        notifications.show({
+          message: "Failed to load permissions",
+          color: "red",
+        });
+      } finally {
+        setLoadingPagePerms(false);
       }
     };
 
@@ -176,8 +201,10 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
     } else {
       setSearch("");
       setBlockPermissions([]);
+      setPagePermissions(null);
     }
   }, [open]);
+
   const getBlockId = () => {
     const { state } = editor;
     const { selection } = state;
@@ -231,10 +258,20 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
         const exists = prev.find((p) => p.userId === user.id);
         if (exists) {
           return prev.map((p) =>
-            p.userId === user.id ? { ...p, permission, name: user.name, avatarUrl: user.avatarUrl } : p
+            p.userId === user.id
+              ? { ...p, permission, name: user.name, avatarUrl: user.avatarUrl }
+              : p,
           );
         }
-        return [...prev, { userId: user.id, name: user.name, permission, avatarUrl: user.avatarUrl }];
+        return [
+          ...prev,
+          {
+            userId: user.id,
+            name: user.name,
+            permission,
+            avatarUrl: user.avatarUrl,
+          },
+        ];
       });
 
       setSelectedPermissionsMap((prev) => ({
@@ -251,7 +288,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
 
   const handleChangePermission = async (
     userId: string,
-    permission: "read" | "edit" | "owner"
+    permission: "read" | "edit" | "owner",
   ) => {
     if (!blockId) return;
 
@@ -281,10 +318,8 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
 
       setBlockPermissions((prev) =>
         prev.map((p) =>
-          p.userId === userId
-            ? { ...p, permission, role: user.role }
-            : p
-        )
+          p.userId === userId ? { ...p, permission, role: user.role } : p,
+        ),
       );
 
       notifications.show({
@@ -298,8 +333,6 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
       });
     }
   };
-
-
 
   const handleRemovePermission = async (userId: string) => {
     if (!blockId) return;
@@ -320,7 +353,10 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
 
       notifications.show({ message: "Access removed", color: "blue" });
     } catch (e) {
-      notifications.show({ message: "Failed to remove permission", color: "red" });
+      notifications.show({
+        message: "Failed to remove permission",
+        color: "red",
+      });
     }
   };
 
@@ -389,7 +425,11 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
                     onChange={(value) => {
                       if (value === "delete") {
                         handleRemovePermission(user.userId);
-                      } else if (value === "read" || value === "edit" || value === "owner") {
+                      } else if (
+                        value === "read" ||
+                        value === "edit" ||
+                        value === "owner"
+                      ) {
                         handleChangePermission(user.userId, value);
                       }
                     }}
@@ -399,7 +439,8 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
                       <div
                         style={{
                           padding: 8,
-                          color: option.value === "delete" ? "#fa5252" : undefined,
+                          color:
+                            option.value === "delete" ? "#fa5252" : undefined,
                         }}
                       >
                         {option.label}
@@ -438,9 +479,17 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
               <Group
                 key={user.id}
                 p="xs"
-                style={{ cursor: "pointer", borderRadius: 8, justifyContent: "space-between" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f1f3f5")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                style={{
+                  cursor: "pointer",
+                  borderRadius: 8,
+                  justifyContent: "space-between",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "#f1f3f5")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
               >
                 {/* user card */}
                 <Group
@@ -461,7 +510,11 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
                       if (blockPermissions.find((p) => p.userId === user.id)) {
                         handleRemovePermission(user.id);
                       }
-                    } else if (value === "read" || value === "edit" || value === "owner") {
+                    } else if (
+                      value === "read" ||
+                      value === "edit" ||
+                      value === "owner"
+                    ) {
                       setSelectedPermissionsMap((prev) => ({
                         ...prev,
                         [user.id]: value,
@@ -481,20 +534,17 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
           })}
         </ScrollArea.Autosize>
       )}
-        <Group grow mt="md">
-          <Button
-            variant="default"
-            style={{ flex: 1 }}
-            onClick={onClose}>
-            Close
-          </Button>
-          <CopyBlockLinkButton
-            spaceSlug={spaceSlug}
-            pageSlug={pageSlug}
-            pageTitle={pageTitle}
-            blockId={blockId}
-          />
-        </Group>
+      <Group grow mt="md">
+        <Button variant="default" style={{ flex: 1 }} onClick={onClose}>
+          Close
+        </Button>
+        <CopyBlockLinkButton
+          spaceSlug={spaceSlug}
+          pageSlug={pageSlug}
+          pageTitle={pageTitle}
+          blockId={blockId}
+        />
+      </Group>
     </Modal>
   );
 };

@@ -25,8 +25,6 @@ export async function getPageById(
   pageInput: Partial<IPageInput>,
 ): Promise<IPage & { originPageId?: string; isSyncedPage?: boolean }> {
   const req = await api.post<IPage>("/pages/info", pageInput);
-  console.log("[req.data]");
-  console.log(req.data);
   return req.data;
 }
 
@@ -180,6 +178,83 @@ export async function copyPage(
     originPageId,
     spaceId,
     parentPageId,
+  });
+  return req.data;
+}
+
+export async function assignPermissionToBlock({
+  pageId,
+  blockId,
+  userId,
+  role,
+  permission,
+}: {
+  pageId: string;
+  blockId: string;
+  userId: string;
+  role: string;
+  permission?: string;
+}) {
+  const req = await api.post("/pages/block-permissions", {
+    pageId,
+    blockId,
+    userId,
+    role,
+    permission,
+  });
+  return req.data;
+}
+
+export async function getBlockPermissions({
+  pageId,
+  blockId,
+}: {
+  pageId: string;
+  blockId: string;
+}) {
+  const req = await api.get(`/pages/block-permissions/${pageId}/${blockId}`);
+  return req.data;
+}
+
+export async function getPagePermissions({ pageId }: { pageId: string }) {
+  const req = await api.get(`/pages/${pageId}/block-permissions`);
+  return req.data;
+}
+
+export async function removeBlockPermission({
+  pageId,
+  blockId,
+  userId,
+}: {
+  pageId: string;
+  blockId: string;
+  userId: string;
+}) {
+  const req = await api.delete("/pages/block-permissions", {
+    data: { pageId, blockId, userId },
+  });
+  return req.data;
+}
+
+export async function updateBlockPermission({
+  pageId,
+  blockId,
+  userId,
+  permission,
+  role,
+}: {
+  pageId: string;
+  blockId: string;
+  userId: string;
+  permission: "read" | "edit" | "owner";
+  role: string;
+}) {
+  const req = await api.post("/pages/block-permissions", {
+    pageId,
+    blockId,
+    userId,
+    permission,
+    role,
   });
   return req.data;
 }

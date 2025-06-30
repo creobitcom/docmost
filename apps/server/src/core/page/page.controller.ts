@@ -83,113 +83,6 @@ export class PageController {
   ) {}
 
   @HttpCode(HttpStatus.OK)
-  @Post('blocks/:pageId')
-  async updateBlocksForPage(
-    @Param('pageId') pageId: string,
-    @Body() dto: UpdatePageBlocksDto,
-    @Req() req: Request,
-  ) {
-    const userId = req.user.id;
-    await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks, userId);
-    return { success: true };
-  }
-
-  @HttpCode(HttpStatus.OK)
-  @Get(':pageId/blockPermissions')
-  async getAccessibleBlocks(
-    @Param('pageId') pageId: string,
-    @Query('userId') userId: string,
-  ) {
-    if (!userId) {
-      console.warn('[BlockPermissions] userId is missing in query!');
-      throw new BadRequestException('userId is required');
-    }
-
-    return this.blockPermissionService.getAccessiblePageBlocks(pageId, userId);
-  }
-
-  @Get(':id/blocks')
-  async getAllPageBlocks(@Param('id') pageId: string, @Req() req: Request) {
-    const userId = req.user.id;
-    const result = await this.pageService.getAllBlocksOfPage(pageId, userId);
-    return { data: result, success: true };
-  }
-
-  @HttpCode(HttpStatus.OK)
-  @Get('blockPermissions/:pageId/:blockId')
-  async getBlockPermissions(
-    @Param('pageId') pageId: string,
-    @Param('blockId') blockId: string,
-  ) {
-    const permissions = await this.db
-      .selectFrom('blockPermissions')
-      .innerJoin('users', 'users.id', 'blockPermissions.userId')
-      .select((eb) => [
-        'users.id',
-        'users.name',
-        eb.ref('users.avatarUrl').as('avatarUrl'),
-        'blockPermissions.permission',
-      ])
-      .where('blockPermissions.pageId', '=', pageId)
-      .where('blockPermissions.blockId', '=', blockId)
-      .execute();
-
-    return permissions;
-  }
-
-  @HttpCode(HttpStatus.OK)
-  @Post('blockPermissions')
-  async assignPermissionToBlock(
-    @Body()
-    dto: {
-      pageId: string;
-      blockId: string;
-      userId: string;
-      role?: string;
-      permission?: string;
-    },
-  ) {
-    const {
-      pageId,
-      blockId,
-      userId,
-      role = 'reader',
-      permission = 'read',
-    } = dto;
-
-    // check: does block exist on current page
-    const block = await this.db
-      .selectFrom('blocks')
-      .select(['id'])
-      .where('pageId', '=', pageId)
-      .where('id', '=', blockId)
-      .executeTakeFirst();
-
-    if (!block) {
-      throw new NotFoundException('Block not found for given page and blockId');
-    }
-
-    // Cascade permission save
-    await this.blockPermissionService.updateBlockPermission({
-      pageId,
-      blockId,
-      userId,
-      role,
-      permission: permission as 'read' | 'edit' | 'owner',
-    });
-
-    return { success: true };
-  }
-
-  @HttpCode(HttpStatus.OK)
-  @Delete('blockPermissions')
-  deleteBlockPermission(
-    @Body() dto: { pageId: string; blockId: string; userId: string },
-  ) {
-    return this.blockPermissionService.deleteBlockPermission(dto);
-  }
-
-  @HttpCode(HttpStatus.OK)
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {
     const page = await this.pageRepo.findById(dto.pageId, {
@@ -765,5 +658,108 @@ export class PageController {
     }
 
     return this.pageService.copyPage(copyPageDto, user.id, workspace.id);
+  }
+
+  // @HttpCode(HttpStatus.OK)
+  // @Post('blocks/:pageId')
+  // async updateBlocksForPage(
+  //   @Param('pageId') pageId: string,
+  //   @Body() dto: UpdatePageBlocksDto,
+  //   @Req() req: Request,
+  // ) {
+  //   const userId = req.user.id;
+  //   await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks, userId);
+  //   return { success: true };
+  // }
+
+  @HttpCode(HttpStatus.OK)
+  @Get(':pageId/block-permissions')
+  async getAccessibleBlocks(
+    @Param('pageId') pageId: string,
+    @AuthUser() user: User,
+  ) {
+    return this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get(':id/blocks')
+  async getAllPageBlocks(@Param('id') pageId: string, @Req() req: Request) {
+    const userId = req.user.id;
+    const result = await this.pageService.getAllBlocksOfPage(pageId, userId);
+    return { data: result, success: true };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get('block-permissions/:pageId/:blockId')
+  async getBlockPermissions(
+    @Param('pageId') pageId: string,
+    @Param('blockId') blockId: string,
+  ) {
+    const permissions = await this.db
+      .selectFrom('blockPermissions')
+      .innerJoin('users', 'users.id', 'blockPermissions.userId')
+      .select((eb) => [
+        'users.id',
+        'users.name',
+        eb.ref('users.avatarUrl').as('avatarUrl'),
+        'blockPermissions.permission',
+      ])
+      .where('blockPermissions.pageId', '=', pageId)
+      .where('blockPermissions.blockId', '=', blockId)
+      .execute();
+
+    return permissions;
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('block-permissions')
+  async assignPermissionToBlock(
+    @Body()
+    dto: {
+      pageId: string;
+      blockId: string;
+      userId: string;
+      role?: string;
+      permission?: string;
+    },
+  ) {
+    const {
+      pageId,
+      blockId,
+      userId,
+      role = 'reader',
+      permission = 'read',
+    } = dto;
+
+    // check: does block exist on current page
+    const block = await this.db
+      .selectFrom('blocks')
+      .select(['id'])
+      .where('pageId', '=', pageId)
+      .where('id', '=', blockId)
+      .executeTakeFirst();
+
+    if (!block) {
+      throw new NotFoundException('Block not found for given page and blockId');
+    }
+
+    // Cascade permission save
+    await this.blockPermissionService.updateBlockPermission({
+      pageId,
+      blockId,
+      userId,
+      role,
+      permission: permission as 'read' | 'edit' | 'owner',
+    });
+
+    return { success: true };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Delete('block-permissions')
+  deleteBlockPermission(
+    @Body() dto: { pageId: string; blockId: string; userId: string },
+  ) {
+    return this.blockPermissionService.deleteBlockPermission(dto);
   }
 }
