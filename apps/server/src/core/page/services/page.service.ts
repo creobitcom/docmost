@@ -94,7 +94,7 @@ export class PageService {
           icon: createPageDto.icon,
           parentPageId: parentPageId,
           spaceId: createPageDto.spaceId,
-          creator_id: userId,
+          creatorId: userId,
           workspaceId: workspaceId,
           lastUpdatedById: userId,
         },
@@ -216,7 +216,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .orderBy('position', 'asc')
@@ -245,7 +245,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
@@ -279,7 +279,6 @@ export class PageService {
           spaceId,
           parentPageId: parentPageId ?? null,
           position: nextPosition,
-          content: rootPage.content,
         },
         rootPage.id,
         trx,
@@ -621,7 +620,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
@@ -740,7 +739,7 @@ export class PageService {
           icon: originPage.icon,
           parentPageId,
           spaceId,
-          creator_id: userId,
+          creatorId: userId,
           workspaceId,
           lastUpdatedById: userId,
         },
