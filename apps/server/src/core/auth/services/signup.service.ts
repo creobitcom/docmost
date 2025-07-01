@@ -76,7 +76,7 @@ export class SignupService {
           {
             name: `${user.name}'s Space`,
             workspaceId,
-            creator_id: user.id,
+            creatorId: user.id,
             visibility: SpaceVisibility.PERSONAL,
             slug: `${user.id}-space`,
           },
@@ -136,7 +136,7 @@ export class SignupService {
           {
             name: `${user.name}'s Space`,
             workspaceId: workspace.id,
-            creator_id: user.id,
+            creatorId: user.id,
             slug: `${user.id}-space`,
             visibility: SpaceVisibility.PERSONAL,
           },

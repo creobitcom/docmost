@@ -115,10 +115,6 @@ export class PageController {
       role: userPageRole,
       permissions: pageAbility.rules,
     };
-    const blocks = await this.blockPermissionService.getAccessiblePageBlocks(
-      page.id,
-      user.id,
-    );
 
     if (page.isSynced) {
       const syncPage = await this.syncPageService.findByReferenceId(page.id);
@@ -134,7 +130,7 @@ export class PageController {
       return { ...page, membership, originPageId: originPage.id };
     }
 
-    return { ...page, blocks, membership };
+    return { ...page, membership };
   }
 
   @HttpCode(HttpStatus.OK)

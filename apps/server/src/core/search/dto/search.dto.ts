@@ -16,7 +16,7 @@ export class SearchDTO {
 
   @IsOptional()
   @IsString()
-  creator_id?: string;
+  creatorId?: string;
 
   @IsOptional()
   @IsNumber()

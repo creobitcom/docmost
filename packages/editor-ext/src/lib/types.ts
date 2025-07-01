@@ -7,7 +7,7 @@ export interface IAttachment {
   fileExt: string;
   mimeType: string;
   type: string;
-  creator_id: string;
+  creatorId: string;
   pageId: string | null;
   spaceId: string | null;
   workspaceId: string;

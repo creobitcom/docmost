@@ -26,7 +26,7 @@ import { UserTokenRepo } from './repos/user-token/user-token.repo';
 import { BacklinkRepo } from '@docmost/db/repos/backlink/backlink.repo';
 import { PageMemberRepo } from './repos/page/page-member.repo';
 import { SynchronizedPageRepo } from './repos/page/synchronized_page.repo';
-import { BlockPermissionRepo } from './repos/page/block-member.repo';
+import { BlockPermissionRepo } from './repos/block/block-permission.repo';
 import { BlockAbilityFactory } from '../core/casl/abilities/block-ability.factory';
 import { KyselyProvider } from './kysely.provider';
 import { Kysely } from 'kysely';

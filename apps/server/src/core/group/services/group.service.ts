@@ -51,7 +51,7 @@ export class GroupService {
       name: createGroupDto.name,
       description: createGroupDto.description,
       isDefault: false,
-      creator_id: authUser.id,
+      creatorId: authUser.id,
       workspaceId: workspaceId,
     };
 
@@ -76,7 +76,7 @@ export class GroupService {
     const insertableGroup: InsertableGroup = {
       name: DefaultGroup.EVERYONE,
       isDefault: true,
-      creator_id: userId ?? null,
+      creatorId: userId ?? null,
       workspaceId: workspaceId,
     };
     return await this.groupRepo.insertGroup(insertableGroup, trx);

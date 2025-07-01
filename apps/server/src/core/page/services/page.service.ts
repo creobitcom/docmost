@@ -557,6 +557,7 @@ export class PageService {
       await this.pageRepo.deletePage(pageId, trx);
     });
   }
+
   async updatePage(id: string, dto: UpdatePageDto, userId: string) {
     await this.db
       .updateTable('pages')
@@ -570,7 +571,7 @@ export class PageService {
   async getAllBlocksOfPage(pageId: string, userId: string) {
     const allBlocks = await this.db
       .selectFrom('blocks')
-      .select(['id', 'pageId', 'blockType', 'position', 'content']) // <= строки
+      .select(['id', 'pageId', 'blockType', 'position', 'content'])
       .where('pageId', '=', pageId)
       .orderBy('position', 'asc')
       .execute();

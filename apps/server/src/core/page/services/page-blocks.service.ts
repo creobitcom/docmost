@@ -17,7 +17,7 @@ export class PageBlocksService {
     await this.db.transaction().execute(async (trx) => {
       const page = await trx
         .selectFrom('pages')
-        .select(['creator_id'])
+        .select(['creatorId'])
         .where('id', '=', pageId)
         .executeTakeFirst();
 
@@ -25,7 +25,7 @@ export class PageBlocksService {
         throw new Error(`Page with id ${pageId} not found`);
       }
 
-      const createdByUserId = page.creator_id;
+      const createdByUserId = page.creatorId;
 
       await trx.deleteFrom('blocks').where('pageId', '=', pageId).execute();
 
@@ -58,9 +58,7 @@ export class PageBlocksService {
               userId: createdByUserId,
               permission: 'owner',
             })
-            .onConflict((oc) =>
-              oc.columns(['blockId', 'userId']).doNothing()
-            )
+            .onConflict((oc) => oc.columns(['blockId', 'userId']).doNothing())
             .execute();
         }
       }

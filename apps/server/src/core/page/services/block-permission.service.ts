@@ -1,12 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SaveBlockPermissionDto } from '../dto/save-block-permission.dto';
-import { KyselyDB } from '@docmost/db/types/kysely.types';
-import { InjectKysely } from 'nestjs-kysely';
-import { sql } from 'kysely';
+import { BlockPermissionRepo } from '@docmost/db/repos/block/block-permission.repo';
 
 @Injectable()
 export class BlockPermissionService {
-  constructor(@InjectKysely() private readonly db: KyselyDB) {}
+  constructor(private readonly blockPermissionRepo: BlockPermissionRepo) {}
 
   async updateBlockPermission({
     userId,
@@ -31,143 +29,72 @@ export class BlockPermissionService {
   }
 
   async saveBlockPermission(dto: SaveBlockPermissionDto) {
-    return this.db
-      .insertInto('blockPermissions')
-      .values({
-        pageId: dto.pageId,
-        blockId: dto.blockId,
-        userId: dto.userId,
-        role: dto.role,
-        permission: dto.permission,
-      })
-      .onConflict((oc) =>
-        oc.columns(['blockId', 'userId']).doUpdateSet({
-          role: (eb) => eb.ref('excluded.role'),
-          permission: (eb) => eb.ref('excluded.permission'),
-        })
-      )
-      .execute();
+    return this.blockPermissionRepo.saveBlockPermission(dto);
   }
 
   async saveBlockPermissionWithCascade(dto: SaveBlockPermissionDto) {
-    // 1. Saving block permission
-    await this.saveBlockPermission(dto);
+    await this.blockPermissionRepo.saveBlockPermission(dto);
 
-    // 2. Checking — page permission
-    const existingPageMember = await this.db
-      .selectFrom('pageMembers')
-      .select('id')
-      .where('userId', '=', dto.userId)
-      .where('pageId', '=', dto.pageId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
+    const existingPageMember = await this.blockPermissionRepo.findPageMember(
+      dto.userId,
+      dto.pageId,
+    );
 
     if (!existingPageMember) {
-      await this.db.insertInto('pageMembers').values({
-        pageId: dto.pageId,
-        userId: dto.userId,
-        role: 'reader', // min access
-        source: 'block',
-      }).execute();
+      await this.blockPermissionRepo.createPageMember(
+        dto.pageId,
+        dto.userId,
+        'reader',
+        'block',
+      );
     }
 
-    // 3. Getting space Id for page
-    const page = await this.db
-      .selectFrom('pages')
-      .select(['spaceId'])
-      .where('id', '=', dto.pageId)
-      .executeTakeFirstOrThrow();
+    const page = await this.blockPermissionRepo.findPageById(dto.pageId);
 
-    // 4. Checking — space access
-    const existingSpaceMember = await this.db
-      .selectFrom('spaceMembers')
-      .select('id')
-      .where('userId', '=', dto.userId)
-      .where('spaceId', '=', page.spaceId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
+    const existingSpaceMember = await this.blockPermissionRepo.findSpaceMember(
+      dto.userId,
+      page.spaceId,
+    );
 
     if (!existingSpaceMember) {
-      await this.db.insertInto('spaceMembers').values({
-        spaceId: page.spaceId,
-        userId: dto.userId,
-        role: 'reader', // min access
-      }).execute();
+      await this.blockPermissionRepo.createSpaceMember(
+        page.spaceId,
+        dto.userId,
+        'reader',
+      );
     }
   }
 
   async deleteBlockPermission(dto: { blockId: string; userId: string }) {
-    const result = await this.db
-      .deleteFrom('blockPermissions')
-      .where('blockId', '=', dto.blockId)
-      .where('userId', '=', dto.userId)
-      .executeTakeFirst();
-
-    return {
-      success: true,
-      deletedRows: Number(result.numDeletedRows),
-    };
+    return this.blockPermissionRepo.deleteBlockPermission(dto);
   }
 
   async getAccessiblePageBlocks(pageId: string, userId: string) {
     const hasPageAccess = await this.userHasDirectPageAccess(userId, pageId);
 
-    const blocks = await this.db
-      .selectFrom('blocks as b')
-      .leftJoin('blockPermissions as bp', (join) =>
-        join.onRef('b.id', '=', 'bp.blockId').on('bp.userId', '=', sql.lit(userId))
-      )
-      .leftJoin('blockPermissions as bp_public', (join) =>
-        join.onRef('b.id', '=', 'bp_public.blockId').on('bp_public.permission', '=', sql.lit('public'))
-      )
-      .innerJoin('pages as p', 'p.id', 'b.pageId')
-      .select([
-        'b.id',
-        'b.pageId',
-        'b.blockType',
-        'b.content',
-        'b.position',
-        'p.creator_id as creatorId',
-        'bp.permission as userPermission',
-        'bp_public.permission as publicPermission',
-        (eb) =>
-          eb
-            .selectFrom('blockPermissions')
-            .select(eb.fn.countAll().as('count'))
-            .whereRef('blockPermissions.blockId', '=', 'b.id')
-            .as('permissionCount'),
-      ])
-      .where('b.pageId', '=', pageId)
-      .orderBy('b.position')
-      .execute();
+    const blocks = await this.blockPermissionRepo.findAccessiblePageBlocks(
+      pageId,
+      userId,
+    );
 
-      const pageMember = await this.db
-      .selectFrom('pageMembers')
-      .select(['id', 'source'])
-      .where('userId', '=', userId)
-      .where('pageId', '=', pageId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
+    const pageMember = await this.blockPermissionRepo.findPageMember(
+      userId,
+      pageId,
+    );
 
     const hasDirectPageAccess = pageMember?.source === 'manual';
 
-
-    console.log(`[AccessCalc] hasPageAccess = ${hasPageAccess}`);
     return blocks.map((block) => {
       const userIsCreator = block.creatorId === userId;
 
-      const hasBlockAccess =
-        !!block.userPermission || userIsCreator;
+      const hasBlockAccess = !!block.userPermission || userIsCreator;
 
       const isPublic = !!block.publicPermission;
       const isUnrestricted = block.permissionCount === 0;
 
       const hasAccess = hasDirectPageAccess
-          ? hasBlockAccess || isPublic || isUnrestricted
-          : hasBlockAccess;
-
-
-      console.log(`[AccessCalc] Block ${block.id}: hasBlockAccess=${hasBlockAccess}, isPublic=${isPublic}, isUnrestricted=${isUnrestricted}, finalHasAccess=${hasAccess}`);
+        ? hasBlockAccess || isPublic || isUnrestricted
+        : hasBlockAccess;
 
       return {
         id: block.id,
@@ -177,24 +104,27 @@ export class BlockPermissionService {
         hasAccess,
         userPermission:
           block.userPermission ??
-          (hasPageAccess && (block.publicPermission ?? (userIsCreator ? 'owner' : null))),
+          (hasPageAccess &&
+            (block.publicPermission ?? (userIsCreator ? 'owner' : null))),
         content: hasAccess ? block.content : null,
       };
     });
   }
 
-  async userHasDirectPageAccess(userId: string, pageId: string): Promise<boolean> {
-    const result = await this.db
-      .selectFrom('pageMembers')
-      .select('id')
-      .where('userId', '=', userId)
-      .where('pageId', '=', pageId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
+  async userHasDirectPageAccess(
+    userId: string,
+    pageId: string,
+  ): Promise<boolean> {
+    const result = await this.blockPermissionRepo.findPageMember(
+      userId,
+      pageId,
+    );
 
     const hasAccess = !!result;
-    console.log(`[AccessCheck] PageMember exists for user ${userId} on page ${pageId}:`, hasAccess);
+    Logger.debug(
+      `PageMember exists for user ${userId} on page ${pageId}: ${hasAccess}`,
+      'BlockPermissionService',
+    );
     return hasAccess;
   }
-
 }

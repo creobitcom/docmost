@@ -27,8 +27,6 @@ export default function Page({ isMyPages = false }: PageParams) {
     isError,
     error,
   } = usePageQuery({ pageId: extractPageSlugId(pageSlug) });
-  console.log("[page]");
-  console.log(page);
   const { data: space } = useGetSpaceBySlugQuery(page?.space?.slug);
 
   const pageAbility = usePageAbility(page?.membership?.permissions);

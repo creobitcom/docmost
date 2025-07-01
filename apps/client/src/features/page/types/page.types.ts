@@ -7,7 +7,7 @@ import {
 import { usePageBreadcrumbsQuery } from "../queries/page-query";
 export interface IAccessibleBlock {
   id: string;
-  userPermission: 'read' | 'edit' | 'owner' | 'none';
+  userPermission: "read" | "edit" | "owner" | "none";
   hasAccess: boolean;
 }
 
@@ -16,19 +16,11 @@ export interface IPage {
   id: string;
   slugId: string;
   title: string;
-  // content: Array<{
-  //   attrs?: {
-  //     textAlign?: string;
-  //     blockId?: string;
-  //     [key: string]: any;
-  //   };
-  //   [key: string]: any;
-  // }>;
   content: string;
   icon: string;
   coverPhoto: string;
   parentPageId: string;
-  creator_id: string;
+  creatorId: string;
   spaceId: string;
   workspaceId: string;
   isLocked: boolean;
@@ -44,11 +36,6 @@ export interface IPage {
   membership?: IMembership;
   isSynced?: boolean;
   color?: string;
-  // blocks: {
-  //   blockIds: string[];
-  //   deletedBlocksId: string[];
-  //   updatedBlocksId: string[];
-  // };
 }
 
 interface IMembership {

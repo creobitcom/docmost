@@ -1,18 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { BlockPermissionRepo } from '../../../database/repos/page/block-member.repo';
-import { BlockAbility, BlockAbilityAction, UserBlockRole } from '../../../core/casl/interfaces/block-ability.type';
+import { BlockPermissionRepo } from '@docmost/db/repos/block/block-permission.repo';
+import {
+  BlockAbility,
+  BlockAbilityAction,
+  UserBlockRole,
+} from '../../../core/casl/interfaces/block-ability.type';
 
 @Injectable()
 export class BlockAbilityFactory {
-  constructor(
-    private readonly blockPermissionRepo: BlockPermissionRepo,
-  ) {}
+  constructor(private readonly blockPermissionRepo: BlockPermissionRepo) {}
 
-  /**
-   * Получить права пользователя для блока
-   */
   async createForBlock(userId: string, blockId: string): Promise<BlockAbility> {
-    const roles = await this.blockPermissionRepo.getUserBlockRoles(userId, blockId);
+    const roles = await this.blockPermissionRepo.getUserBlockRoles(
+      userId,
+      blockId,
+    );
 
     if (!roles) {
       return { blockId, actions: [] };
