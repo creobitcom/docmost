@@ -1,3 +1,4 @@
+import { PageMember } from '@docmost/db/types/entity.types';
 import { KyselyDB } from '@docmost/db/types/kysely.types';
 import { Injectable } from '@nestjs/common';
 import { InjectKysely } from 'nestjs-kysely';
@@ -11,19 +12,15 @@ export class BlockPermissionRepo {
   async getUserBlockRoles(
     userId: string,
     blockId: string,
-  ): Promise<UserBlockRole[] | undefined> {
-    const rows = await this.db
+  ): Promise<string | null> {
+    const result = await this.db
       .selectFrom('blockPermissions')
       .select(['role'])
       .where('userId', '=', userId)
       .where('blockId', '=', blockId)
-      .execute();
+      .executeTakeFirst();
 
-    if (rows.length === 0) {
-      return undefined;
-    }
-
-    return rows.map((r) => r.role as UserBlockRole);
+    return result?.role || null;
   }
 
   async insertPermission(permission: {
@@ -95,10 +92,13 @@ export class BlockPermissionRepo {
     };
   }
 
-  async findPageMember(userId: string, pageId: string) {
+  async findPageMember(
+    userId: string,
+    pageId: string,
+  ): Promise<PageMember | null> {
     return this.db
       .selectFrom('pageMembers')
-      .select(['id', 'source'])
+      .selectAll()
       .where('userId', '=', userId)
       .where('pageId', '=', pageId)
       .where('deletedAt', 'is', null)

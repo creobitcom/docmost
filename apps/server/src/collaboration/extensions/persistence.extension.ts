@@ -23,9 +23,14 @@ import {
 } from '../../common/helpers/prosemirror/utils';
 import { isDeepStrictEqual } from 'node:util';
 import { IPageBacklinkJob } from '../../integrations/queue/constants/queue.interface';
-import { Page } from '@docmost/db/types/entity.types';
+import { Block, Page, PageContent } from '@docmost/db/types/entity.types';
 import { PageService } from 'src/core/page/services/page.service';
 import { BlockPermissionService } from 'src/core/page/services/block-permission.service';
+import { BlockAbilityFactory } from 'src/core/casl/abilities/block-ability.factory';
+import {
+  BlockCaslAction,
+  BlockCaslSubject,
+} from 'src/core/casl/interfaces/block-ability.type';
 
 @Injectable()
 export class PersistenceExtension implements Extension {
@@ -36,6 +41,7 @@ export class PersistenceExtension implements Extension {
     private readonly pageService: PageService,
     private readonly pageRepo: PageRepo,
     private readonly blockPermissionService: BlockPermissionService,
+    private readonly blockAbility: BlockAbilityFactory,
     @InjectKysely() private readonly db: KyselyDB,
     private eventEmitter: EventEmitter2,
     @InjectQueue(QueueName.GENERAL_QUEUE) private generalQueue: Queue,
@@ -67,10 +73,8 @@ export class PersistenceExtension implements Extension {
     }
 
     const accessibleBlocks =
-      await this.blockPermissionService.getAccessiblePageBlocks(
-        userId,
-        page.id,
-      );
+      await this.blockPermissionService.getAccessiblePageBlocks(pageId, userId);
+
     this.logger.debug('allowed blocks to user', accessibleBlocks);
 
     // if (page.ydoc) {
@@ -87,8 +91,8 @@ export class PersistenceExtension implements Extension {
       this.logger.debug(`converting json to ydoc: ${pageId}`);
 
       const filteredContent = this.filterContentByBlockAccess(
+        userId,
         page.content,
-        accessibleBlocks,
       );
 
       const ydoc = TiptapTransformer.toYdoc(
@@ -212,27 +216,27 @@ export class PersistenceExtension implements Extension {
     this.contributors.delete(documentName);
   }
 
-  private filterContentByBlockAccess(
+  private async filterContentByBlockAccess(
+    userId: string,
     content: any,
-    accessibleBlocks: any[],
-  ): any {
-    if (!content?.content) return content;
+  ): Promise<any> {
+    for (const block of content.content) {
+      const blockAbility = await this.blockAbility.createForUser(
+        userId,
+        block.attrs.blockId,
+      );
 
-    const accessibleBlockIds = new Set(
-      accessibleBlocks
-        .filter((block) => block.hasAccess)
-        .map((block) => block.id),
-    );
-
-    return {
-      ...content,
-      content: content.content.filter((node: any) => {
-        if (node.attrs?.blockId) {
-          return accessibleBlockIds.has(node.attrs.blockId);
+      if (blockAbility.cannot(BlockCaslAction.Read, BlockCaslSubject.Block)) {
+        if (block?.content) {
+          block.content = [];
         }
-        return true;
-      }),
-    };
+
+        block.attrs.noAccess = true;
+      } else {
+        block.attrs.noAccess = true;
+      }
+    }
+    return content;
   }
 
   private filterYDocByBlockAccess(doc: Y.Doc, accessibleBlocks: any[]): Y.Doc {

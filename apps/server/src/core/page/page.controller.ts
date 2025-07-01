@@ -27,7 +27,7 @@ import { AuthUser } from '../../common/decorators/auth-user.decorator';
 import { AuthWorkspace } from '../../common/decorators/auth-workspace.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
-import { User, Workspace } from '@docmost/db/types/entity.types';
+import { Page, User, Workspace } from '@docmost/db/types/entity.types';
 import { SidebarPageDto } from './dto/sidebar-page.dto';
 import {
   SpaceCaslAction,
@@ -64,6 +64,11 @@ interface Request {
 }
 
 import { CopyPageDto } from './dto/copy-page.dto';
+import { BlockAbilityFactory } from '../casl/abilities/block-ability.factory';
+import {
+  BlockCaslAction,
+  BlockCaslSubject,
+} from '../casl/interfaces/block-ability.type';
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
@@ -79,6 +84,7 @@ export class PageController {
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
     private readonly blockPermissionService: BlockPermissionService,
+    private readonly blockAbility: BlockAbilityFactory,
     @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
@@ -116,9 +122,10 @@ export class PageController {
       permissions: pageAbility.rules,
     };
 
+    let originPage: Page | null = null;
     if (page.isSynced) {
       const syncPage = await this.syncPageService.findByReferenceId(page.id);
-      const originPage = await this.pageRepo.findById(syncPage.originPageId, {
+      originPage = await this.pageRepo.findById(syncPage.originPageId, {
         includeContent: true,
         includeLastUpdatedBy: true,
         includeContributors: true,
@@ -127,10 +134,25 @@ export class PageController {
         throw new NotFoundException('Origin page not found');
       }
       page.content = originPage.content;
-      return { ...page, membership, originPageId: originPage.id };
     }
 
-    return { ...page, membership };
+    // @ts-ignore
+    for (const block of page.content.content) {
+      const blockAbility = await this.blockAbility.createForUser(
+        user.id,
+        block.attrs.blockId,
+      );
+
+      if (blockAbility.cannot(BlockCaslAction.Read, BlockCaslSubject.Block)) {
+        if (block?.content) {
+          block.content = [];
+        }
+
+        block.attrs.noAccess = true;
+      }
+    }
+
+    return { ...page, membership, originPageId: originPage?.id };
   }
 
   @HttpCode(HttpStatus.OK)
@@ -668,22 +690,22 @@ export class PageController {
   //   return { success: true };
   // }
 
-  @HttpCode(HttpStatus.OK)
-  @Get(':pageId/block-permissions')
-  async getAccessibleBlocks(
-    @Param('pageId') pageId: string,
-    @AuthUser() user: User,
-  ) {
-    return this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
-  }
+  // @HttpCode(HttpStatus.OK)
+  // @Get(':pageId/block-permissions')
+  // async getAccessibleBlocks(
+  //   @Param('pageId') pageId: string,
+  //   @AuthUser() user: User,
+  // ) {
+  //   return this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
+  // }
 
-  @HttpCode(HttpStatus.OK)
-  @Get(':id/blocks')
-  async getAllPageBlocks(@Param('id') pageId: string, @Req() req: Request) {
-    const userId = req.user.id;
-    const result = await this.pageService.getAllBlocksOfPage(pageId, userId);
-    return { data: result, success: true };
-  }
+  // @HttpCode(HttpStatus.OK)
+  // @Get(':id/blocks')
+  // async getAllPageBlocks(@Param('id') pageId: string, @Req() req: Request) {
+  //   const userId = req.user.id;
+  //   const result = await this.pageService.getAllBlocksOfPage(pageId, userId);
+  //   return { data: result, success: true };
+  // }
 
   @HttpCode(HttpStatus.OK)
   @Get('block-permissions/:pageId/:blockId')

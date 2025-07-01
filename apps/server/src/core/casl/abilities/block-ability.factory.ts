@@ -1,49 +1,66 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { BlockPermissionRepo } from '@docmost/db/repos/block/block-permission.repo';
 import {
-  BlockAbility,
-  BlockAbilityAction,
-  UserBlockRole,
-} from '../../../core/casl/interfaces/block-ability.type';
+  BlockCaslAction,
+  BlockCaslSubject,
+  IBlockAbility,
+} from '../interfaces/block-ability.type';
+import {
+  AbilityBuilder,
+  createMongoAbility,
+  MongoAbility,
+} from '@casl/ability';
 
 @Injectable()
 export class BlockAbilityFactory {
   constructor(private readonly blockPermissionRepo: BlockPermissionRepo) {}
 
-  async createForBlock(userId: string, blockId: string): Promise<BlockAbility> {
-    const roles = await this.blockPermissionRepo.getUserBlockRoles(
+  async createForUser(userId: string, blockId: string) {
+    const userBlockRole = await this.blockPermissionRepo.getUserBlockRoles(
       userId,
       blockId,
     );
 
-    if (!roles) {
-      return { blockId, actions: [] };
+    switch (userBlockRole) {
+      case 'admin':
+        return buildBlockAdminAbility();
+      case 'writer':
+        return buildBlockWriterAbility();
+      case 'reader':
+        return buildBlockReaderAbility();
+      default:
+        return buildBlockNoAccessAbility();
     }
-
-    const actions = this.mapRolesToActions(roles);
-
-    return {
-      blockId,
-      actions,
-    };
   }
+}
 
-  private mapRolesToActions(roles: UserBlockRole[]): BlockAbilityAction[] {
-    const actionSet = new Set<BlockAbilityAction>();
+function buildBlockAdminAbility() {
+  const { can, build } = new AbilityBuilder<MongoAbility<IBlockAbility>>(
+    createMongoAbility,
+  );
+  can(BlockCaslAction.Manage, BlockCaslSubject.Block);
+  return build();
+}
 
-    for (const role of roles) {
-      if (role === 'admin') {
-        actionSet.add('read');
-        actionSet.add('update');
-        actionSet.add('delete');
-      } else if (role === 'writer') {
-        actionSet.add('read');
-        actionSet.add('update');
-      } else if (role === 'reader') {
-        actionSet.add('read');
-      }
-    }
+function buildBlockWriterAbility() {
+  const { can, build } = new AbilityBuilder<MongoAbility<IBlockAbility>>(
+    createMongoAbility,
+  );
+  can(BlockCaslAction.Manage, BlockCaslSubject.Block);
+  return build();
+}
 
-    return Array.from(actionSet);
-  }
+function buildBlockReaderAbility() {
+  const { can, build } = new AbilityBuilder<MongoAbility<IBlockAbility>>(
+    createMongoAbility,
+  );
+  can(BlockCaslAction.Read, BlockCaslSubject.Block);
+  return build();
+}
+
+function buildBlockNoAccessAbility() {
+  const { build } = new AbilityBuilder<MongoAbility<IBlockAbility>>(
+    createMongoAbility,
+  );
+  return build();
 }

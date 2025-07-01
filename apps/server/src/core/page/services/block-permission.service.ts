@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SaveBlockPermissionDto } from '../dto/save-block-permission.dto';
 import { BlockPermissionRepo } from '@docmost/db/repos/block/block-permission.repo';
+import { Block } from '@docmost/db/types/entity.types';
 
 @Injectable()
 export class BlockPermissionService {
@@ -69,7 +70,10 @@ export class BlockPermissionService {
     return this.blockPermissionRepo.deleteBlockPermission(dto);
   }
 
-  async getAccessiblePageBlocks(pageId: string, userId: string) {
+  async getAccessiblePageBlocks(
+    pageId: string,
+    userId: string,
+  ): Promise<{ id: string; hasAccess: boolean }[]> {
     const hasPageAccess = await this.userHasDirectPageAccess(userId, pageId);
 
     const blocks = await this.blockPermissionRepo.findAccessiblePageBlocks(
@@ -82,36 +86,21 @@ export class BlockPermissionService {
       pageId,
     );
 
-    const hasDirectPageAccess = pageMember?.source === 'manual';
-
     return blocks.map((block) => {
-      const userIsCreator = block.creatorId === userId;
-
-      const hasBlockAccess = !!block.userPermission || userIsCreator;
+      const hasBlockAccess = !!block.userPermission;
 
       const isPublic = !!block.publicPermission;
       const isUnrestricted = block.permissionCount === 0;
 
-      const hasAccess = hasDirectPageAccess
+      const hasAccess = hasPageAccess
         ? hasBlockAccess || isPublic || isUnrestricted
         : hasBlockAccess;
 
-      return {
-        id: block.id,
-        pageId: block.pageId,
-        blockType: block.blockType,
-        position: block.position,
-        hasAccess,
-        userPermission:
-          block.userPermission ??
-          (hasPageAccess &&
-            (block.publicPermission ?? (userIsCreator ? 'owner' : null))),
-        content: hasAccess ? block.content : null,
-      };
+      return { id: block.id, hasAccess };
     });
   }
 
-  async userHasDirectPageAccess(
+  private async userHasDirectPageAccess(
     userId: string,
     pageId: string,
   ): Promise<boolean> {
