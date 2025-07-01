@@ -140,6 +140,6 @@ export type PageContent = {
 // Content Block
 export type ContentBlock = {
   type: string;
-  attrs: { blockId: string };
+  attrs: { blockId: string; position?: number | null; id?: string };
   content: any;
 };
