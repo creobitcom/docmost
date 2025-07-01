@@ -25,6 +25,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { IPageBacklinkJob } from '../../integrations/queue/constants/queue.interface';
 import { Page } from '@docmost/db/types/entity.types';
 import { PageService } from 'src/core/page/services/page.service';
+import { BlockPermissionService } from 'src/core/page/services/block-permission.service';
 
 @Injectable()
 export class PersistenceExtension implements Extension {
@@ -34,17 +35,25 @@ export class PersistenceExtension implements Extension {
   constructor(
     private readonly pageService: PageService,
     private readonly pageRepo: PageRepo,
+    private readonly blockPermissionService: BlockPermissionService,
     @InjectKysely() private readonly db: KyselyDB,
     private eventEmitter: EventEmitter2,
     @InjectQueue(QueueName.GENERAL_QUEUE) private generalQueue: Queue,
   ) {}
 
   async onLoadDocument(data: onLoadDocumentPayload) {
-    const { documentName, document } = data;
+    const { documentName, document, context, requestParameters } = data;
     const pageId = getPageId(documentName);
+    const userId: string = context.user.id;
 
-    if (!document.isEmpty('default')) {
-      return;
+    const hasLocalContent = requestParameters.get('hasLocalContent') === 'true';
+    const localContentLength = parseInt(
+      requestParameters.get('localContentLength') || '0',
+    );
+
+    if (hasLocalContent && localContentLength > 0) {
+      this.logger.debug(`Client has local content, skipping database load`);
+      return document;
     }
 
     const page: Page = await this.pageRepo.findById(pageId, {
@@ -57,23 +66,33 @@ export class PersistenceExtension implements Extension {
       return;
     }
 
-    if (page.ydoc) {
-      this.logger.debug(`ydoc loaded from db: ${pageId}`);
+    const accessibleBlocks =
+      await this.blockPermissionService.getAccessiblePageBlocks(
+        userId,
+        page.id,
+      );
+    this.logger.debug('allowed blocks to user', accessibleBlocks);
 
-      const doc = new Y.Doc();
-      const dbState = new Uint8Array(page.ydoc);
+    // if (page.ydoc) {
+    //   this.logger.debug(`ydoc loaded from db: ${pageId}`);
 
-      Y.applyUpdate(doc, dbState);
-      return doc;
-    }
+    //   const doc = new Y.Doc();
+    //   const dbState = new Uint8Array(page.ydoc);
 
-    // if no ydoc state in db convert json in page.content to Ydoc.
+    //   Y.applyUpdate(doc, dbState);
+    //   return doc;
+    // }
+
     if (page.content) {
       this.logger.debug(`converting json to ydoc: ${pageId}`);
-      this.logger.debug('Sending page: ', page);
+
+      const filteredContent = this.filterContentByBlockAccess(
+        page.content,
+        accessibleBlocks,
+      );
 
       const ydoc = TiptapTransformer.toYdoc(
-        page.content,
+        filteredContent,
         'default',
         tiptapExtensions,
       );
@@ -128,7 +147,7 @@ export class PersistenceExtension implements Extension {
         try {
           const existingContributors = page.contributorIds || [];
           const contributorSet = this.contributors.get(documentName);
-          contributorSet.add(page.creator_id);
+          contributorSet.add(page.creatorId);
           const newContributors = [...contributorSet];
           contributorIds = Array.from(
             new Set([...existingContributors, ...newContributors]),
@@ -191,5 +210,63 @@ export class PersistenceExtension implements Extension {
   async afterUnloadDocument(data: afterUnloadDocumentPayload) {
     const documentName = data.documentName;
     this.contributors.delete(documentName);
+  }
+
+  private filterContentByBlockAccess(
+    content: any,
+    accessibleBlocks: any[],
+  ): any {
+    if (!content?.content) return content;
+
+    const accessibleBlockIds = new Set(
+      accessibleBlocks
+        .filter((block) => block.hasAccess)
+        .map((block) => block.id),
+    );
+
+    return {
+      ...content,
+      content: content.content.filter((node: any) => {
+        if (node.attrs?.blockId) {
+          return accessibleBlockIds.has(node.attrs.blockId);
+        }
+        return true;
+      }),
+    };
+  }
+
+  private filterYDocByBlockAccess(doc: Y.Doc, accessibleBlocks: any[]): Y.Doc {
+    const accessibleBlockIds = new Set(
+      accessibleBlocks
+        .filter((block) => block.hasAccess)
+        .map((block) => block.id),
+    );
+
+    const fragment = doc.getXmlFragment('default');
+    const filteredDoc = new Y.Doc();
+    const filteredFragment = filteredDoc.getXmlFragment('default');
+
+    filteredFragment.delete(0, filteredFragment.length);
+
+    const processedBlockIds = new Set();
+
+    fragment?.forEach((item) => {
+      if (!item) return;
+
+      const blockId = item.getAttribute('blockId');
+
+      if (blockId && processedBlockIds.has(blockId)) {
+        return;
+      }
+
+      const clonedItem = item.clone();
+      filteredFragment.insert(filteredFragment.length, [clonedItem]);
+
+      if (blockId) {
+        processedBlockIds.add(blockId);
+      }
+    });
+
+    return filteredDoc;
   }
 }

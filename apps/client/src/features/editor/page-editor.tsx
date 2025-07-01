@@ -94,6 +94,12 @@ export default function PageEditor({
   }, [pageId, ydoc]);
 
   const remoteProvider = useMemo(() => {
+    if (!isLocalSynced) {
+      return null;
+    }
+
+    const hasLocalContent = ydoc.getXmlFragment("default").length > 0;
+
     const provider = new HocuspocusProvider({
       name: documentName,
       url: collaborationURL,
@@ -108,6 +114,10 @@ export default function PageEditor({
         if (isTokenExpired) {
           refetchCollabToken();
         }
+      },
+      parameters: {
+        hasLocalContent: hasLocalContent.toString(),
+        localContentLength: ydoc.getXmlFragment("default").length.toString(),
       },
       onStatus: (status) => {
         if (status.status === "connected") {
@@ -125,9 +135,13 @@ export default function PageEditor({
     });
 
     return provider;
-  }, [ydoc, pageId, collabQuery?.token]);
+  }, [ydoc, pageId, isLocalSynced, collabQuery?.token]);
 
   useLayoutEffect(() => {
+    if (!isLocalSynced) {
+      return;
+    }
+
     remoteProvider.connect();
     return () => {
       setRemoteSynced(false);
@@ -135,15 +149,17 @@ export default function PageEditor({
       remoteProvider.destroy();
       localProvider.destroy();
     };
-  }, [remoteProvider, localProvider]);
+  }, [remoteProvider, localProvider, isLocalSynced]);
 
   const extensions = useMemo(() => {
+    if (!remoteProvider) return mainExtensions;
+
     return [
       ...mainExtensions,
       ...collabExtensions(remoteProvider, currentUser?.user),
       ...creobitExtentions,
     ];
-  }, [ydoc, pageId, remoteProvider, currentUser?.user]);
+  }, [remoteProvider, currentUser?.user]);
 
   const editor = useEditor(
     {
@@ -197,7 +213,7 @@ export default function PageEditor({
         debouncedUpdateContent(editorJson);
       },
     },
-    [pageId, editable, remoteProvider?.status],
+    [pageId, editable, remoteProvider?.status, isLocalSynced],
   );
 
   const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
@@ -239,6 +255,10 @@ export default function PageEditor({
   }, [pageId]);
 
   useEffect(() => {
+    if (!remoteProvider) {
+      return;
+    }
+
     if (remoteProvider?.status === WebSocketStatus.Connecting) {
       const timeout = setTimeout(() => {
         setYjsConnectionStatus(WebSocketStatus.Disconnected);
@@ -248,6 +268,10 @@ export default function PageEditor({
   }, [remoteProvider?.status]);
 
   useEffect(() => {
+    if (!remoteProvider) {
+      return;
+    }
+
     if (
       isIdle &&
       documentState === "hidden" &&
@@ -273,6 +297,10 @@ export default function PageEditor({
   const isSynced = isLocalSynced && isRemoteSynced;
 
   useEffect(() => {
+    if (!remoteProvider) {
+      return;
+    }
+
     const collabReadyTimeout = setTimeout(() => {
       if (
         !isCollabReady &&
