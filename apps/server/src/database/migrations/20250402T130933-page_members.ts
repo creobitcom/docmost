@@ -36,9 +36,6 @@ export async function up(db: Kysely<any>): Promise<void> {
       'allow_either_user_id_or_group_id_check',
       sql`(("user_id" IS NOT NULL AND "group_id" IS NULL) OR ("user_id" IS NULL AND "group_id" IS NOT NULL))`,
     )
-    .addColumn('source', 'varchar(20)', (col) =>
-      col.defaultTo(sql.lit('manual'))
-    )
     .execute();
 }
 
