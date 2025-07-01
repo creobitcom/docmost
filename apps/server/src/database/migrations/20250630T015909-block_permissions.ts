@@ -16,8 +16,10 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().references('users.id').onDelete('cascade'),
     )
     .addColumn('role', 'varchar', (col) => col.notNull())
-    .addColumn('permission', 'varchar', (col) => col.notNull())
-    .addUniqueConstraint('block_permissions_', ['block_id', 'user_id'])
+    .addUniqueConstraint('block_permissions_block_user', [
+      'block_id',
+      'user_id',
+    ])
     .execute();
 }
 
