@@ -187,4 +187,11 @@ export class BlockPermissionRepo {
       .orderBy('b.position')
       .execute();
   }
+
+  async findBlockPermissions(blockId: string) {
+    return this.db
+      .selectFrom('blockPermissions')
+      .where('blockId', '=', blockId)
+      .execute();
+  }
 }

@@ -340,7 +340,7 @@ export class PageService {
     trx?: KyselyTransaction,
   ): Promise<void> {
     const blocks: {
-      attrs: { blockId: string };
+      attrs: { blockId: string; noaccess?: string };
       type?: string;
       content?: any[];
     }[] = (updatePageData?.content as any)?.content;
@@ -386,6 +386,14 @@ export class PageService {
       const blockId = block.attrs.blockId;
       const existingBlock = existingBlocksMap.get(blockId);
       const calculatedHash = calculateBlockHash(block);
+
+      const hasAccess = block.attrs.noaccess === 'false';
+      delete block.attrs.noaccess;
+
+      if (block?.attrs?.noaccess) {
+        this.logger.debug('Skipping noaccess block: ', block);
+        continue;
+      }
 
       if (!existingBlock) {
         await this.pageRepo.createBlock(

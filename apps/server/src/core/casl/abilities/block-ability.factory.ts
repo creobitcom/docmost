@@ -15,22 +15,51 @@ import {
 export class BlockAbilityFactory {
   constructor(private readonly blockPermissionRepo: BlockPermissionRepo) {}
 
-  async createForUser(userId: string, blockId: string) {
-    const userBlockRole = await this.blockPermissionRepo.getUserBlockRoles(
+  async createForUser(userId: string, blockId: string, pageId: string) {
+    const blockHasPermissions = await this.blockHasAnyPermissions(blockId);
+
+    if (blockHasPermissions) {
+      const userBlockRole = await this.blockPermissionRepo.getUserBlockRoles(
+        userId,
+        blockId,
+      );
+
+      switch (userBlockRole) {
+        case 'admin':
+          return buildBlockAdminAbility();
+        case 'writer':
+          return buildBlockWriterAbility();
+        case 'reader':
+          return buildBlockReaderAbility();
+        default:
+          return buildBlockNoAccessAbility();
+      }
+    }
+
+    return buildBlockAdminAbility();
+  }
+
+  private async userHasDirectPageAccess(
+    userId: string,
+    pageId: string,
+  ): Promise<boolean> {
+    const result = await this.blockPermissionRepo.findPageMember(
       userId,
-      blockId,
+      pageId,
     );
 
-    switch (userBlockRole) {
-      case 'admin':
-        return buildBlockAdminAbility();
-      case 'writer':
-        return buildBlockWriterAbility();
-      case 'reader':
-        return buildBlockReaderAbility();
-      default:
-        return buildBlockNoAccessAbility();
-    }
+    const hasAccess = !!result;
+    Logger.debug(
+      `PageMember exists for user ${userId} on page ${pageId}: ${hasAccess}`,
+      'BlockPermissionService',
+    );
+    return hasAccess;
+  }
+
+  private async blockHasAnyPermissions(blockId: string): Promise<boolean> {
+    const permissions =
+      await this.blockPermissionRepo.findBlockPermissions(blockId);
+    return permissions && permissions.length > 0;
   }
 }
 

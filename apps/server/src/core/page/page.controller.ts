@@ -13,7 +13,6 @@ import {
   Query,
   Param,
   Put,
-  Inject,
   Req,
   Delete,
 } from '@nestjs/common';
@@ -59,9 +58,6 @@ import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
 import { extractTopLevelBlocks } from './extract-page-blocks';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB } from '@docmost/db/types/kysely.types';
-interface Request {
-  user: { id: string };
-}
 
 import { CopyPageDto } from './dto/copy-page.dto';
 import { BlockAbilityFactory } from '../casl/abilities/block-ability.factory';
@@ -136,11 +132,16 @@ export class PageController {
       page.content = originPage.content;
     }
 
+    if (!page?.content) {
+      return { ...page, membership, originPageId: originPage?.id };
+    }
+
     // @ts-ignore
     for (const block of page.content.content) {
       const blockAbility = await this.blockAbility.createForUser(
         user.id,
         block.attrs.blockId,
+        page.id,
       );
 
       if (blockAbility.cannot(BlockCaslAction.Read, BlockCaslSubject.Block)) {
