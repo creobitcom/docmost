@@ -18,3 +18,6 @@ export * from "./lib/embed";
 export * from "./lib/mention";
 export * from "./lib/markdown";
 export * from "./lib/block-group";
+export * from "./lib/block-id";
+export * from "./lib/block-position";
+export * from "./lib/no-access";

@@ -38,6 +38,9 @@ import {
   Embed,
   Mention,
   BlockGroup,
+  NoAccessExtension,
+  BlockId,
+  BlockPosition,
 } from "@docmost/editor-ext";
 import {
   randomElement,
@@ -73,12 +76,9 @@ import i18n from "@/i18n.ts";
 import { MarkdownClipboard } from "@/features/editor/extensions/markdown-clipboard.ts";
 import EmojiCommand from "./emoji-command";
 import { CharacterCount } from "@tiptap/extension-character-count";
-import { BlockId } from "@/features/editor/extensions/block-id";
-import { BlockPosition } from "@/features/editor/extensions/block-position";
 import { BlockTypes } from "@/features/editor/utils/block-types";
 import { SmartEnter } from "@/features/editor/extensions/smart-enter";
 import Document from "@tiptap/extension-document";
-
 
 const lowlight = createLowlight(common);
 lowlight.register("mermaid", plaintext);
@@ -243,6 +243,10 @@ export const collabExtensions: CollabExtensions = (provider, user) => [
 ];
 
 export const creobitExtentions = [
+  NoAccessExtension.configure({
+    // types: BlockTypes,
+    types: ["paragraph"],
+  }),
   BlockId.configure({
     attributeName: "blockId",
     types: BlockTypes,

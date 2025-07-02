@@ -33,6 +33,9 @@ import {
   Embed,
   Mention,
   BlockGroup,
+  BlockId,
+  BlockPosition,
+  NoAccessExtension,
 } from '@docmost/editor-ext';
 import { generateText, getSchema, JSONContent } from '@tiptap/core';
 import { generateHTML } from '../common/helpers/prosemirror/html';
@@ -42,7 +45,7 @@ import { generateHTML } from '../common/helpers/prosemirror/html';
 import { generateJSON } from '@tiptap/html';
 import { Node } from '@tiptap/pm/model';
 
-export const tiptapExtensions = [
+export const mainExtensions = [
   StarterKit.configure({
     codeBlock: false,
   }),
@@ -80,6 +83,78 @@ export const tiptapExtensions = [
   Mention,
   BlockGroup,
 ] as any;
+
+enum BlockType {
+  Paragraph = 'paragraph',
+  Heading = 'heading',
+  Blockquote = 'blockquote',
+  CodeBlock = 'codeBlock',
+  BulletList = 'bulletList',
+  OrderedList = 'orderedList',
+  ListItem = 'listItem',
+  TaskList = 'taskList',
+  TaskItem = 'taskItem',
+  HorizontalRule = 'horizontalRule',
+  Image = 'image',
+  Table = 'table',
+  TableRow = 'tableRow',
+  TableCell = 'tableCell',
+  TableHeader = 'tableHeader',
+  Iframe = 'iframe',
+  Figure = 'figure',
+  N8N = 'n8n',
+  StarterKit = 'starterKit',
+  Placeholder = 'placeholder',
+  TextAlign = 'textAlign',
+  Underline = 'underline',
+  LinkExtension = 'link',
+  Superscript = 'superscript',
+  SubScript = 'subscript',
+  Highlight = 'highlight',
+  Typography = 'typography',
+  TrailingNode = 'trailingNode',
+  GlobalDragHandle = 'globalDragHandle',
+  TextStyle = 'textStyle',
+  Color = 'color',
+  SlashCommand = 'slashCommand',
+  EmojiCommand = 'emojiCommand',
+  Comment = 'comment',
+  Mention = 'mention',
+  MathInline = 'mathInline',
+  MathBlock = 'mathBlock',
+  Details = 'details',
+  DetailsSummary = 'detailsSummary',
+  DetailsContent = 'detailsContent',
+  Youtube = 'youtube',
+  TiptapVideo = 'video',
+  Callout = 'callout',
+  CustomCodeBlock = 'customCodeBlock',
+  Selection = 'selection',
+  Attachment = 'attachment',
+  Drawio = 'drawio',
+  Excalidraw = 'excalidraw',
+  Embed = 'embed',
+  MarkdownClipboard = 'markdownClipboard',
+  CharacterCount = 'characterCount',
+  BlockGroup = 'blockGroup',
+}
+const BlockTypes = Object.values(BlockType);
+
+export const creobitExtentions = [
+  NoAccessExtension.configure({
+    types: ['paragraph'],
+  }),
+  BlockId.configure({
+    attributeName: 'blockId',
+    types: BlockTypes,
+    createId: () => window.crypto.randomUUID(),
+  }),
+  BlockPosition.configure({
+    types: BlockTypes,
+  }),
+] as any;
+
+export const tiptapExtensions = [...mainExtensions, ...creobitExtentions];
 
 export function jsonToHtml(tiptapJson: any) {
   return generateHTML(tiptapJson, tiptapExtensions);
