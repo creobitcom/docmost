@@ -30,6 +30,7 @@ import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 import { MyPageColorDto } from '../dto/update-color.dto';
 import { PageBlocksService } from './page-blocks.service';
+import { BlockRepo } from '@docmost/db/repos/block/block.repo';
 
 @Injectable()
 export class PageService {
@@ -42,6 +43,7 @@ export class PageService {
     private readonly syncPageRepo: SynchronizedPageRepo,
     private readonly PageBlocksService: PageBlocksService,
     @InjectKysely() private readonly db: KyselyDB,
+    private readonly blockRepo: BlockRepo,
   ) {
     this.logger = new Logger('PageService');
   }
@@ -90,7 +92,7 @@ export class PageService {
           icon: createPageDto.icon,
           parentPageId: parentPageId,
           spaceId: createPageDto.spaceId,
-          creator_id: userId,
+          creatorId: userId,
           workspaceId: workspaceId,
           lastUpdatedById: userId,
         },
@@ -212,7 +214,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .orderBy('position', 'asc')
@@ -241,7 +243,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
@@ -610,7 +612,7 @@ export class PageService {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
@@ -631,13 +633,13 @@ export class PageService {
     for (const page of result.items) {
       const preferences = await this.pageRepo.findUserPagePreferences(
         page.id,
-        page.creator_id,
+        page.creatorId,
       );
 
       if (!preferences) {
         await this.pageRepo.createUserPagePreferences({
           pageId: page.id,
-          userId: page.creator_id,
+          userId: page.creatorId,
           position: page.position,
           color: '#4CAF50',
         });
@@ -686,6 +688,11 @@ export class PageService {
     }
 
     return pageUpdateResult;
+  }
+
+  async getBlockById(blockId: string) {
+    // Можно добавить дополнительные проверки прав доступа, если нужно
+    return this.blockRepo.findById(blockId);
   }
 }
 

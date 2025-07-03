@@ -28,6 +28,7 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface Attachments {
+  createdAt: Generated<Timestamp>;
   creatorId: string;
   deletedAt: Timestamp | null;
   fileExt: string;
@@ -57,7 +58,7 @@ export interface AuthAccounts {
 export interface AuthProviders {
   allowSignup: Generated<boolean>;
   createdAt: Generated<Timestamp>;
-  creator_id: string | null;
+  creatorId: string | null;
   deletedAt: Timestamp | null;
   id: Generated<string>;
   isEnabled: Generated<boolean>;
@@ -106,17 +107,6 @@ export interface Billing {
   workspaceId: string;
 }
 
-export interface Blocks {
-  blockType: string | null;
-  position: number;
-  content: Json;
-  createdAt: Generated<Timestamp | null>;
-  id: Generated<string>;
-  pageId: string;
-  stateHash: string | null;
-  updatedAt: Generated<Timestamp | null>;
-}
-
 export interface BlockPermissions {
   blockId: string;
   id: Generated<string>;
@@ -126,10 +116,21 @@ export interface BlockPermissions {
   userId: string;
 }
 
+export interface Blocks {
+  blockType: string | null;
+  content: Json;
+  createdAt: Generated<Timestamp | null>;
+  id: Generated<string>;
+  pageId: string;
+  position: Generated<number>;
+  stateHash: string | null;
+  updatedAt: Generated<Timestamp | null>;
+}
+
 export interface Comments {
   content: Json | null;
   createdAt: Generated<Timestamp>;
-  creator_id: string | null;
+  creatorId: string | null;
   deletedAt: Timestamp | null;
   editedAt: Timestamp | null;
   id: Generated<string>;
@@ -143,7 +144,7 @@ export interface Comments {
 
 export interface Groups {
   createdAt: Generated<Timestamp>;
-  creator_id: string | null;
+  creatorId: string | null;
   deletedAt: Timestamp | null;
   description: string | null;
   id: Generated<string>;
@@ -196,7 +197,7 @@ export interface Pages {
   contributorIds: Generated<string[] | null>;
   coverPhoto: string | null;
   createdAt: Generated<Timestamp>;
-  creator_id: string | null;
+  creatorId: string | null;
   deletedAt: Timestamp | null;
   deletedById: string | null;
   icon: string | null;
@@ -216,6 +217,15 @@ export interface Pages {
   ydoc: Buffer | null;
 }
 
+export interface ShadowPages {
+  blockId: string;
+  createdAt: Generated<Timestamp | null>;
+  createdBy: string;
+  expiresAt: Timestamp | null;
+  id: Generated<string>;
+  pageId: string;
+}
+
 export interface SpaceMembers {
   addedById: string | null;
   createdAt: Generated<Timestamp>;
@@ -230,16 +240,7 @@ export interface SpaceMembers {
 
 export interface Spaces {
   createdAt: Generated<Timestamp>;
-  creator_id: string | null;
-  role: string;
-  spaceId: string;
-  updatedAt: Generated<Timestamp>;
-  userId: string | null;
-}
-
-export interface Spaces {
-  createdAt: Generated<Timestamp>;
-  creator_id: string | null;
+  creatorId: string | null;
   defaultRole: Generated<string>;
   deletedAt: Timestamp | null;
   description: string | null;
@@ -346,6 +347,7 @@ export interface DB {
   pageHistory: PageHistory;
   pageMembers: PageMembers;
   pages: Pages;
+  shadowPages: ShadowPages;
   spaceMembers: SpaceMembers;
   spaces: Spaces;
   synchronizedPages: SynchronizedPages;

@@ -38,7 +38,7 @@ export class PageRepo {
     'coverPhoto',
     'position',
     'parentPageId',
-    'creator_id',
+    'creatorId',
     'lastUpdatedById',
     'spaceId',
     'workspaceId',
@@ -295,7 +295,7 @@ export class PageRepo {
       eb
         .selectFrom('users')
         .select(['users.id', 'users.name', 'users.avatarUrl'])
-        .whereRef('users.id', '=', 'pages.creator_id'),
+        .whereRef('users.id', '=', 'pages.creatorId'),
     ).as('creator');
   }
 

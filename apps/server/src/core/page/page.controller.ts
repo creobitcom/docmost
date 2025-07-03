@@ -121,9 +121,6 @@ export class PageController {
   }
 
 
-
-
-
   @HttpCode(HttpStatus.OK)
   @Get('blockPermissions/:pageId/:blockId')
   async getBlockPermissions(

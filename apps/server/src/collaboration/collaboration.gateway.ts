@@ -12,6 +12,7 @@ import {
   RedisConfig,
 } from '../common/helpers';
 import { LoggerExtension } from './extensions/logger.extension';
+import jwt from 'jsonwebtoken'
 
 @Injectable()
 export class CollaborationGateway {
@@ -52,8 +53,25 @@ export class CollaborationGateway {
     });
   }
 
-  handleConnection(client: WebSocket, request: IncomingMessage): any {
-    this.hocuspocus.handleConnection(client, request);
+  async handleConnection(client: WebSocket, request: IncomingMessage) {
+    const { searchParams, pathname } = new URL(request.url!, `ws://${request.headers.host}`)
+    const roomName = pathname.replace(/^\/collab\/?/, '') // убираем prefix /collab
+
+    // Shadow блоки
+    if (roomName.startsWith('shadow-block:')) {
+      const token = searchParams.get('t')
+      const [, blockId] = roomName.split(':')
+      if (!token) return client.close()
+      try {
+        const payload: any = jwt.verify(token, process.env.JWT_SECRET!)
+        if (payload.b !== blockId) return client.close()
+      } catch {
+        return client.close()
+      }
+    }
+
+    // Проксируем в y-websocket
+    // setupWSConnection(client, request, { docName: roomName })
   }
 
   getConnectionCount() {

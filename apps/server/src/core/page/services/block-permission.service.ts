@@ -127,7 +127,7 @@ export class BlockPermissionService {
         'b.blockType',
         'b.content',
         'b.position',
-        'p.creator_id as creatorId',
+        'p.creatorId as creatorId',
         'bp.permission as userPermission',
         'bp_public.permission as publicPermission',
         (eb) =>
