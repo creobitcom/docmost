@@ -24,6 +24,8 @@ import { Tooltip, ActionIcon } from '@mantine/core';
 import { IconLink } from '@tabler/icons-react';
 import { getPageInfo } from "@/lib/api-client";
 import axios from "axios";
+import { useAtom } from "jotai";
+import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
 
 
 interface ItemProps extends React.ComponentPropsWithoutRef<"div"> {
@@ -125,6 +127,9 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
   const [pageSlug, setPageSlug] = useState<string | null>(null);
   const [spaceSlug, setSpaceSlug] = useState<string | null>(null);
   const [pageTitle, setPageTitle] = useState<string | null>(null);
+  const [currentUser] = useAtom(currentUserAtom);
+  const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
+  const [isPageCreator, setIsPageCreator] = useState(false);
 
   useEffect(() => {
     const fetchPageInfo = async () => {
@@ -133,13 +138,28 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
         setSpaceSlug(res.spaceSlug);
         setPageSlug(res.pageSlug);
         setPageTitle(res.pageTitle);
+        
+        // Проверяем, является ли текущий пользователь создателем страницы
+        // Для этого нужно получить информацию о странице с создателем
+        const pageResponse = await fetch(`/api/pages/info`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ pageId }),
+        });
+        
+        if (pageResponse.ok) {
+          const pageData = await pageResponse.json();
+          setIsPageCreator(pageData.creator_id === currentUser?.user?.id);
+        }
       } catch (e) {
         console.error("Failed to fetch page info:", e);
       }
     };
 
     fetchPageInfo();
-  }, [pageId]);
+  }, [pageId, currentUser?.user?.id]);
 
   const [selectedPermissionsMap, setSelectedPermissionsMap] = useState<
     Record<string, "read" | "edit" | "owner">
@@ -158,14 +178,18 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
 
       try {
         const result = await getBlockPermissions({ pageId, blockId });
-          setBlockPermissions(
-            result.map((item) => ({
-              userId: item.id,
-              name: item.name,
-              avatarUrl: item.avatarUrl,
-              permission: item.permission,
-            }))
-          );
+        setBlockPermissions(
+          result.map((item) => ({
+            userId: item.id,
+            name: item.name,
+            avatarUrl: item.avatarUrl,
+            permission: item.permission,
+          }))
+        );
+
+        // Проверяем права текущего пользователя на этот блок
+        const currentUserPermission = result.find(item => item.id === currentUser?.user?.id);
+        setUserBlockPermission(currentUserPermission?.permission || null);
       } catch (err) {
         notifications.show({ message: "Failed to load permissions", color: "red" });
       }
@@ -176,8 +200,9 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
     } else {
       setSearch("");
       setBlockPermissions([]);
+      setUserBlockPermission(null);
     }
-  }, [open]);
+  }, [open, currentUser?.user?.id]);
   const getBlockId = () => {
     const { state } = editor;
     const { selection } = state;
@@ -333,168 +358,188 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
       yOffset="10vh"
       zIndex={10000}
     >
-      {/* --- Новый блок: права доступа на страницу --- */}
-      {pagePermissions && (
-        <>
-          <Divider my="md" />
-          <Text size="sm" fw={500} mb="xs">
-            Page Permissions
+      {/* Проверка прав пользователя */}
+      {userBlockPermission !== 'owner' && !isPageCreator && (
+        <Stack gap="md" align="center" py="xl">
+          <Text size="lg" fw={500} color="red">
+            Недостаточно прав
           </Text>
-          {loadingPagePerms ? (
-            <Loader size="sm" />
-          ) : pagePermissions.length === 0 ? (
-            <Text size="xs" color="dimmed">
-              No permissions found for this page.
-            </Text>
-          ) : (
-            <Stack gap="xs" maw={400}>
-              {pagePermissions.map((perm) => (
-                <Group key={perm.userId} gap="sm" justify="apart" wrap="nowrap">
-                  <Group gap="xs" wrap="nowrap">
-                    <Avatar src={perm.avatarUrl} size="sm" />
-                    <Text size="sm">{perm.name}</Text>
-                  </Group>
-                  <Text size="sm" color="dimmed" tt="capitalize" fw={600}>
-                    {perm.permission}
-                  </Text>
-                </Group>
-              ))}
-            </Stack>
-          )}
-        </>
-      )}
-      {blockPermissions.length > 0 && (
-        <>
-          <Text size="sm" fw={500} mt="md" mb="xs">
-            Shared with
+          <Text size="sm" color="dimmed" ta="center">
+            Для управления правами доступа к блоку требуются права владельца (owner) или статус создателя страницы.
           </Text>
-          <ScrollArea.Autosize mah={200}>
-            <Stack gap="xs">
-              {blockPermissions.map((user) => (
-                <Group
-                  key={user.userId}
-                  justify="space-between"
-                  p="xs"
-                  style={{ borderRadius: 8, border: "1px solid #eee" }}
-                >
-                  <Group>
-                    <Avatar src={user.avatarUrl} size="sm" />
-                    <Box>
-                      <Text size="sm">{user.name}</Text>
-                    </Box>
-                  </Group>
-                  <Select
-                    searchable={false}
-                    value={user.permission}
-                    onChange={(value) => {
-                      if (value === "delete") {
-                        handleRemovePermission(user.userId);
-                      } else if (value === "read" || value === "edit" || value === "owner") {
-                        handleChangePermission(user.userId, value);
-                      }
-                    }}
-                    data={permissionOptions}
-                    w={130}
-                    renderOption={({ option }) => (
-                      <div
-                        style={{
-                          padding: 8,
-                          color: option.value === "delete" ? "#fa5252" : undefined,
-                        }}
-                      >
-                        {option.label}
-                      </div>
-                    )}
-                    styles={{
-                      dropdown: {
-                        zIndex: 10001,
-                      },
-                    }}
-                  />
-                </Group>
-              ))}
-            </Stack>
-          </ScrollArea.Autosize>
-          <Divider my="sm" />
-        </>
-      )}
-
-      <TextInput
-        placeholder="Search user..."
-        leftSection={<IconSearch size={16} />}
-        value={search}
-        onChange={(e) => setSearch(e.currentTarget.value)}
-        mb="sm"
-      />
-
-      {isLoading ? (
-        <Loader size="sm" />
-      ) : (
-        <ScrollArea.Autosize mah={200}>
-          {data?.items.map((user) => {
-            const permission = selectedPermissionsMap[user.id] || "read";
-
-            return (
-              <Group
-                key={user.id}
-                p="xs"
-                style={{ cursor: "pointer", borderRadius: 8, justifyContent: "space-between" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f1f3f5")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-              >
-                {/* user card */}
-                <Group
-                  style={{ flexGrow: 1 }}
-                  onClick={() => handleSelectUserWithPermission(user)}
-                >
-                  <Avatar src={user.avatarUrl} size="sm" />
-                  <Box>
-                    <Text size="sm">{user.name}</Text>
-                  </Box>
-                </Group>
-
-                {/* permission selector */}
-                <Select
-                  value={permission}
-                  onChange={(value) => {
-                    if (value === "delete") {
-                      if (blockPermissions.find((p) => p.userId === user.id)) {
-                        handleRemovePermission(user.id);
-                      }
-                    } else if (value === "read" || value === "edit" || value === "owner") {
-                      setSelectedPermissionsMap((prev) => ({
-                        ...prev,
-                        [user.id]: value,
-                      }));
-                    }
-                  }}
-                  data={permissionOptions}
-                  w={120}
-                  styles={{
-                    dropdown: {
-                      zIndex: 10001,
-                    },
-                  }}
-                />
-              </Group>
-            );
-          })}
-        </ScrollArea.Autosize>
-      )}
-        <Group grow mt="md">
-          <Button
-            variant="default"
-            style={{ flex: 1 }}
-            onClick={onClose}>
-            Close
+          <Button onClick={onClose} variant="default">
+            Закрыть
           </Button>
-          <CopyBlockLinkButton
-            spaceSlug={spaceSlug}
-            pageSlug={pageSlug}
-            pageTitle={pageTitle}
-            blockId={blockId}
+        </Stack>
+      )}
+
+      {/* Основной контент модалки - показывается только для владельцев или создателей */}
+      {(userBlockPermission === 'owner' || isPageCreator) && (
+        <>
+          {/* --- Новый блок: права доступа на страницу --- */}
+          {pagePermissions && (
+            <>
+              <Divider my="md" />
+              <Text size="sm" fw={500} mb="xs">
+                Page Permissions
+              </Text>
+              {loadingPagePerms ? (
+                <Loader size="sm" />
+              ) : pagePermissions.length === 0 ? (
+                <Text size="xs" color="dimmed">
+                  No permissions found for this page.
+                </Text>
+              ) : (
+                <Stack gap="xs" maw={400}>
+                  {pagePermissions.map((perm) => (
+                    <Group key={perm.userId} gap="sm" justify="apart" wrap="nowrap">
+                      <Group gap="xs" wrap="nowrap">
+                        <Avatar src={perm.avatarUrl} size="sm" />
+                        <Text size="sm">{perm.name}</Text>
+                      </Group>
+                      <Text size="sm" color="dimmed" tt="capitalize" fw={600}>
+                        {perm.permission}
+                      </Text>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+            </>
+          )}
+          {blockPermissions.length > 0 && (
+            <>
+              <Text size="sm" fw={500} mt="md" mb="xs">
+                Shared with
+              </Text>
+              <ScrollArea.Autosize mah={200}>
+                <Stack gap="xs">
+                  {blockPermissions.map((user) => (
+                    <Group
+                      key={user.userId}
+                      justify="space-between"
+                      p="xs"
+                      style={{ borderRadius: 8, border: "1px solid #eee" }}
+                    >
+                      <Group>
+                        <Avatar src={user.avatarUrl} size="sm" />
+                        <Box>
+                          <Text size="sm">{user.name}</Text>
+                        </Box>
+                      </Group>
+                      <Select
+                        searchable={false}
+                        value={user.permission}
+                        onChange={(value) => {
+                          if (value === "delete") {
+                            handleRemovePermission(user.userId);
+                          } else if (value === "read" || value === "edit" || value === "owner") {
+                            handleChangePermission(user.userId, value);
+                          }
+                        }}
+                        data={permissionOptions}
+                        w={130}
+                        renderOption={({ option }) => (
+                          <div
+                            style={{
+                              padding: 8,
+                              color: option.value === "delete" ? "#fa5252" : undefined,
+                            }}
+                          >
+                            {option.label}
+                          </div>
+                        )}
+                        styles={{
+                          dropdown: {
+                            zIndex: 10001,
+                          },
+                        }}
+                      />
+                    </Group>
+                  ))}
+                </Stack>
+              </ScrollArea.Autosize>
+              <Divider my="sm" />
+            </>
+          )}
+
+          <TextInput
+            placeholder="Search user..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            mb="sm"
           />
-        </Group>
+
+          {isLoading ? (
+            <Loader size="sm" />
+          ) : (
+            <ScrollArea.Autosize mah={200}>
+              {data?.items.map((user) => {
+                const permission = selectedPermissionsMap[user.id] || "read";
+
+                return (
+                  <Group
+                    key={user.id}
+                    p="xs"
+                    style={{ cursor: "pointer", borderRadius: 8, justifyContent: "space-between" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f1f3f5")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  >
+                    {/* user card */}
+                    <Group
+                      style={{ flexGrow: 1 }}
+                      onClick={() => handleSelectUserWithPermission(user)}
+                    >
+                      <Avatar src={user.avatarUrl} size="sm" />
+                      <Box>
+                        <Text size="sm">{user.name}</Text>
+                      </Box>
+                    </Group>
+
+                    {/* permission selector */}
+                    <Select
+                      value={permission}
+                      onChange={(value) => {
+                        if (value === "delete") {
+                          if (blockPermissions.find((p) => p.userId === user.id)) {
+                            handleRemovePermission(user.id);
+                          }
+                        } else if (value === "read" || value === "edit" || value === "owner") {
+                          setSelectedPermissionsMap((prev) => ({
+                            ...prev,
+                            [user.id]: value,
+                          }));
+                        }
+                      }}
+                      data={permissionOptions}
+                      w={120}
+                      styles={{
+                        dropdown: {
+                          zIndex: 10001,
+                        },
+                      }}
+                    />
+                  </Group>
+                );
+              })}
+            </ScrollArea.Autosize>
+          )}
+          <Group grow mt="md">
+            <Button
+              variant="default"
+              style={{ flex: 1 }}
+              onClick={onClose}>
+              Close
+            </Button>
+            <CopyBlockLinkButton
+              spaceSlug={spaceSlug}
+              pageSlug={pageSlug}
+              pageTitle={pageTitle}
+              blockId={blockId}
+            />
+          </Group>
+        </>
+      )}
     </Modal>
   );
 };

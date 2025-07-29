@@ -19,7 +19,7 @@ export async function up(db: Kysely<any>): Promise<void> {
       await db
         .insertInto('blocks')
         .values({
-          page_id: page.id,
+          pageId: page.id,
           block_type: block.type,
           content: JSON.stringify(block),
           state_hash: calculateBlockHash(block),
@@ -41,14 +41,14 @@ export async function down(db: Kysely<any>): Promise<void> {
 
   const allBlocks = await db
     .selectFrom('blocks')
-    .select(['page_id', 'content'])
+    .select(['pageId', 'content'])
     .execute();
 
   const blocksByPage = allBlocks.reduce((acc, block) => {
-    if (!acc[block.page_id]) {
-      acc[block.page_id] = [];
+    if (!acc[block.pageId]) {
+      acc[block.pageId] = [];
     }
-    acc[block.page_id].push(block.content);
+    acc[block.pageId].push(block.content);
     return acc;
   }, {});
 

@@ -27,7 +27,16 @@ export class AuthenticationExtension implements Extension {
 
   async onAuthenticate(data: onAuthenticatePayload) {
     const { documentName, token } = data;
-    const pageId = getPageId(documentName);
+    let pageId: string;
+    if (documentName.startsWith('block.')) {
+      // Получить pageId по blockId через публичный метод pageRepo
+      const blockId = documentName.split('.')[1];
+      const block = await this.pageRepo.getBlockById(blockId);
+      if (!block) throw new NotFoundException('Block not found');
+      pageId = block.pageId;
+    } else {
+      pageId = getPageId(documentName);
+    }
 
     let jwtPayload: JwtCollabPayload;
 

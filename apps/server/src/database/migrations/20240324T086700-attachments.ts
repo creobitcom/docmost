@@ -15,7 +15,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('creator_id', 'uuid', (col) =>
       col.references('users.id').notNull(),
     )
-    .addColumn('page_id', 'uuid', (col) => col)
+    .addColumn('pageId', 'uuid', (col) => col)
     .addColumn('space_id', 'uuid', (col) => col)
     .addColumn('workspace_id', 'uuid', (col) =>
       col.references('workspaces.id').onDelete('cascade').notNull(),

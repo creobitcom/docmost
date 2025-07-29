@@ -29,7 +29,11 @@ export class CollaborationModule implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly collaborationGateway: CollaborationGateway,
     private readonly httpAdapterHost: HttpAdapterHost,
-  ) {}
+    private readonly persistenceExtension: PersistenceExtension,
+  ) {
+    // Явно связываем gateway с extension
+    this.persistenceExtension['gateway'] = this.collaborationGateway;
+  }
 
   onModuleInit() {
     this.collabWsAdapter = new CollabWsAdapter();

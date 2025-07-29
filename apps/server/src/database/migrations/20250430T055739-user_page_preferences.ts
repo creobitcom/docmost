@@ -6,13 +6,13 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('user_id', 'uuid', (col) =>
       col.references('users.id').onDelete('cascade'),
     )
-    .addColumn('page_id', 'uuid', (col) =>
+    .addColumn('pageId', 'uuid', (col) =>
       col.references('pages.id').onDelete('cascade'),
     )
     .addColumn('color', 'varchar')
-    .addPrimaryKeyConstraint('user_page_preferences_user_id_page_id_pk', [
+    .addPrimaryKeyConstraint('user_page_preferences_user_id_pageId_pk', [
       'user_id',
-      'page_id',
+      'pageId',
     ])
     .addColumn('position', 'varchar')
     .execute();

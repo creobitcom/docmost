@@ -37,156 +37,99 @@ export class PersistenceExtension implements Extension {
     @InjectKysely() private readonly db: KyselyDB,
     private eventEmitter: EventEmitter2,
     @InjectQueue(QueueName.GENERAL_QUEUE) private generalQueue: Queue,
-  ) {}
-
-  async onLoadDocument(data: onLoadDocumentPayload) {
-    const { documentName, document } = data;
-    const pageId = getPageId(documentName);
-
-    if (!document.isEmpty('default')) {
-      return;
-    }
-
-    const page: Page = await this.pageRepo.findById(pageId, {
-      includeContent: true,
-      includeYdoc: true,
-    });
-
-    if (!page) {
-      this.logger.warn('page not found');
-      return;
-    }
-
-    if (page.ydoc) {
-      this.logger.debug(`ydoc loaded from db: ${pageId}`);
-
-      const doc = new Y.Doc();
-      const dbState = new Uint8Array(page.ydoc);
-
-      Y.applyUpdate(doc, dbState);
-      return doc;
-    }
-
-    // if no ydoc state in db convert json in page.content to Ydoc.
-    if (page.content) {
-      this.logger.debug(`converting json to ydoc: ${pageId}`);
-      this.logger.debug('Sending page: ', page);
-
-      const ydoc = TiptapTransformer.toYdoc(
-        page.content,
-        'default',
-        tiptapExtensions,
-      );
-
-      Y.encodeStateAsUpdate(ydoc);
-      return ydoc;
-
-      // return Y.encodeStateAsUpdate(ydoc);
-    }
-
-    this.logger.debug(`creating fresh ydoc: ${pageId}`);
-    return new Y.Doc();
+  ) {
+    this.logger.warn('[DIAG][init] PersistenceExtension constructed, gateway=' + !!this['gateway']);
   }
 
-  async onStoreDocument(data: onStoreDocumentPayload) {
-    const { documentName, document, context } = data;
-
-    const pageId = getPageId(documentName);
-
-    const tiptapJson = TiptapTransformer.fromYdoc(document, 'default');
-    const ydocState = Buffer.from(Y.encodeStateAsUpdate(document));
-
-    Logger.debug('Document: ', tiptapJson);
-
-    let textContent = null;
-
-    try {
-      textContent = jsonToText(tiptapJson);
-    } catch (err) {
-      this.logger.warn('jsonToText' + err?.['message']);
+  async onLoadDocument({ documentName }) {
+    if (documentName.startsWith('block.')) {
+      const blockId = documentName.split('.')[1];
+      const block = await this.db
+        .selectFrom('blocks')
+        .select(['yjsSnapshot'])
+        .where('id', '=', blockId)
+        .executeTakeFirst();
+      if (block && block.yjsSnapshot) {
+        const doc = new Y.Doc();
+        Y.applyUpdate(doc, new Uint8Array(block.yjsSnapshot));
+        return doc;
+      } else {
+      return new Y.Doc();
     }
+    }
+    // ... (другая логика для других документов, если нужно)
+  }
 
-    let page: Page = null;
-
-    try {
-      await executeTx(this.db, async (trx) => {
-        page = await this.pageRepo.findById(pageId, {
-          withLock: true,
-          includeContent: true,
-          trx,
-        });
-
-        if (!page) {
-          this.logger.error(`Page with id ${pageId} not found`);
+  async onStoreDocument({ documentName, document }) {
+    if (documentName.startsWith('block.')) {
+      const blockId = documentName.split('.')[1];
+      const yjsSnapshot = Buffer.from(Y.encodeStateAsUpdate(document));
+      await this.db
+        .updateTable('blocks')
+        .set({ yjsSnapshot })
+        .where('id', '=', blockId)
+        .execute();
           return;
         }
-
-        if (isDeepStrictEqual(tiptapJson, page.content)) {
-          page = null;
-          return;
-        }
-
-        let contributorIds = undefined;
-        try {
-          const existingContributors = page.contributorIds || [];
-          const contributorSet = this.contributors.get(documentName);
-          contributorSet.add(page.creator_id);
-          const newContributors = [...contributorSet];
-          contributorIds = Array.from(
-            new Set([...existingContributors, ...newContributors]),
-          );
-          this.contributors.delete(documentName);
-        } catch (err) {
-          this.logger.log('Contributors error:' + err?.['message']);
-        }
-
-        await this.pageService.updateForSocket(
-          {
-            content: tiptapJson,
-            textContent: textContent,
-            ydoc: ydocState,
-            lastUpdatedById: context.user.id,
-            contributorIds: contributorIds,
-          },
-          pageId,
-          trx,
-        );
-
-        this.logger.debug(`Page updated: ${pageId} - SlugId: ${page.slugId}`);
-      });
-    } catch (err) {
-      this.logger.error(`Failed to update page ${pageId}`, err);
-    }
-
-    if (page) {
-      this.eventEmitter.emit('collab.page.updated', {
-        page: {
-          ...page,
-          content: tiptapJson,
-          lastUpdatedById: context.user.id,
-        },
-      });
-
-      const mentions = extractMentions(tiptapJson);
-      const pageMentions = extractPageMentions(mentions);
-
-      await this.generalQueue.add(QueueJob.PAGE_BACKLINKS, {
-        pageId: pageId,
-        workspaceId: page.workspaceId,
-        mentions: pageMentions,
-      } as IPageBacklinkJob);
-    }
+    // ... (другая логика для других документов, если нужно)
   }
 
   async onChange(data: onChangePayload) {
     const documentName = data.documentName;
-    const userId = data.context?.user.id;
+    const userId = data.context?.user?.id;
+    const pageId = getPageId(documentName);
+    this.logger.warn(`[DIAG][onChange] onChange called for user ${userId}, pageId=${pageId}`);
     if (!userId) return;
 
+    // Получаем разрешённые блоки для пользователя
+    let allowedBlockIds: Set<string> | null = null;
+    const blockPermissionService = this.pageService['blockPermissionService'];
+    if (blockPermissionService) {
+      const allowedBlocks = await blockPermissionService.getAccessiblePageBlocks(pageId, userId);
+      allowedBlockIds = new Set(allowedBlocks.map(b => b.id));
+    }
+
+    // Удаляем новые блоки без доступа из Y.Doc
+    const doc = data.document;
+    const content = doc.getXmlFragment('content');
+    const children = content.toArray();
+    let removedBlockIds: string[] = [];
+    for (let i = children.length - 1; i >= 0; i--) {
+      const node = children[i];
+      if (node instanceof Y.XmlElement) {
+        const blockId = node.getAttribute('blockId');
+        if (blockId && allowedBlockIds && !allowedBlockIds.has(blockId)) {
+          content.delete(i, 1);
+          removedBlockIds.push(blockId);
+          this.logger.debug(`[DIAG][onChange] REMOVED block ${blockId} for user ${userId}`);
+        }
+      }
+    }
+    this.logger.warn(`[DIAG][onChange] removedBlockIds: ${JSON.stringify(removedBlockIds)}`);
+    if (removedBlockIds.length > 0) {
+      this.logger.warn(`[DIAG][onChange] Blocks removed for user ${userId}: ${JSON.stringify(removedBlockIds)}`);
+      this.logger.warn(`[DIAG][onChange] Emitting collab.page.forceRefresh for user ${userId}`);
+      this.eventEmitter.emit('collab.page.forceRefresh', {
+        pageId,
+        userId,
+        removedBlockIds,
+      });
+      if (this['gateway'] && typeof this['gateway'].sendForceRefresh === 'function') {
+        this.logger.warn(`[DIAG][onChange] Calling sendForceRefresh for user ${userId}`);
+        try {
+          this['gateway'].sendForceRefresh(userId, pageId, removedBlockIds);
+        } catch (err) {
+          this.logger.error(`[DIAG][onChange] sendForceRefresh error:`, err);
+        }
+      } else {
+        this.logger.warn(`[DIAG][onChange] Gateway not found or sendForceRefresh not a function`);
+      }
+    }
+
+    // ...existing code...
     if (!this.contributors.has(documentName)) {
       this.contributors.set(documentName, new Set());
     }
-
     this.contributors.get(documentName).add(userId);
   }
 

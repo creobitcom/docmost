@@ -15,7 +15,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('ydoc', 'bytea', (col) => col)
     .addColumn('text_content', 'text', (col) => col)
     .addColumn('tsv', sql`tsvector`, (col) => col)
-    .addColumn('parent_page_id', 'uuid', (col) =>
+    .addColumn('parent_pageId', 'uuid', (col) =>
       col.references('pages.id').onDelete('cascade'),
     )
     .addColumn('creator_id', 'uuid', (col) => col.references('users.id'))

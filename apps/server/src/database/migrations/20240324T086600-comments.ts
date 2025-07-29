@@ -10,7 +10,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('selection', 'varchar', (col) => col)
     .addColumn('type', 'varchar', (col) => col)
     .addColumn('creator_id', 'uuid', (col) => col.references('users.id'))
-    .addColumn('page_id', 'uuid', (col) =>
+    .addColumn('pageId', 'uuid', (col) =>
       col.references('pages.id').onDelete('cascade').notNull(),
     )
     .addColumn('parent_comment_id', 'uuid', (col) =>

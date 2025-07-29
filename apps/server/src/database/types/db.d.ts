@@ -115,6 +115,7 @@ export interface Blocks {
   pageId: string;
   stateHash: string | null;
   updatedAt: Generated<Timestamp | null>;
+  yjsSnapshot: Buffer | null;
 }
 
 export interface BlockPermissions {

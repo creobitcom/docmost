@@ -68,97 +68,79 @@ export class ImportService {
       try {
         const pagePosition = await this.getNewPagePosition(spaceId);
 
+        // 1. Создаём страницу (без yjsSnapshot)
         createdPage = await this.pageRepo.insertPage({
           slugId: generateSlugId(),
           title: pageTitle,
-          content: prosemirrorJson,
+          content: prosemirrorJson, // можно удалить, если не нужно
           textContent: jsonToText(prosemirrorJson),
-          ydoc: await this.createYdoc(prosemirrorJson),
-          position: pagePosition,
+          position: pagePosition.toString(),
           spaceId: spaceId,
           creator_id: userId,
           workspaceId: workspaceId,
           lastUpdatedById: userId,
         });
 
+        // 2. Создаём блоки для этой страницы
+        if (createdPage?.id) {
+          const blocks = Array.isArray(prosemirrorJson?.content) ? prosemirrorJson.content : [];
+          if (blocks.length > 0) {
+            const { TiptapTransformer } = require('@hocuspocus/transformer');
+            for (let i = 0; i < blocks.length; i++) {
+              const blockContent = blocks[i];
+              if (!blockContent || typeof blockContent.type !== 'string') continue;
+              const ydoc = TiptapTransformer.toYdoc(blockContent, 'default');
+              const yjsSnapshot = Buffer.from(require('yjs').encodeStateAsUpdate(ydoc));
+              await this.db
+                .insertInto('blocks')
+                .values({
+                  pageId: createdPage.id,
+                  blockType: blockContent.type,
+                  content: blockContent,
+                  position: i,
+                  yjsSnapshot,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .execute();
+            }
+          }
+        }
+
         this.logger.debug(
-          `Successfully imported "${title}${fileExtension}. ID: ${createdPage.id} - SlugId: ${createdPage.slugId}"`,
+          `Successfully imported "${title}${fileExtension}. ID: ${createdPage.id} - SlugId: ${createdPage.slugId}"`
         );
       } catch (err) {
-        const message = 'Failed to create imported page';
+        const message = 'Error inserting page or blocks';
         this.logger.error(message, err);
         throw new BadRequestException(message);
       }
     }
-
-    return createdPage;
   }
 
-  async processMarkdown(markdownInput: string): Promise<any> {
-    try {
-      const html = await markdownToHtml(markdownInput);
-      return this.processHTML(html);
-    } catch (err) {
-      throw err;
-    }
+  private async processMarkdown(fileContent: string) {
+    const prosemirrorState = await markdownToHtml(fileContent);
+    return prosemirrorState;
   }
 
-  async processHTML(htmlInput: string): Promise<any> {
-    try {
-      return htmlToJson(htmlInput);
-    } catch (err) {
-      throw err;
-    }
+  private async processHTML(fileContent: string) {
+    const prosemirrorState = await htmlToJson(fileContent);
+    return prosemirrorState;
   }
 
-  async createYdoc(prosemirrorJson: any): Promise<Buffer | null> {
-    if (prosemirrorJson) {
-      this.logger.debug(`Converting prosemirror json state to ydoc`);
-
-      const ydoc = TiptapTransformer.toYdoc(
-        prosemirrorJson,
-        'default',
-        tiptapExtensions,
-      );
-
-      Y.encodeStateAsUpdate(ydoc);
-
-      return Buffer.from(Y.encodeStateAsUpdate(ydoc));
-    }
-    return null;
+  private extractTitleAndRemoveHeading(prosemirrorState: any) {
+    const doc = prosemirrorState.doc;
+    const title = doc.attrs.title || doc.attrs.heading;
+    // Возвращаем оригинальный JSON, а не строку
+    const prosemirrorJson = prosemirrorState;
+    return { title, prosemirrorJson };
   }
 
-  extractTitleAndRemoveHeading(prosemirrorState: any) {
-    let title = null;
-
-    if (
-      prosemirrorState?.content?.length > 0 &&
-      prosemirrorState.content[0].type === 'heading' &&
-      prosemirrorState.content[0].attrs?.level === 1
-    ) {
-      title = prosemirrorState.content[0].content[0].text;
-
-      // remove h1 header node from state
-      prosemirrorState.content.shift();
-    }
-
-    return { title, prosemirrorJson: prosemirrorState };
-  }
-
-  async getNewPagePosition(spaceId: string): Promise<string> {
-    const lastPage = await this.db
-      .selectFrom('pages')
-      .select(['id', 'position'])
-      .where('spaceId', '=', spaceId)
-      .orderBy('position', 'desc')
-      .limit(1)
-      .where('parentPageId', 'is', null)
-      .executeTakeFirst();
-
+  private async getNewPagePosition(spaceId: string) {
+    const lastPage = await this.pageRepo.getLatestPageBySpaceId(spaceId);
     if (lastPage) {
-      return generateJitteredKeyBetween(lastPage.position, null);
-    } else {
-      return generateJitteredKeyBetween(null, null);
+      return generateJitteredKeyBetween(String(lastPage.position), String(lastPage.position));
     }
+    return generateJitteredKeyBetween(null, null);
   }
 }

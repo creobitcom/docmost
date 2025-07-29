@@ -27,6 +27,8 @@ import { LinkSelector } from "@/features/editor/components/bubble-menu/link-sele
 import { useTranslation } from "react-i18next";
 import { ContextMenu } from "./context-menu";
 import { SearchMenu } from "./search-menu";
+import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
+import { getBlockPermissions } from "@/lib/api-client";
 
 type EditorBubbleMenuProps = {
   editor: ReturnType<typeof useEditor>;
@@ -37,6 +39,9 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
   const { t } = useTranslation();
   const [showCommentPopup, setShowCommentPopup] = useAtom(showCommentPopupAtom);
   const [, setDraftCommentId] = useAtom(draftCommentIdAtom);
+  const [currentUser] = useAtom(currentUserAtom);
+  const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
+  const [isPageCreator, setIsPageCreator] = useState(false);
 
   const showCommentPopupRef = useRef(showCommentPopup);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
@@ -45,11 +50,77 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
   const [searchValue, setSearchValue] = useState("");
   const [searchModalOpened, setSearchModalOpened] = useState(false);
 
-
   const [isNodeSelectorOpen, setIsNodeSelectorOpen] = useState(false);
   const [isTextAlignmentSelectorOpen, setIsTextAlignmentOpen] = useState(false);
   const [isColorSelectorOpen, setIsColorSelectorOpen] = useState(false);
   const [isLinkSelectorOpen, setIsLinkSelectorOpen] = useState(false);
+
+  // Функция для получения blockId из текущего выделения
+  const getCurrentBlockId = () => {
+    const { state } = editor;
+    const { selection } = state;
+    const fromPos = selection.from;
+    let foundNode = null;
+
+    state.doc.nodesBetween(fromPos, fromPos, (node) => {
+      if (node.attrs?.blockId) {
+        foundNode = node;
+        return false;
+      }
+      return true;
+    });
+
+    return foundNode?.attrs?.blockId;
+  };
+
+  // Проверяем права пользователя на текущий блок и статус создателя
+  useEffect(() => {
+    const checkUserPermissions = async () => {
+      const blockId = getCurrentBlockId();
+      if (!blockId || !currentUser?.user?.id) {
+        setUserBlockPermission(null);
+        return;
+      }
+
+      try {
+        // Проверяем права на блок
+        const result = await getBlockPermissions({ pageId, blockId });
+        const currentUserPermission = result.find(item => item.id === currentUser.user.id);
+        setUserBlockPermission(currentUserPermission?.permission || null);
+
+        // Проверяем, является ли пользователь создателем страницы
+        const pageResponse = await fetch(`/api/pages/info`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ pageId }),
+        });
+        
+        if (pageResponse.ok) {
+          const pageData = await pageResponse.json();
+          setIsPageCreator(pageData.creator_id === currentUser.user.id);
+        }
+      } catch (err) {
+        console.error("Failed to check user permissions:", err);
+        setUserBlockPermission(null);
+      }
+    };
+
+    // Проверяем права при изменении выделения
+    const handleSelectionUpdate = () => {
+      checkUserPermissions();
+    };
+
+    editor.on('selectionUpdate', handleSelectionUpdate);
+    
+    // Начальная проверка
+    checkUserPermissions();
+
+    return () => {
+      editor.off('selectionUpdate', handleSelectionUpdate);
+    };
+  }, [editor, pageId, currentUser?.user?.id]);
 
   useEffect(() => {
     showCommentPopupRef.current = showCommentPopup;
@@ -172,25 +243,28 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
           </ActionIcon>
         </Tooltip>
 
-        <Tooltip label="Search Users" withArrow>
-          <ActionIcon
-            variant="default"
-            size="lg"
-            radius="0"
-            aria-label="Search"
-            style={{ border: "none" }}
-            onClick={() => {
-              setIsSearchOpen(!isSearchOpen);
-              setIsColorSelectorOpen(false);
-              setIsLinkSelectorOpen(false);
-              setIsNodeSelectorOpen(false);
-              setIsTextAlignmentOpen(false);
-            }}
-            ref={searchButtonRef}
-          >
-            <IconSearch size={16} stroke={2} />
-          </ActionIcon>
-        </Tooltip>
+        {/* Показываем кнопку поиска только для владельцев или создателей страницы */}
+        {(userBlockPermission === 'owner' || isPageCreator) && (
+          <Tooltip label="Search Users" withArrow>
+            <ActionIcon
+              variant="default"
+              size="lg"
+              radius="0"
+              aria-label="Search"
+              style={{ border: "none" }}
+              onClick={() => {
+                setIsSearchOpen(!isSearchOpen);
+                setIsColorSelectorOpen(false);
+                setIsLinkSelectorOpen(false);
+                setIsNodeSelectorOpen(false);
+                setIsTextAlignmentOpen(false);
+              }}
+              ref={searchButtonRef}
+            >
+              <IconSearch size={16} stroke={2} />
+            </ActionIcon>
+          </Tooltip>
+        )}
 
         {isSearchOpen && (
           <div

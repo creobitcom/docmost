@@ -1,518 +1,395 @@
-import "@/features/editor/styles/index.css";
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { IndexeddbPersistence } from "y-indexeddb";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import * as Y from "yjs";
-import {
-  HocuspocusProvider,
-  onAuthenticationFailedParameters,
-  WebSocketStatus,
-} from "@hocuspocus/provider";
-import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
-import {
-  collabExtensions,
-  creobitExtentions,
-  mainExtensions,
-} from "@/features/editor/extensions/extensions";
+import { HocuspocusProvider } from "@hocuspocus/provider";
+import { useEditor, EditorContent } from "@tiptap/react";
+import { mainExtensions, collabExtensions, creobitExtentions } from "@/features/editor/extensions/extensions";
 import { useAtom } from "jotai";
-import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
-import {
-  pageEditorAtom,
-  yjsConnectionStatusAtom,
-} from "@/features/editor/atoms/editor-atoms";
-import { asideStateAtom } from "@/components/layouts/global/hooks/atoms/sidebar-atom";
-import {
-  activeCommentIdAtom,
-  showCommentPopupAtom,
-} from "@/features/comment/atoms/comment-atom";
-import CommentDialog from "@/features/comment/components/comment-dialog";
-import { EditorBubbleMenu } from "@/features/editor/components/bubble-menu/bubble-menu";
-import TableCellMenu from "@/features/editor/components/table/table-cell-menu.tsx";
-import TableMenu from "@/features/editor/components/table/table-menu.tsx";
-import ImageMenu from "@/features/editor/components/image/image-menu.tsx";
-import CalloutMenu from "@/features/editor/components/callout/callout-menu.tsx";
-import VideoMenu from "@/features/editor/components/video/video-menu.tsx";
-import {
-  handleFileDrop,
-  handlePaste,
-} from "@/features/editor/components/common/editor-paste-handler.tsx";
-import LinkMenu from "@/features/editor/components/link/link-menu.tsx";
-import ExcalidrawMenu from "./components/excalidraw/excalidraw-menu";
-import DrawioMenu from "./components/drawio/drawio-menu";
+import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
 import { useCollabToken } from "@/features/auth/queries/auth-query.tsx";
-import { useDebouncedCallback, useDocumentVisibility } from "@mantine/hooks";
-import { useIdle } from "@/hooks/use-idle.ts";
-import { queryClient } from "@/main.tsx";
-import { IPage } from "@/features/page/types/page.types.ts";
-import { useParams } from "react-router-dom";
-import { extractPageSlugId } from "@/lib";
-import { FIVE_MINUTES } from "@/lib/constants.ts";
-import { jwtDecode } from "jwt-decode";
-import { Loader } from "@mantine/core";
-import { useAccessibleBlocks } from '@/hooks/useAccessibleBlocks';
-import { PlaceholderBlock } from './extensions/PlaceholderBlock';
-import { ReadOnlyBlockExtension } from './extensions/read-only-extension'
-import { useMantineTheme } from '@mantine/core';
-import { useMantineColorScheme } from '@mantine/core';
+import { TiptapTransformer } from "@hocuspocus/transformer";
+import { useDebouncedCallback } from '@mantine/hooks';
+import { EditorBubbleMenu } from "@/features/editor/components/bubble-menu/bubble-menu";
 
-interface PageEditorProps {
-  pageId: string;
-  editable: boolean;
-  content: any;
-  initialContent: any;
+function getTokenFromCollabQuery(collabQuery: any): string | undefined {
+  if (!collabQuery) return undefined;
+  if (typeof collabQuery.token === 'string') return collabQuery.token;
+  if (collabQuery.data && typeof collabQuery.data.token === 'string') return collabQuery.data.token;
+  return undefined;
 }
 
-export default function PageEditor({
-  pageId,
-  editable,
-  content: _content,
-  initialContent,
-}: PageEditorProps) {
-  const [, setPageId] = useState<string | null>(null);
-  const [content, setContent] = useState(initialContent);
-  const collaborationURL = useCollaborationUrl();
+
+
+async function saveBlocksToServer(pageId, blocks) {
+  console.log('[saveBlocksToServer] Saving blocks:', blocks);
+  const response = await fetch(`/api/pages/blocks/${pageId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ blocks }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[saveBlocksToServer] Error:', response.status, errorText);
+  } else {
+    console.log('[saveBlocksToServer] Success');
+  }
+}
+
+async function deleteBlock(pageId: string, blockId: string) {
+  const response = await fetch(`/api/pages/blocks/${pageId}/delete`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ blockId }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete block');
+  }
+
+  return response.json();
+}
+
+
+
+function BlockEditor({ block, editable, onBlockCreated, onBlockDeleted, allBlocks, saveBlocksToServer }) {
   const [currentUser] = useAtom(currentUserAtom);
-  const [, setEditor] = useAtom(pageEditorAtom);
-  const [, setAsideState] = useAtom(asideStateAtom);
-  const [, setActiveCommentId] = useAtom(activeCommentIdAtom);
-  const [showCommentPopup, setShowCommentPopup] = useAtom(showCommentPopupAtom);
-  const ydoc = useMemo(() => new Y.Doc(), [pageId]);
-  const [isLocalSynced, setLocalSynced] = useState(false);
-  const [isRemoteSynced, setRemoteSynced] = useState(false);
-  const [yjsConnectionStatus, setYjsConnectionStatus] = useAtom(
-    yjsConnectionStatusAtom
-  );
-  const menuContainerRef = useRef(null);
-  const documentName = `page.${pageId}`;
-  const { data: collabQuery, refetch: refetchCollabToken } = useCollabToken();
-  const { isIdle, resetIdle } = useIdle(FIVE_MINUTES, { initialState: false });
-  const documentState = useDocumentVisibility();
-  const [isCollabReady, setIsCollabReady] = useState(false);
-  const { pageSlug } = useParams();
-  const collabRetryCount = useRef(0);
-  const slugId = extractPageSlugId(pageSlug);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    Id: string;
-  } | null>(null);
-  const {
-    data: accessibleBlocks = [],
-    isLoading: isLoadingAccessibleBlocks,
-    error: accessibleBlocksError,
-  } = useAccessibleBlocks(pageId, currentUser?.user.id ?? '');
-  const initialHash = React.useRef(window.location.hash);
-  const theme = useMantineTheme();
-  const { colorScheme } = useMantineColorScheme();
+  const ydoc = useMemo(() => new Y.Doc(), [block.id]);
+  const collaborationURL = useCollaborationUrl();
+  const { data: collabQuery } = useCollabToken();
 
-  const handleContentUpdate = (newContent: any) => {
-    setContent(newContent);
-  };
+  const token = getTokenFromCollabQuery(collabQuery);
+  if (!token) return null;
 
-  const localProvider = useMemo(() => {
-    const provider = new IndexeddbPersistence(documentName, ydoc);
-    provider.on("synced", () => {
-      setLocalSynced(true);
-    });
-    return provider;
-  }, [pageId, ydoc]);
+  // Гарантируем валидный контент - каждый блок содержит только один параграф
+  let contentToInit;
 
-  const remoteProvider = useMemo(() => {
-    const provider = new HocuspocusProvider({
-      name: documentName,
-      url: collaborationURL,
-      document: ydoc,
-      token: collabQuery?.token,
-      connect: false,
-      preserveConnection: false,
-      onAuthenticationFailed: (auth: onAuthenticationFailedParameters) => {
-        collabRetryCount.current += 1;
-        refetchCollabToken().then(() => {
-          collabRetryCount.current = 0;
-        });
-
-        if (collabRetryCount.current > 20) {
-          window.location.reload();
-        }
-      },
-      onStatus: (status) => {
-        if (status.status === "connected") {
-          setYjsConnectionStatus(status.status);
-        }
-      },
-    });
-
-    provider.on("synced", () => {
-      setRemoteSynced(true);
-    });
-
-    provider.on("disconnect", () => {
-      setYjsConnectionStatus(WebSocketStatus.Disconnected);
-    });
-
-    return provider;
-  }, [ydoc, pageId, collabQuery?.token]);
-
-  useEffect(() => {
-    setContent(initialContent);
-  }, [initialContent]);
-
-  useEffect(() => {
-    setPageId(pageId);
-  }, [pageId]);
-
-  useEffect(() => {
-    const handleClick = () => {
-      setContextMenu(null);
-    };
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
-  }, []);
-
-  useLayoutEffect(() => {
-    remoteProvider.connect();
-    return () => {
-      setRemoteSynced(false);
-      setLocalSynced(false);
-      remoteProvider.destroy();
-      localProvider.destroy();
-    };
-  }, [remoteProvider, localProvider]);
-  const extensions = useMemo(() => {
-    return [
-      ...mainExtensions,
-      ...collabExtensions(remoteProvider, currentUser?.user),
-      ...creobitExtentions,
-      PlaceholderBlock.configure({
-        themeMode: colorScheme,
-      }),
-      ReadOnlyBlockExtension,
-    ];
-  }, [ydoc, pageId, remoteProvider, currentUser?.user]);
-
-  const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
-    const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
-
-    if (pageData) {
-      queryClient.setQueryData(["pages", slugId], {
-        ...pageData,
-        content: newContent,
-        updatedAt: new Date(),
-      });
-    }
-  }, 3000);
-
-  const sanitizedContent = (contentFromDb) => {
-    if (
-      !contentFromDb ||
-      !contentFromDb.content ||
-      contentFromDb.content.length === 0
-    ) {
-      return null
-    }
-
-    return contentFromDb
-  }
-  console.log('accessibleBlocks:', accessibleBlocks);
-  if (!Array.isArray(accessibleBlocks)) {
-    console.error('accessibleBlocks is not an array:', accessibleBlocks);
+  // Парсим контент из JSON строки
+  let parsedContent;
+  try {
+    parsedContent = typeof block.content === 'string'
+      ? JSON.parse(block.content)
+      : block.content;
+  } catch (e) {
+    console.warn('Failed to parse block content:', block.content);
+    parsedContent = null;
   }
 
-  const editorContent = useMemo(() => {
-    if (!Array.isArray(accessibleBlocks)) return [];
+  console.log('[BlockEditor] block.content:', block.content);
+  console.log('[BlockEditor] parsedContent:', parsedContent);
 
-    return accessibleBlocks.map((block) => {
-      if (block.hasAccess && block.content) {
-        return {
-          ...block.content,
-          attrs: {
-            ...block.content.attrs,
-            blockId: block.id,
-            userPermission: block.userPermission ?? 'none',
-          },
+  if (
+    parsedContent &&
+    typeof parsedContent === 'object' &&
+    typeof parsedContent.type === 'string'
+  ) {
+    if (parsedContent.type === 'doc') {
+      // Если это doc, берем все параграфы с уникальными blockId
+      const paragraphs = parsedContent.content?.filter(node =>
+        node.type === 'paragraph' && node.attrs?.blockId
+      ) || [];
+
+      if (paragraphs.length > 0) {
+        contentToInit = {
+          type: 'doc',
+          content: paragraphs
+        };
+      } else {
+        // Если нет параграфов с blockId, создаем пустой параграф
+        contentToInit = {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [] }]
         };
       }
+    } else if (parsedContent.type === 'paragraph') {
+      // Если это параграф, оборачиваем в doc
+      contentToInit = { type: 'doc', content: [parsedContent] };
+    } else {
+      // Оборачиваем одиночный узел в doc
+      contentToInit = { type: 'doc', content: [parsedContent] };
+    }
+  } else {
+    // Если контент пустой или null - создаем пустой параграф
+    contentToInit = {
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        attrs: { textAlign: 'left' },
+        content: []
+      }]
+    };
+  }
 
-      return {
-        type: 'placeholder',
-        attrs: {
-          blockId: block.id,
-          userPermission: 'none',
-        },
-      };
-    });
-  }, [accessibleBlocks]);
+  console.log('[BlockEditor] contentToInit:', contentToInit);
 
-
-console.log("editorContent:",editorContent)
-
-  const editor = useEditor(
-    {
-      extensions,
-      editable,
-      immediatelyRender: true,
-      shouldRerenderOnTransaction: true,
-      editorProps: {
-        scrollThreshold: 80,
-        scrollMargin: 80,
-        handleDOMEvents: {
-          keydown: (_view, event) => {
-            if (["ArrowUp", "ArrowDown", "Enter"].includes(event.key)) {
-              const slashCommand = document.querySelector("#slash-command");
-              if (slashCommand) {
-                return true;
-              }
-            }
-            if (
-              [
-                "ArrowUp",
-                "ArrowDown",
-                "ArrowLeft",
-                "ArrowRight",
-                "Enter",
-              ].includes(event.key)
-            ) {
-              const emojiCommand = document.querySelector("#emoji-command");
-              if (emojiCommand) {
-                return true;
-              }
-            }
-          },
-        },
-        handlePaste: (view, event, slice) =>
-          handlePaste(view, event, pageId, currentUser?.user.id),
-        handleDrop: (view, event, _slice, moved) =>
-          handleFileDrop(view, event, moved, pageId),
-      },
-      onCreate({ editor }) {
-        if (editor) {
-          // @ts-ignore
-          setEditor(editor);
-          editor.storage.pageId = pageId;
-        }
-      },
-      onUpdate({ editor }) {
-        if (editor.isEmpty) return;
-        const editorJson = editor.getJSON();
-        debouncedUpdateContent(editorJson);
-      },
-    },
-    [pageId, editable, remoteProvider?.status]
+  const provider = useMemo(
+    () =>
+      new HocuspocusProvider({
+        url: collaborationURL,
+        name: `block.${block.id}`,
+        document: ydoc,
+        token,
+      }),
+    [block.id, collaborationURL, token]
   );
 
-  useEffect(() => {
-    if (editor && editorContent.length) {
-      editor.commands.setContent({
-        type: 'doc',
-        content: editorContent,
-      });
-    }
-  }, [editor, editorContent]);
+  const handleEditorUpdate = useDebouncedCallback((editor) => {
+    const json = editor.getJSON();
+    console.log('[BlockEditor] Editor JSON:', json);
 
-  useEffect(() => {
-    if (!editor) return;
+    // Извлекаем все параграфы с уникальными blockId из текущего редактора
+    const paragraphs = json.content?.filter(node =>
+      node.type === 'paragraph' && node.attrs?.blockId
+    ) || [];
 
-    const blockId = initialHash.current?.replace('#', '');
-    if (!blockId) {
-      console.log('Нет blockId для фокуса');
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      let pos: number | null = null;
-      let foundNode = null;
-
-      editor.state.doc.descendants((node, posInDoc) => {
-        if (node.attrs.blockId === blockId) {
-          pos = posInDoc;
-          foundNode = node;
-          return false;
+    if (paragraphs.length > 0) {
+      // Создаем обновленный список всех блоков страницы
+      const updatedBlocks = allBlocks.map(existingBlock => {
+        // Проверяем, соответствует ли текущий блок по blockId из HTML
+        const currentBlockId = paragraphs[0]?.attrs?.blockId;
+        const existingBlockId = existingBlock.id;
+        
+        // Если это текущий блок - обновляем его контент
+        if (currentBlockId === existingBlockId) {
+          return {
+            blockId: existingBlockId,
+            blockType: existingBlock.blockType,
+            pageId: existingBlock.pageId,
+            content: paragraphs[0] // Берем первый параграф как контент блока
+          };
         }
-        return true;
+        // Для остальных блоков оставляем как есть
+        return {
+          blockId: existingBlockId,
+          blockType: existingBlock.blockType,
+          pageId: existingBlock.pageId,
+          content: existingBlock.content
+        };
       });
 
-
-      if (pos !== null) {
-        editor.commands.setTextSelection(pos);
-        editor.commands.focus();
-
-        const domNode = editor.view.dom.querySelector(`[blockid="${blockId}"]`);
-
-        setTimeout(() => {
-          if (domNode) {
-            domNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 50);
-
-      } else {
-        console.warn(`Блок с blockId=${blockId} не найден в документе`);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [editor]);
-
-
-
-
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      const el = document.getElementById(hash.slice(1));
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
-  const handleActiveCommentEvent = (event) => {
-    const { commentId } = event.detail;
-    setActiveCommentId(commentId);
-    setAsideState({ tab: "comments", isAsideOpen: true });
-
-    const selector = `div[data-comment-id="${commentId}"]`;
-    const commentElement = document.querySelector(selector);
-    commentElement?.scrollIntoView();
-  };
-
-  useEffect(() => {
-    if (editor && editorContent.length) {
-      editor.commands.setContent({
-        type: 'doc',
-        content: editorContent,
-      });
+      console.log('[BlockEditor] Saving all blocks:', updatedBlocks);
+      saveBlocksToServer(block.pageId, updatedBlocks);
     }
-  }, [editor, editorContent]);
+  }, 2000);
 
+  const editor = useEditor({
+    extensions: [
+      ...mainExtensions,
+      ...collabExtensions(provider, currentUser?.user),
+      ...creobitExtentions
+    ],
+    editable,
+    content: contentToInit,
+    editorProps: {
+      attributes: {
+        "data-block-id": block.id,
+      },
+      handleKeyDown: (view, event) => {
+        const { state } = view;
+        const { selection } = state;
+        const { $from } = selection;
+        const parentType = $from.parent.type.name;
 
+        // Только для параграфов: Enter в конце параграфа создаёт новый блок
+        if (
+          event.key === 'Enter' &&
+          parentType === 'paragraph' &&
+          $from.parentOffset === $from.parent.content.size
+        ) {
+          event.preventDefault();
 
+          // Создаем новый блок на клиенте
+          const newBlock = {
+            id: window.crypto.randomUUID(),
+            pageId: block.pageId,
+            blockType: 'paragraph',
+            position: block.position + 1,
+            content: {
+              type: 'paragraph',
+              attrs: {
+                textAlign: 'left',
+                position: block.position + 1
+              },
+              content: []
+            },
+            hasAccess: true,
+            userPermission: 'owner'
+          };
+          console.log("Creating new block on client:", newBlock);
+
+          // Создаем обновленный список всех блоков с новым блоком
+          const updatedBlocks = [...allBlocks, {
+            blockId: newBlock.id,
+            blockType: newBlock.blockType,
+            pageId: newBlock.pageId,
+            content: newBlock.content
+          }];
+
+          // Отправляем полный список блоков на сервер
+          saveBlocksToServer(block.pageId, updatedBlocks);
+
+          onBlockCreated(newBlock);
+          return true;
+        }
+
+        // Для других типов блоков — стандартное поведение
+        // Также стандартное поведение для Enter не в конце параграфа
+        // (например, внутри списка, таблицы, кода и т.д.)
+        return false;
+      },
+    },
+    onUpdate({ editor }) {
+      if (editor.isEmpty) return;
+      handleEditorUpdate(editor);
+    },
+  });
+
+  useEffect(() => () => provider.destroy(), [provider]);
 
   useEffect(() => {
-    document.addEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
-    return () => {
-      document.removeEventListener("ACTIVE_COMMENT_EVENT", handleActiveCommentEvent);
-    };
-  }, []);
+    const yXmlFragment = ydoc.getXmlFragment("content");
+    if (yXmlFragment.length === 0) {
+      const tempYdoc = TiptapTransformer.toYdoc(contentToInit, "default");
+      const tempFragment = tempYdoc.getXmlFragment("content");
+      let nodes = [];
+      if (tempFragment && typeof tempFragment.toArray === "function") {
+        nodes = tempFragment.toArray();
+      } else if (Array.isArray(tempFragment)) {
+        nodes = tempFragment;
+      } else {
+        nodes = [];
+      }
+      // Расширенное логирование для диагностики
+      console.log('[BlockEditor][DIAG] block.content:', block.content);
+      console.log('[BlockEditor][DIAG] tempFragment:', tempFragment);
+      console.log('[BlockEditor][DIAG] nodes:', nodes);
+      const validNodes = nodes.filter(
+        node => node instanceof Y.XmlElement || node instanceof Y.XmlText
+      );
+      console.log('[BlockEditor][DIAG] validNodes:', validNodes);
+      if (validNodes.length === 0) {
+        // Вставляем пустой параграф, если нет валидных узлов
+        const yParagraph = new Y.XmlElement('paragraph');
+        yXmlFragment.insert(0, [yParagraph]);
+      } else {
+        yXmlFragment.insert(0, validNodes);
+      }
+    }
+  }, [ydoc, contentToInit]);
+
+  return (
+    <>
+      <EditorContent editor={editor} />
+      {editor && <EditorBubbleMenu editor={editor} pageId={block.pageId} />}
+    </>
+  );
+}
+
+function PlaceholderBlock({ block }) {
+  return (
+    <div className="placeholder-block">
+      🔒 Нет доступа к этому блоку (ID: {block.id})
+    </div>
+  );
+}
+
+export default function PageEditor({ pageId }) {
+  const [blocks, setBlocks] = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  async function fetchBlocks() {
+    const res = await fetch(`/api/pages/${pageId}/blocks`, { credentials: "include" });
+    const result = await res.json();
+    // Универсальная обработка вложенности
+    let blocks = Array.isArray(result?.data?.data)
+      ? result.data.data
+      : Array.isArray(result?.data)
+      ? result.data
+      : Array.isArray(result)
+      ? result
+      : [];
+    console.log("blocks data from API", blocks);
+    setBlocks(blocks);
+
+    // Если блоков нет и это первая инициализация - создаем первый блок только на клиенте
+    if (blocks.length === 0 && !isInitialized) {
+      console.log("No blocks found, creating initial block on client only");
+      const initialBlock = {
+        id: window.crypto.randomUUID(),
+        pageId: pageId,
+        blockType: 'paragraph',
+        position: 0,
+        content: {
+          type: 'paragraph',
+          attrs: {
+            textAlign: 'left',
+            position: 0
+          },
+          content: []
+        },
+        hasAccess: true,
+        userPermission: 'owner'
+      };
+      console.log("Initial block created on client:", initialBlock);
+
+      // Отправляем первый блок на сервер через тот же эндпоинт
+      saveBlocksToServer(pageId, [{
+        blockId: initialBlock.id,
+        blockType: initialBlock.blockType,
+        pageId: initialBlock.pageId,
+        content: initialBlock.content // Отправляем JSON объект, а не массив
+      }]);
+
+      setBlocks([initialBlock]);
+    }
+    setIsInitialized(true);
+  }
 
   useEffect(() => {
-    setActiveCommentId(null);
-    setShowCommentPopup(false);
-    setAsideState({ tab: "", isAsideOpen: false });
+    fetchBlocks();
   }, [pageId]);
 
-  useEffect(() => {
-    if (remoteProvider?.status === WebSocketStatus.Connecting) {
-      const timeout = setTimeout(() => {
-        setYjsConnectionStatus(WebSocketStatus.Disconnected);
-      }, 5000);
-      return () => clearTimeout(timeout);
-    }
-  }, [remoteProvider?.status]);
-
-  useEffect(() => {
-    if (
-      isIdle &&
-      documentState === "hidden" &&
-      remoteProvider?.status === WebSocketStatus.Connected
-    ) {
-      remoteProvider.disconnect();
-      setIsCollabReady(false);
-      return;
-    }
-
-    if (
-      documentState === "visible" &&
-      remoteProvider?.status === WebSocketStatus.Disconnected
-    ) {
-      const reconnectTimeout = setTimeout(() => {
-        remoteProvider.connect();
-        resetIdle();
-      }, collabRetryCount.current > 2 ? 3000 : 0);
-
-      return () => clearTimeout(reconnectTimeout);
-    }
-  }, [isIdle, documentState, remoteProvider?.status]);
-
-  const isSynced = isLocalSynced && isRemoteSynced;
-
-  useEffect(() => {
-    const collabReadyTimeout = setTimeout(() => {
-      if (
-        !isCollabReady &&
-        isSynced &&
-        remoteProvider.status === WebSocketStatus.Connected
-      ) {
-        setIsCollabReady(true);
+  const handleBlockCreated = (newBlock) => {
+    // Добавляем новый блок в состояние
+    setBlocks(prevBlocks => {
+      const newBlocks = [...prevBlocks];
+      // Находим позицию для вставки
+      const insertIndex = newBlocks.findIndex(block => block.position > newBlock.position);
+      if (insertIndex === -1) {
+        newBlocks.push(newBlock);
+      } else {
+        newBlocks.splice(insertIndex, 0, newBlock);
       }
-    }, 300);
+      return newBlocks;
+    });
+  };
 
-    return () => clearTimeout(collabReadyTimeout);
-  }, [isSynced, isCollabReady, remoteProvider?.status]);
-  //console.log("userId для useAccessibleBlocks:", currentUser?.user.id);
+  const handleBlockDeleted = (blockId) => {
+    setBlocks(prevBlocks => prevBlocks.filter(block => block.id !== blockId));
+  };
 
+  console.log('[PageEditor] Rendering blocks:', blocks);
 
-  return  isCollabReady ? (
+  return (
     <div>
-      <div ref={menuContainerRef}>
-        <EditorContent editor={editor} />
-        {contextMenu && (
-      <div
-        style={{
-          position: "absolute",
-          top: contextMenu.y,
-          left: contextMenu.x,
-          background: "#fff",
-          border: "1px solid #ccc",
-          borderRadius: "6px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          zIndex: 9999,
-        }}
-        onClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => e.preventDefault()}
-      >
-
-      </div>
-    )}
-        {editor && editor.isEditable && (
-          <div>
-            <EditorBubbleMenu editor={editor} pageId={pageId} />
-            <TableMenu editor={editor} />
-            <TableCellMenu editor={editor} appendTo={menuContainerRef} />
-            <ImageMenu editor={editor} />
-            <VideoMenu editor={editor} />
-            <CalloutMenu editor={editor} />
-            <ExcalidrawMenu editor={editor} />
-            <DrawioMenu editor={editor} />
-            <LinkMenu editor={editor} appendTo={menuContainerRef} />
-          </div>
-        )}
-
-        {showCommentPopup && <CommentDialog editor={editor} pageId={pageId} />}
-      </div>
-
-      <div
-        onClick={() => editor.commands.focus("end")}
-        style={{ paddingBottom: "20vh" }}
-      ></div>
+      {blocks.map((block) => {
+        console.log('[PageEditor] Rendering block:', block.id, 'hasAccess:', block.hasAccess);
+        return block.hasAccess ? (
+          <BlockEditor
+            key={block.id}
+            block={block}
+            editable={block.userPermission === "edit" || block.userPermission === "owner"}
+            onBlockCreated={handleBlockCreated}
+            onBlockDeleted={handleBlockDeleted}
+            allBlocks={blocks}
+            saveBlocksToServer={saveBlocksToServer}
+          />
+        ) : (
+          <PlaceholderBlock key={block.id} block={block} />
+        );
+      })}
     </div>
-  ) : (
-
-    <EditorProvider
-      onUpdate={handleContentUpdate}
-      editable={false}
-      immediatelyRender={true}
-      extensions={mainExtensions}
-      content={sanitizedContent(editorContent)}
-    ></EditorProvider>
   );
 }

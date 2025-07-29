@@ -381,6 +381,10 @@ export class PageService {
       const calculatedHash = calculateBlockHash(block);
 
       if (!existingBlock) {
+        if (!block.content || (Array.isArray(block.content) && block.content.length === 0) || (typeof block.content === 'object' && Object.keys(block.content).length === 0)) {
+          this.logger.error('Попытка создать пустой блок через updatePageBlocks:', block, new Error().stack);
+          throw new Error('updatePageBlocks: попытка создать пустой блок!');
+        }
         await this.pageRepo.createBlock(
           block,
           blockId,
@@ -561,11 +565,11 @@ export class PageService {
 
   async getAllBlocksOfPage(pageId: string, userId: string) {
     const allBlocks = await this.db
-    .selectFrom('blocks')
-    .select(['id', 'pageId', 'blockType', 'position', 'content']) // <= строки
-    .where('pageId', '=', pageId)
-    .orderBy('position', 'asc')
-    .execute();
+      .selectFrom('blocks')
+      .select(['id', 'pageId', 'blockType', 'position', 'content'])
+      .where('pageId', '=', pageId)
+      .orderBy('position', 'asc')
+      .execute();
 
     const permissions = await this.db
       .selectFrom('blockPermissions')
@@ -578,23 +582,19 @@ export class PageService {
 
     return allBlocks.map(block => {
       const userPermission = permissionMap.get(block.id);
-
-      if (!userPermission) {
-        return {
-          id: block.id,
-          blockType: block.blockType,
-          position: block.position,
-          userPermission: null,
-        };
-      }
-
       return {
         ...block,
-        userPermission,
+        hasAccess: !!userPermission,
+        userPermission: userPermission ?? 'none',
+        content: userPermission ? block.content : null,
       };
     });
   }
 
+  async saveBlocksForPage(pageId: string, blocks: any[], userId: string) {
+    // Просто делегируем в PageBlocksService
+    await this.PageBlocksService.saveBlocksForPage(pageId, blocks, userId);
+  }
 
   async getMyPages(
     pagination: PaginationOptions,

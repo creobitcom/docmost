@@ -6,7 +6,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('id', 'uuid', (col) =>
       col.primaryKey().defaultTo(sql`gen_uuid_v7()`),
     )
-    .addColumn('page_id', 'uuid', (col) =>
+    .addColumn('pageId', 'uuid', (col) =>
       col.references('pages.id').onDelete('cascade').notNull(),
     )
     .addColumn('slug_id', 'varchar', (col) => col)

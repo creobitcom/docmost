@@ -52,10 +52,7 @@ export function FullEditor({
         isMyPages={isMyPages}
       />
       <MemoizedPageEditor
-        initialContent={content}
         pageId={pageId}
-        editable={true}
-        content={content}
       />
     </Container>
   );

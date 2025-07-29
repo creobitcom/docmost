@@ -12,7 +12,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('group_id', 'uuid', (col) =>
       col.references('groups.id').onDelete('cascade'),
     )
-    .addColumn('page_id', 'uuid', (col) =>
+    .addColumn('pageId', 'uuid', (col) =>
       col.references('pages.id').onDelete('cascade').notNull(),
     )
     .addColumn('role', 'varchar', (col) => col.notNull())
@@ -24,12 +24,12 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.notNull().defaultTo(sql`now()`),
     )
     .addColumn('deleted_at', 'timestamptz', (col) => col)
-    .addUniqueConstraint('page_members_page_id_user_id_unique', [
-      'page_id',
+    .addUniqueConstraint('page_members_pageId_user_id_unique', [
+      'pageId',
       'user_id',
     ])
-    .addUniqueConstraint('page_members_page_id_group_id_unique', [
-      'page_id',
+    .addUniqueConstraint('page_members_pageId_group_id_unique', [
+      'pageId',
       'group_id',
     ])
     .addCheckConstraint(

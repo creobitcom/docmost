@@ -6,7 +6,7 @@ import { sql } from 'kysely';
 
 @Injectable()
 export class BlockPermissionService {
-  constructor(@InjectKysely() private readonly db: KyselyDB) {}
+  constructor(@InjectKysely() public readonly db: KyselyDB) {}
 
   async updateBlockPermission({
     userId,
@@ -110,6 +110,14 @@ export class BlockPermissionService {
   }
 
   async getAccessiblePageBlocks(pageId: string, userId: string) {
+    // Получаем creator_id страницы
+    const page = await this.db
+      .selectFrom('pages')
+      .select(['creator_id'])
+      .where('id', '=', pageId)
+      .executeTakeFirst();
+    const isCreator = page?.creator_id === userId;
+
     const hasPageAccess = await this.userHasDirectPageAccess(userId, pageId);
 
     const blocks = await this.db
@@ -120,7 +128,7 @@ export class BlockPermissionService {
       .leftJoin('blockPermissions as bp_public', (join) =>
         join.onRef('b.id', '=', 'bp_public.blockId').on('bp_public.permission', '=', sql.lit('public'))
       )
-      .innerJoin('pages as p', 'p.id', 'b.pageId')
+      .innerJoin('pages as p', 'b.pageId', 'p.id')
       .select([
         'b.id',
         'b.pageId',
@@ -141,7 +149,7 @@ export class BlockPermissionService {
       .orderBy('b.position')
       .execute();
 
-      const pageMember = await this.db
+    const pageMember = await this.db
       .selectFrom('pageMembers')
       .select(['id', 'source'])
       .where('userId', '=', userId)
@@ -151,23 +159,53 @@ export class BlockPermissionService {
 
     const hasDirectPageAccess = pageMember?.source === 'manual';
 
-
-    console.log(`[AccessCalc] hasPageAccess = ${hasPageAccess}`);
     return blocks.map((block) => {
       const userIsCreator = block.creatorId === userId;
 
-      const hasBlockAccess =
-        !!block.userPermission || userIsCreator;
+      // Если пользователь — создатель страницы, всегда owner-доступ
+      if (userIsCreator) {
+              // Парсим контент из JSON строки
+      let parsedContent;
+      try {
+        parsedContent = typeof block.content === 'string'
+          ? JSON.parse(block.content)
+          : block.content;
+      } catch (e) {
+        console.warn('Failed to parse block content:', block.content);
+        parsedContent = null;
+      }
 
+      return {
+        id: block.id,
+        pageId: block.pageId,
+        blockType: block.blockType,
+        position: block.position,
+        hasAccess: true,
+        userPermission: 'owner',
+        content: parsedContent,
+      };
+      }
+
+      const hasBlockAccess = !!block.userPermission;
       const isPublic = !!block.publicPermission;
       const isUnrestricted = block.permissionCount === 0;
 
       const hasAccess = hasDirectPageAccess
-          ? hasBlockAccess || isPublic || isUnrestricted
-          : hasBlockAccess;
+        ? hasBlockAccess || isPublic || isUnrestricted
+        : hasBlockAccess;
 
-
-      console.log(`[AccessCalc] Block ${block.id}: hasBlockAccess=${hasBlockAccess}, isPublic=${isPublic}, isUnrestricted=${isUnrestricted}, finalHasAccess=${hasAccess}`);
+      // Парсим контент из JSON строки
+      let parsedContent = null;
+      if (hasAccess) {
+        try {
+          parsedContent = typeof block.content === 'string'
+            ? JSON.parse(block.content)
+            : block.content;
+        } catch (e) {
+          console.warn('Failed to parse block content:', block.content);
+          parsedContent = null;
+        }
+      }
 
       return {
         id: block.id,
@@ -177,8 +215,8 @@ export class BlockPermissionService {
         hasAccess,
         userPermission:
           block.userPermission ??
-          (hasPageAccess && (block.publicPermission ?? (userIsCreator ? 'owner' : null))),
-        content: hasAccess ? block.content : null,
+          (hasPageAccess && (block.publicPermission ?? null)),
+        content: parsedContent,
       };
     });
   }

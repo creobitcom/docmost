@@ -12,8 +12,8 @@ export class BlockDto {
   @IsString()
   pageId: string;
 
-  @IsArray()
-  content: any;
+  @IsObject()
+  content: JSON;
 }
 
 export class UpdatePageBlocksDto {

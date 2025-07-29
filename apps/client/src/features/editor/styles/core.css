@@ -164,6 +164,9 @@
     pointer-events: none;
     user-select: text;
   }
+  .tiptap-read-only-context [data-user-permission]:not([data-user-permission="edit"]):not([data-user-permission="owner"]) {
+    display: none !important;
+  }
 
   .alignLeft {
     margin-left: 0;

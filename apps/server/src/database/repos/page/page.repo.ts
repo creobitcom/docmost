@@ -67,8 +67,7 @@ export class PageRepo {
 
     let query = db
       .selectFrom('pages')
-      .select(this.baseFields)
-      .$if(opts?.includeYdoc, (qb) => qb.select('ydoc'));
+      .select(this.baseFields);
 
     if (opts?.includeCreator) {
       query = query.select((eb) => this.withCreator(eb));
@@ -224,11 +223,14 @@ export class PageRepo {
     trx?: KyselyTransaction,
   ): Promise<Page> {
     const db = dbOrTx(this.db, trx);
-    return db
+    const createdPage = await db
       .insertInto('pages')
       .values(insertablePage)
       .returning(this.baseFields)
       .executeTakeFirst();
+
+    // Блоки создаются только на клиенте, не создаем их здесь
+    return createdPage;
   }
 
   async deletePage(pageId: string, trx?: KyselyTransaction): Promise<void> {
@@ -279,6 +281,17 @@ export class PageRepo {
     });
 
     return result;
+  }
+
+  async getLatestPageBySpaceId(spaceId: string): Promise<Page | null> {
+    const page = await this.db
+      .selectFrom('pages')
+      .selectAll()
+      .where('spaceId', '=', spaceId)
+      .orderBy('position', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    return page ?? null;
   }
 
   withSpace(eb: ExpressionBuilder<DB, 'pages'>) {
@@ -390,5 +403,17 @@ export class PageRepo {
       .where('userId', '=', userId)
       .where('pageId', '=', pageId)
       .executeTakeFirst();
+  }
+
+  async getBlockById(blockId: string): Promise<{ pageId: string } | undefined> {
+    return this.db
+      .selectFrom('blocks')
+      .select(['pageId'])
+      .where('id', '=', blockId)
+      .executeTakeFirst();
+  }
+
+  async deleteBlocksByPageId(pageId: string) {
+    await this.db.deleteFrom('blocks').where('pageId', '=', pageId).execute();
   }
 }
