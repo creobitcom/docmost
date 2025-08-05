@@ -180,6 +180,7 @@ export class BlockPermissionService {
           parsedContent = null;
         }
 
+        console.log('[BlockPermissionService] Block content for', block.id, ':', parsedContent);
         return {
           id: block.id,
           pageId: block.pageId,

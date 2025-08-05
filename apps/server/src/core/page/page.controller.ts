@@ -381,7 +381,24 @@ export class PageController {
       }
     }
 
-    return { ...page, blocks, membership };
+    // For backward compatibility with frontend that expects page.content
+    // Convert blocks back to Tiptap JSON format if no content exists
+    let compatibilityContent = page.content;
+    if (!compatibilityContent && blocks.length > 0) {
+      // Reconstruct content from blocks for frontend compatibility
+      compatibilityContent = {
+        type: 'doc',
+        content: blocks.map(block => block.content).filter(Boolean)
+      };
+      console.log('[PageController] Created compatibility content from', blocks.length, 'blocks');
+    }
+
+    return { 
+      ...page, 
+      content: compatibilityContent,
+      blocks, 
+      membership 
+    };
   }
 
   @HttpCode(HttpStatus.OK)
