@@ -15,7 +15,7 @@ import { SpaceModule } from './space/space.module';
 import { GroupModule } from './group/group.module';
 import { CaslModule } from './casl/casl.module';
 import { DomainMiddleware } from '../common/middlewares/domain.middleware';
-import { BlockModule } from './block/block.module';
+//import { BlockModule } from './block/block.module';
 
 @Module({
   imports: [
@@ -23,7 +23,7 @@ import { BlockModule } from './block/block.module';
     AuthModule,
     WorkspaceModule,
     PageModule,
-    BlockModule,
+    //BlockModule,
     AttachmentModule,
     CommentModule,
     SearchModule,
