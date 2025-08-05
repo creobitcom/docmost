@@ -61,6 +61,21 @@ import { extractTopLevelBlocks } from './extract-page-blocks';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB } from '@docmost/db/types/kysely.types';
 import { SkipTransform } from '../../common/decorators/skip-transform.decorator';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Функция для логирования в файл
+function logToFile(message: string) {
+  const logDir = path.join(process.cwd(), 'logs');
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  const logFile = path.join(logDir, 'page-controller.log');
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  fs.appendFileSync(logFile, logMessage);
+  console.log(message); // Также выводим в консоль
+}
 
 interface Request {
   user: { id: string, user: { id: string } };
@@ -316,6 +331,7 @@ export class PageController {
   @HttpCode(HttpStatus.OK)
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User): Promise<any> {
+    logToFile(`[PageController] getPage called with dto: ${JSON.stringify(dto)} user: ${user.id}`);
     const page = await this.pageRepo.findById(dto.pageId, {
       includeSpace: true,
       includeContent: true,
@@ -367,30 +383,33 @@ export class PageController {
 
     // FALLBACK: If no blocks exist but page has content, create blocks from content
     if (blocks.length === 0 && page.content) {
-      console.log('[PageController] No blocks found, creating from page content for page:', page.id);
+      logToFile(`[PageController] No blocks found, creating from page content for page: ${page.id}`);
       try {
         const blocksFromContent = extractTopLevelBlocks(page.content, page.id);
         if (blocksFromContent.length > 0) {
           await this.pageBlocksService.saveBlocksForPage(page.id, blocksFromContent, user.id);
           // Reload blocks after creation
           blocks = await this.blockPermissionService.getAccessiblePageBlocks(page.id, user.id);
-          console.log('[PageController] Created and loaded blocks:', blocks.length);
+          logToFile(`[PageController] Created and loaded blocks: ${blocks.length}`);
         }
       } catch (error) {
-        console.error('[PageController] Error creating blocks from content:', error);
+        logToFile(`[PageController] Error creating blocks from content: ${error}`);
       }
     }
 
     // For backward compatibility with frontend that expects page.content
-    // Convert blocks back to Tiptap JSON format if no content exists
+    // ALWAYS reconstruct content from blocks to ensure latest data
     let compatibilityContent = page.content;
-    if (!compatibilityContent && blocks.length > 0) {
+    if (blocks.length > 0) {
       // Reconstruct content from blocks for frontend compatibility
       compatibilityContent = {
         type: 'doc',
         content: blocks.map(block => block.content).filter(Boolean)
       };
-      console.log('[PageController] Created compatibility content from', blocks.length, 'blocks');
+      logToFile(`[PageController] Created compatibility content from ${blocks.length} blocks`);
+      logToFile(`[PageController] Compatibility content: ${JSON.stringify(compatibilityContent, null, 2)}`);
+    } else {
+      logToFile(`[PageController] No blocks found, using original page.content`);
     }
 
     return { 

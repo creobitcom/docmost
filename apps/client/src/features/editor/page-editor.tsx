@@ -149,6 +149,7 @@ export default function PageEditor({
     {
       extensions,
       editable,
+      content: content, // Add content parameter to initialize editor with page content
       immediatelyRender: true,
       shouldRerenderOnTransaction: true,
       editorProps: {
@@ -197,7 +198,7 @@ export default function PageEditor({
         debouncedUpdateContent(editorJson);
       },
     },
-    [pageId, editable, remoteProvider?.status],
+    [pageId, editable, content, remoteProvider?.status], // Add content to dependencies
   );
 
   const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {

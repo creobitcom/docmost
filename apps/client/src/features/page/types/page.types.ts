@@ -18,7 +18,7 @@ export interface IPage {
   //   };
   //   [key: string]: any;
   // }>;
-  content: string;
+  content: any; // Changed from string to any to support both string and object formats
   icon: string;
   coverPhoto: string;
   parentPageId: string;
