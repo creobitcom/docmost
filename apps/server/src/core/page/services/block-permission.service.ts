@@ -150,6 +150,7 @@ export class BlockPermissionService {
       .execute();
 
     console.log('[BlockPermissionService] getAccessiblePageBlocks for pageId:', pageId, 'userId:', userId);
+    console.log('[BlockPermissionService] Page creator check: page.creatorId:', page?.creatorId, 'userId:', userId, 'isCreator:', isCreator);
     console.log('[BlockPermissionService] Raw blocks from DB:', blocks.map(b => ({ id: b.id, position: b.position, blockType: b.blockType })));
     console.log('[BlockPermissionService] Total blocks found:', blocks.length);
 
@@ -164,10 +165,10 @@ export class BlockPermissionService {
     const hasDirectPageAccess = pageMember?.source === 'manual';
 
     const result = blocks.map((block) => {
-      const userIsCreator = block.creatorId === userId;
+      const userIsBlockCreator = block.creatorId === userId;
 
-      // Если пользователь — создатель страницы, всегда owner-доступ
-      if (userIsCreator) {
+      // Если пользователь — создатель страницы, всегда owner-доступ ко всем блокам
+      if (isCreator || userIsBlockCreator) {
         // Парсим контент из JSON строки
         let parsedContent;
         try {
@@ -185,7 +186,7 @@ export class BlockPermissionService {
           blockType: block.blockType,
           position: block.position,
           hasAccess: true,
-          userPermission: 'owner',
+          userPermission: isCreator ? 'page-owner' : 'block-owner',
           content: parsedContent,
         };
       }
