@@ -149,7 +149,9 @@ export class BlockPermissionService {
       .orderBy('b.position')
       .execute();
 
-    console.log('[BlockPermissionService] Raw blocks from DB:', blocks.map(b => ({ id: b.id, position: b.position })));
+    console.log('[BlockPermissionService] getAccessiblePageBlocks for pageId:', pageId, 'userId:', userId);
+    console.log('[BlockPermissionService] Raw blocks from DB:', blocks.map(b => ({ id: b.id, position: b.position, blockType: b.blockType })));
+    console.log('[BlockPermissionService] Total blocks found:', blocks.length);
 
     const pageMember = await this.db
       .selectFrom('page_members')

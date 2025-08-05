@@ -346,7 +346,7 @@ export class PageController {
       role: userPageRole,
       permissions: pageAbility.rules,
     };
-    const blocks = await this.blockPermissionService.getAccessiblePageBlocks(page.id, user.id);
+    let blocks = await this.blockPermissionService.getAccessiblePageBlocks(page.id, user.id);
 
     const syncPage = await this.syncPageService.findByReferenceId(page.id);
 
@@ -363,6 +363,22 @@ export class PageController {
       page.id = originPage.id;
       page.title = originPage.title;
       page.icon = originPage.icon;
+    }
+
+    // FALLBACK: If no blocks exist but page has content, create blocks from content
+    if (blocks.length === 0 && page.content) {
+      console.log('[PageController] No blocks found, creating from page content for page:', page.id);
+      try {
+        const blocksFromContent = extractTopLevelBlocks(page.content, page.id);
+        if (blocksFromContent.length > 0) {
+          await this.pageBlocksService.saveBlocksForPage(page.id, blocksFromContent, user.id);
+          // Reload blocks after creation
+          blocks = await this.blockPermissionService.getAccessiblePageBlocks(page.id, user.id);
+          console.log('[PageController] Created and loaded blocks:', blocks.length);
+        }
+      } catch (error) {
+        console.error('[PageController] Error creating blocks from content:', error);
+      }
     }
 
     return { ...page, blocks, membership };
