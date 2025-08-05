@@ -72,10 +72,10 @@ export class PageMemberService {
       .where(({ not, exists, selectFrom }) =>
         not(
           exists(
-            selectFrom('pageMembers')
+            selectFrom('page_members')
               .select('id')
-              .whereRef('pageMembers.userId', '=', 'users.id')
-              .where('pageMembers.pageId', '=', dto.pageId),
+              .whereRef('page_members.userId', '=', 'users.id')
+              .where('page_members.pageId', '=', dto.pageId),
           ),
         ),
       );
@@ -88,10 +88,10 @@ export class PageMemberService {
       .where(({ not, exists, selectFrom }) =>
         not(
           exists(
-            selectFrom('pageMembers')
+            selectFrom('page_members')
               .select('id')
-              .whereRef('pageMembers.groupId', '=', 'groups.id')
-              .where('pageMembers.pageId', '=', dto.pageId),
+              .whereRef('page_members.groupId', '=', 'groups.id')
+              .where('page_members.pageId', '=', dto.pageId),
           ),
         ),
       );

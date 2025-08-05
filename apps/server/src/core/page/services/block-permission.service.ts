@@ -113,10 +113,10 @@ export class BlockPermissionService {
     // Получаем creator_id страницы
     const page = await this.db
       .selectFrom('pages')
-      .select(['creator_id'])
+      .select(['creatorId'])
       .where('id', '=', pageId)
       .executeTakeFirst();
-    const isCreator = page?.creator_id === userId;
+    const isCreator = page?.creatorId === userId;
 
     const hasPageAccess = await this.userHasDirectPageAccess(userId, pageId);
 
@@ -135,7 +135,7 @@ export class BlockPermissionService {
         'b.blockType',
         'b.content',
         'b.position',
-        'p.creator_id as creatorId',
+        'p.creatorId as creatorId',
         'bp.permission as userPermission',
         'bp_public.permission as publicPermission',
         (eb) =>

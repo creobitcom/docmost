@@ -30,7 +30,7 @@ export class PageMemberRepo {
   ): Promise<void> {
     const db = dbOrTx(this.db, trx);
     await db
-      .insertInto('pageMembers')
+      .insertInto('page_members')
       .values(insertablePageMember)
       .returningAll()
       .execute();
@@ -49,17 +49,17 @@ export class PageMemberRepo {
     pageId: string,
   ): Promise<UserPageRole[]> {
     const roles = await this.db
-      .selectFrom('pageMembers')
+      .selectFrom('page_members')
       .select(['userId', 'role'])
       .where('userId', '=', userId)
       .where('pageId', '=', pageId)
       .unionAll(
         this.db
-          .selectFrom('pageMembers')
-          .innerJoin('groupUsers', 'groupUsers.groupId', 'pageMembers.groupId')
-          .select(['groupUsers.userId', 'pageMembers.role'])
+          .selectFrom('page_members')
+          .innerJoin('groupUsers', 'groupUsers.groupId', 'page_members.groupId')
+          .select(['groupUsers.userId', 'page_members.role'])
           .where('groupUsers.userId', '=', userId)
-          .where('pageMembers.pageId', '=', pageId),
+          .where('page_members.pageId', '=', pageId),
       )
       .execute();
 
@@ -71,9 +71,9 @@ export class PageMemberRepo {
 
   async getPageMembersPaginated(pageId: string, pagination: PaginationOptions) {
     let query = this.db
-      .selectFrom('pageMembers')
-      .leftJoin('users', 'users.id', 'pageMembers.userId')
-      .leftJoin('groups', 'groups.id', 'pageMembers.groupId')
+      .selectFrom('page_members')
+      .leftJoin('users', 'users.id', 'page_members.userId')
+      .leftJoin('groups', 'groups.id', 'page_members.groupId')
       .select([
         'users.id as userId',
         'users.name as userName',
@@ -82,12 +82,12 @@ export class PageMemberRepo {
         'groups.id as groupId',
         'groups.name as groupName',
         'groups.isDefault as groupIsDefault',
-        'pageMembers.role',
-        'pageMembers.createdAt',
+        'page_members.role',
+        'page_members.createdAt',
       ])
       .select((eb) => this.groupRepo.withMemberCount(eb))
-      .where('pageMembers.pageId', '=', pageId)
-      .orderBy('pageMembers.createdAt', 'asc');
+      .where('page_members.pageId', '=', pageId)
+      .orderBy('page_members.createdAt', 'asc');
 
     if (pagination.query) {
       query = query.where((eb) =>
@@ -139,7 +139,7 @@ export class PageMemberRepo {
 
   async roleCountByPageId(role: string, pageId: string): Promise<number> {
     const { count } = await this.db
-      .selectFrom('pageMembers')
+      .selectFrom('page_members')
       .select((eb) => eb.fn.count('role').as('count'))
       .where('role', '=', role)
       .where('pageId', '=', pageId)
@@ -154,7 +154,7 @@ export class PageMemberRepo {
     pageId: string,
   ): Promise<void> {
     await this.db
-      .updateTable('pageMembers')
+      .updateTable('page_members')
       .set(updatablePageMember)
       .where('id', '=', pageMemberId)
       .where('pageId', '=', pageId)
@@ -171,7 +171,7 @@ export class PageMemberRepo {
   ): Promise<PageMember> {
     const db = dbOrTx(this.db, trx);
     let query = db
-      .selectFrom('pageMembers')
+      .selectFrom('page_members')
       .selectAll()
       .where('pageId', '=', pageId);
     if (opts.userId) {
@@ -191,7 +191,7 @@ export class PageMemberRepo {
   ): Promise<void> {
     const db = dbOrTx(this.db, trx);
     await db
-      .deleteFrom('pageMembers')
+      .deleteFrom('page_members')
       .where('id', '=', memberId)
       .where('pageId', '=', pageId)
       .execute();

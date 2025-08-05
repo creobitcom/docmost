@@ -28,6 +28,7 @@ import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 import { MyPageColorDto } from '../dto/update-color.dto';
 import { PageBlocksService } from './page-blocks.service';
+// import { CopyPageDto } from '../dto/copy-page.dto';
 
 @Injectable()
 export class PageService {
@@ -149,6 +150,23 @@ export class PageService {
     });
   }
 
+  withHasChildren(eb: ExpressionBuilder<DB, 'pages'>) {
+    return eb
+      .selectFrom('pages as child')
+      .select((eb) =>
+        eb
+          .case()
+          .when(eb.fn.countAll(), '>', 0)
+          .then(true)
+          .else(false)
+          .end()
+          .as('count'),
+      )
+      .whereRef('child.parentPageId', '=', 'pages.id')
+      .limit(1)
+      .as('hasChildren');
+  }
+
   async getPagesInSpace(
     spaceId: string,
     pagination?: PaginationOptions,
@@ -165,18 +183,14 @@ export class PageService {
     return this.pageRepo.getSidebarPages(spaceId, pagination, pageId);
   }
 
-  async movePageToSpace(
-    rootPage: Page,
-    spaceId: string,
-    parentPageId?: string,
-  ) {
+  async movePageToSpace(rootPage: Page, spaceId: string) {
     await executeTx(this.db, async (trx) => {
       // Update root page
       const nextPosition = await this.nextPagePosition(spaceId);
       await this.pageRepo.updatePageMetadata(
         {
           spaceId,
-          parentPageId: parentPageId ?? null,
+          parentPageId: null,
           position: nextPosition,
           content: rootPage.content,
         },
@@ -408,11 +422,38 @@ export class PageService {
   }
 
   async getMyPages(
-    userId: string,
-    pagination: PaginationOptions,
     pageId?: string,
+    pagination?: PaginationOptions,
   ): Promise<PaginationResult<SidebarPageResultDto>> {
-    return this.pageRepo.getMyPages(userId, pagination, pageId);
+    const baseQuery = this.db
+      .selectFrom('pages')
+      .select([
+        'id',
+        'slugId',
+        'title',
+        'icon',
+        'position',
+        'parentPageId',
+        'spaceId',
+        'creatorId',
+        'isSynced',
+      ])
+      .select((eb) => this.withHasChildren(eb))
+      .orderBy('position', 'asc');
+
+    const query = baseQuery.where(
+      'parentPageId',
+      pageId ? '=' : 'is',
+      pageId ?? null,
+    );
+
+    const result: PaginationResult<SidebarPageResultDto> =
+      await executeWithPagination(query, {
+        page: pagination?.page || 1,
+        perPage: 250,
+      });
+
+    return result;
   }
 
   async updateMyPageColor(dto: MyPageColorDto, userId: string) {
@@ -456,73 +497,15 @@ export class PageService {
     return pageUpdateResult;
   }
 
-  async copyPage(
-    copyPageDto: CopyPageDto,
-    userId: string,
-    workspaceId: string,
-  ) {
-    const { parentPageId, originPageId, spaceId } = copyPageDto;
-
-    if (parentPageId) {
-      const parentPage = await this.pageRepo.findById(parentPageId);
-      if (!parentPage) {
-        throw new NotFoundException(`Parent page "${parentPageId}" not found.`);
-      }
-      if (parentPage.spaceId !== spaceId) {
-        throw new NotFoundException(
-          `Parent page "${parentPageId}" does not belong to space "${spaceId}".`,
-        );
-      }
-    }
-
-    const originPage = await this.pageRepo.findById(originPageId, {
-      includeContent: true,
-    });
-    if (!originPage) {
-      throw new NotFoundException('Origin page not found');
-    }
-
-    const newPage = await executeTx<Page>(this.db, async (trx) => {
-      const position = await this.nextPagePosition(spaceId, parentPageId);
-
-      const copyPage = await this.pageRepo.insertPage(
-        {
-          slugId: generateSlugId(),
-          title: `${originPage.title} - Copy`,
-          position,
-          icon: originPage.icon,
-          parentPageId,
-          spaceId,
-          creatorId: userId,
-          workspaceId,
-          lastUpdatedById: userId,
-        },
-        trx,
-      );
-
-      if (originPage.content) {
-        await this.pageRepo.insertContent(
-          copyPage.id,
-          originPage.content as PageContent,
-          trx,
-        );
-      }
-
-      await this.pageMemberRepo.insertPageMember(
-        {
-          userId,
-          pageId: copyPage.id,
-          role: SpaceRole.ADMIN,
-          addedById: userId,
-        },
-        trx,
-      );
-
-      return copyPage;
-    });
-
-    return newPage;
-  }
+  // async copyPage(
+  //   copyPageDto: CopyPageDto,
+  //   userId: string,
+  //   workspaceId: string,
+  // ) {
+  //   const { parentPageId, originPageId, spaceId } = copyPageDto;
+  //   // Implementation commented out - feature removed
+  //   throw new BadRequestException('Copy page feature is not available');
+  // }
 }
 
 /*

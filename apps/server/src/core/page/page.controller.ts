@@ -411,10 +411,11 @@ export class PageController {
       user.id,
     );
 
-    if (updatePageDto.content) {
-      const blocks = extractTopLevelBlocks(updatePageDto.content, updatePageDto.pageId);
-      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, blocks, user.id);
-    }
+    // Block extraction will be handled in page service if content is provided
+    // if (updatePageDto.content) {
+    //   const blocks = extractTopLevelBlocks(updatePageDto.content, updatePageDto.pageId);
+    //   await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, blocks, user.id);
+    // }
 
     if (page.isSynced) {
       const syncPageData = await this.syncPageService.findByReferenceId(
@@ -808,7 +809,7 @@ export class PageController {
     @Query() dto: MyPagesDto,
     @Query() pagination: PaginationOptions,
   ) {
-    return this.pageService.getMyPages(pagination, dto.pageId);
+    return this.pageService.getMyPages(dto.pageId, pagination);
   }
 
   validateIds(dto: RemovePageMemberDto | UpdatePageMemberRoleDto) {

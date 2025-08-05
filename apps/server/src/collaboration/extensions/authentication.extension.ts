@@ -29,11 +29,13 @@ export class AuthenticationExtension implements Extension {
     const { documentName, token } = data;
     let pageId: string;
     if (documentName.startsWith('block.')) {
-      // Получить pageId по blockId через публичный метод pageRepo
-      const blockId = documentName.split('.')[1];
-      const block = await this.pageRepo.getBlockById(blockId);
-      if (!block) throw new NotFoundException('Block not found');
-      pageId = block.pageId;
+      // For block documents, extract pageId from document name format: block.{blockId}.{pageId}
+      const parts = documentName.split('.');
+      if (parts.length >= 3) {
+        pageId = parts[2];
+      } else {
+        throw new UnauthorizedException('Invalid block document format');
+      }
     } else {
       pageId = getPageId(documentName);
     }

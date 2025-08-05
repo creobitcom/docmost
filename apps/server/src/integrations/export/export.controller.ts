@@ -44,9 +44,7 @@ export class ExportController {
     @AuthUser() user: User,
     @Res() res: FastifyReply,
   ) {
-    const page = await this.pageService.findById(dto.pageId, {
-      includeContent: true,
-    });
+    const page = await this.pageService.findById(dto.pageId, true);
 
     if (!page) {
       throw new NotFoundException('Page not found');
