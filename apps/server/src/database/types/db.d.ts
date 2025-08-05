@@ -116,6 +116,16 @@ export interface Blocks {
   pageId: string;
   stateHash: string | null;
   updatedAt: Generated<Timestamp | null>;
+  yjsSnapshot: Buffer | null;
+}
+
+export interface BlockPermissions {
+  blockId: string;
+  id: Generated<string>;
+  pageId: string;
+  permission: string;
+  role: string;
+  userId: string;
 }
 
 export interface Comments {
@@ -178,6 +188,7 @@ export interface PageMembers {
   id: Generated<string>;
   pageId: string;
   role: string;
+  source: Generated<string | null>;
   updatedAt: Generated<Timestamp>;
   userId: string | null;
 }
@@ -320,12 +331,13 @@ export interface DB {
   authProviders: AuthProviders;
   backlinks: Backlinks;
   billing: Billing;
+  block_permissions: BlockPermissions;
   blocks: Blocks;
   comments: Comments;
   groups: Groups;
   groupUsers: GroupUsers;
   pageHistory: PageHistory;
-  pageMembers: PageMembers;
+  page_members: PageMembers;
   pages: Pages;
   spaceMembers: SpaceMembers;
   spaces: Spaces;
