@@ -32,7 +32,6 @@ import {
   Excalidraw,
   Embed,
   Mention,
-  BlockGroup,
 } from '@docmost/editor-ext';
 import { generateText, getSchema, JSONContent } from '@tiptap/core';
 import { generateHTML } from '../common/helpers/prosemirror/html';
@@ -78,7 +77,6 @@ export const tiptapExtensions = [
   Excalidraw,
   Embed,
   Mention,
-  BlockGroup,
 ] as any;
 
 export function jsonToHtml(tiptapJson: any) {
