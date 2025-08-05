@@ -11,6 +11,11 @@ import {
   BadRequestException,
   Logger,
   Query,
+  Param,
+  Put,
+  Inject,
+  Req,
+  Delete,
 } from '@nestjs/common';
 import { PageService } from './services/page.service';
 import { CreatePageDto } from './dto/create-page.dto';
@@ -22,7 +27,7 @@ import { AuthUser } from '../../common/decorators/auth-user.decorator';
 import { AuthWorkspace } from '../../common/decorators/auth-workspace.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
-import { User, Workspace } from '@docmost/db/types/entity.types';
+import { SpaceMember, User, Workspace } from '@docmost/db/types/entity.types';
 import { SidebarPageDto } from './dto/sidebar-page.dto';
 import {
   SpaceCaslAction,
@@ -48,11 +53,24 @@ import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { MyPageColorDto } from './dto/update-color.dto';
 import { MyPagesDto } from './dto/my-pages.dto';
 import { CopyPageDto } from './dto/copy-page.dto';
+import { SpaceRole } from 'src/common/helpers/types/permission';
+import { BlockPermissionService } from './services/block-permission.service';
+import { PageBlocksService } from './services/page-blocks.service';
+import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
+import { extractTopLevelBlocks } from './extract-page-blocks';
+import { InjectKysely } from 'nestjs-kysely';
+import { KyselyDB } from '@docmost/db/types/kysely.types';
+import { SkipTransform } from '../../common/decorators/skip-transform.decorator';
+
+interface Request {
+  user: { id: string, user: { id: string } };
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller('pages')
 export class PageController {
   constructor(
+    private readonly pageBlocksService: PageBlocksService,
     private readonly pageService: PageService,
     private readonly pageMemberService: PageMemberService,
     private readonly pageMemberRepo: PageMemberRepo,
@@ -61,11 +79,243 @@ export class PageController {
     private readonly spaceAbility: SpaceAbilityFactory,
     private readonly pageAbility: PageAbilityFactory,
     private readonly syncPageService: SynchronizedPageService,
+    private readonly blockPermissionService: BlockPermissionService,
+    @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
   @HttpCode(HttpStatus.OK)
+  @Post('blocks/:pageId')
+  @SkipTransform()
+  async updateBlocksForPage(
+    @Param('pageId') pageId: string,
+    @Body() dto: UpdatePageBlocksDto,
+    @AuthUser() user: User,
+  ) {
+    console.log('updateBlocksForPage pageId:', pageId, 'body:', dto);
+
+    const page = await this.pageRepo.findById(pageId);
+    if (!page) {
+      throw new NotFoundException('Page not found');
+    }
+
+    const pageAbility = await this.pageAbility.createForUser(user, pageId);
+    if (pageAbility.cannot(PageCaslAction.Edit, PageCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks, user.id);
+    return { success: true };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get('blockPermissions/:pageId/:blockId')
+  async getBlockPermissions(
+    @Param('pageId') pageId: string,
+    @Param('blockId') blockId: string,
+    @AuthUser() user: User,
+  ) {
+    console.log('[getBlockPermissions] Starting with pageId:', pageId, 'blockId:', blockId, 'user.id:', user.id);
+
+    // Логируем SQL-запрос
+    const query = this.db
+      .selectFrom('pages')
+      .select('creatorId')
+      .where('id', '=', pageId);
+
+    console.log('[getBlockPermissions] SQL Query:', query.compile());
+
+    const page = await query.executeTakeFirst() as any;
+
+    console.log('[getBlockPermissions] Raw page result:', page);
+    console.log('[getBlockPermissions] Page creatorId:', page?.creatorId);
+    console.log('[getBlockPermissions] Page creatorId type:', typeof page?.creatorId);
+
+    if (!page) {
+      console.error('[getBlockPermissions] Page not found for id:', pageId);
+      throw new NotFoundException('Page not found');
+    }
+    if (!page.creatorId) {
+      console.error('[getBlockPermissions] Page creatorId is null for id:', pageId);
+      throw new ForbiddenException('Page creatorId is null');
+    }
+    console.log('[getBlockPermissions] user.id:', user.id, 'page.creatorId:', page.creatorId, 'typeof user.id:', typeof user.id, 'typeof creatorId:', typeof page.creatorId);
+    const isCreator = page.creatorId === user.id;
+
+    // Если пользователь не создатель, проверяем его права на блок
+    if (!isCreator) {
+      const blockPermission = await this.db
+        .selectFrom('block_permissions')
+        .select('permission')
+        .where('pageId', '=', pageId)
+        .where('blockId', '=', blockId)
+        .where('userId', '=', user.id)
+        .executeTakeFirst();
+
+      // Если у пользователя нет прав 'owner', запрещаем доступ
+      if (!blockPermission || blockPermission.permission !== 'owner') {
+        throw new ForbiddenException('Insufficient permissions to view block permissions');
+      }
+    }
+
+    const permissions = await this.db
+      .selectFrom('block_permissions')
+      .innerJoin('users', 'users.id', 'block_permissions.userId')
+      .select((eb) => [
+        'users.id',
+        'users.name',
+        eb.ref('users.avatarUrl').as('avatarUrl'),
+        'block_permissions.permission',
+      ])
+      .where('block_permissions.pageId', '=', pageId)
+      .where('block_permissions.blockId', '=', blockId)
+      .execute();
+
+    return permissions;
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get(':pageId/blockPermissions')
+  async getAccessibleBlocks(
+    @Param('pageId') pageId: string,
+    @Query('userId') userId: string,
+  ) {
+    if (!userId) {
+      console.warn('[BlockPermissions] userId is missing in query!');
+      throw new BadRequestException('userId is required');
+    }
+
+    return this.blockPermissionService.getAccessiblePageBlocks(pageId, userId);
+  }
+
+  @Get(':id/blocks')
+  async getAllPageBlocks(@Param('id') pageId: string, @AuthUser() user: User) {
+    console.log('[PageController] user:', user);
+
+    const page = await this.pageRepo.findById(pageId);
+    if (!page) {
+      throw new NotFoundException('Page not found');
+    }
+
+    const pageAbility = await this.pageAbility.createForUser(user, pageId);
+    if (pageAbility.cannot(PageCaslAction.Read, PageCaslSubject.Page)) {
+      throw new ForbiddenException();
+    }
+
+    const result = await this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
+    console.log('[PageController] Blocks returned with positions:', result.map(b => ({ id: b.id, position: b.position })));
+    return { data: result, success: true };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('blockPermissions')
+  async assignPermissionToBlock(
+    @Body() dto: {
+      pageId: string;
+      blockId: string;
+      userId: string;
+      role?: string;
+      permission?: string;
+    },
+    @AuthUser() user: User,
+  ) {
+    const { pageId, blockId, userId, role = 'reader', permission = 'read' } = dto;
+
+    // Запрещаем пользователю изменять свои собственные права
+    if (userId === user.id) {
+      throw new ForbiddenException('Users cannot modify their own permissions');
+    }
+
+    // Проверяем, является ли пользователь создателем страницы
+    const page = await this.db
+      .selectFrom('pages')
+      .select('creatorId')
+      .where('id', '=', pageId)
+      .executeTakeFirst() as any;
+
+    const isCreator = page?.creatorId === user.id;
+
+    // Если пользователь не создатель, проверяем его права на блок
+    if (!isCreator) {
+      const blockPermission = await this.db
+        .selectFrom('block_permissions')
+        .select('permission')
+        .where('pageId', '=', pageId)
+        .where('blockId', '=', blockId)
+        .where('userId', '=', user.id)
+        .executeTakeFirst();
+
+      // Если у пользователя нет прав 'owner', запрещаем доступ
+      if (!blockPermission || blockPermission.permission !== 'owner') {
+        throw new ForbiddenException('Insufficient permissions to modify block permissions');
+      }
+    }
+
+    // check: does block exist on current page
+    const block = await this.db
+      .selectFrom('blocks')
+      .select(['id'])
+      .where('pageId', '=', pageId)
+      .where('id', '=', blockId)
+      .executeTakeFirst();
+
+    if (!block) {
+      throw new NotFoundException('Block not found for given page and blockId');
+    }
+
+    // Cascade permission save
+    await this.blockPermissionService.updateBlockPermission({
+      pageId,
+      blockId,
+      userId,
+      role,
+      permission: permission as 'read' | 'edit' | 'owner',
+    });
+
+    return { success: true };
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Delete('blockPermissions')
+  async deleteBlockPermission(
+    @Body() dto: { pageId: string; blockId: string; userId: string },
+    @AuthUser() user: User,
+  ) {
+    // Запрещаем пользователю удалять свои собственные права
+    if (dto.userId === user.id) {
+      throw new ForbiddenException('Users cannot delete their own permissions');
+    }
+
+    // Проверяем, является ли пользователь создателем страницы
+    const page = await this.db
+      .selectFrom('pages')
+      .select('creatorId')
+      .where('id', '=', dto.pageId)
+      .executeTakeFirst() as any;
+
+    const isCreator = page?.creatorId === user.id;
+
+    // Если пользователь не создатель, проверяем его права на блок
+    if (!isCreator) {
+      const blockPermission = await this.db
+        .selectFrom('block_permissions')
+        .select('permission')
+        .where('pageId', '=', dto.pageId)
+        .where('blockId', '=', dto.blockId)
+        .where('userId', '=', user.id)
+        .executeTakeFirst();
+
+      // Если у пользователя нет прав 'owner', запрещаем доступ
+      if (!blockPermission || blockPermission.permission !== 'owner') {
+        throw new ForbiddenException('Insufficient permissions to delete block permissions');
+      }
+    }
+
+    return this.blockPermissionService.deleteBlockPermission(dto);
+  }
+
+  @HttpCode(HttpStatus.OK)
   @Post('/info')
-  async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User) {
+  async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User): Promise<any> {
     const page = await this.pageRepo.findById(dto.pageId, {
       includeSpace: true,
       includeContent: true,
@@ -96,9 +346,11 @@ export class PageController {
       role: userPageRole,
       permissions: pageAbility.rules,
     };
+    const blocks = await this.blockPermissionService.getAccessiblePageBlocks(page.id, user.id);
 
-    if (page.isSynced) {
-      const syncPage = await this.syncPageService.findByReferenceId(page.id);
+    const syncPage = await this.syncPageService.findByReferenceId(page.id);
+
+    if (syncPage) {
       const originPage = await this.pageRepo.findById(syncPage.originPageId, {
         includeContent: true,
         includeLastUpdatedBy: true,
@@ -108,10 +360,12 @@ export class PageController {
         throw new NotFoundException('Origin page not found');
       }
       page.content = originPage.content;
-      return { ...page, membership, originPageId: originPage.id };
+      page.id = originPage.id;
+      page.title = originPage.title;
+      page.icon = originPage.icon;
     }
 
-    return { ...page, membership };
+    return { ...page, blocks, membership };
   }
 
   @HttpCode(HttpStatus.OK)
@@ -151,6 +405,16 @@ export class PageController {
     }
 
     Logger.debug(updatePageDto);
+    const updatedPage = await this.pageService.update(
+      page,
+      updatePageDto,
+      user.id,
+    );
+
+    if (updatePageDto.content) {
+      const blocks = extractTopLevelBlocks(updatePageDto.content, updatePageDto.pageId);
+      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, blocks, user.id);
+    }
 
     if (page.isSynced) {
       const syncPageData = await this.syncPageService.findByReferenceId(
@@ -162,7 +426,7 @@ export class PageController {
       return this.pageService.update(originPage, updatePageDto, user.id);
     }
 
-    return this.pageService.update(page, updatePageDto, user.id);
+    return updatedPage;
   }
 
   @HttpCode(HttpStatus.OK)
@@ -398,11 +662,7 @@ export class PageController {
       throw new ForbiddenException();
     }
 
-    return this.pageService.movePageToSpace(
-      movedPage,
-      dto.spaceId,
-      dto.parentPageId,
-    );
+    return this.pageService.movePageToSpace(movedPage, dto.spaceId);
   }
 
   @HttpCode(HttpStatus.OK)
@@ -547,32 +807,8 @@ export class PageController {
   async myPages(
     @Query() dto: MyPagesDto,
     @Query() pagination: PaginationOptions,
-    @AuthUser() user: User,
   ) {
-    const pages = await this.pageService.getMyPages(
-      user.id,
-      pagination,
-      dto.pageId,
-    );
-
-    return {
-      items: await Promise.all(
-        pages.items.map(async (page) => {
-          try {
-            const pageAbility = await this.pageAbility.createForUser(
-              user,
-              page.id,
-            );
-            return pageAbility.can(PageCaslAction.Read, PageCaslSubject.Page)
-              ? page
-              : null;
-          } catch (err) {
-            return null;
-          }
-        }),
-      ).then((items) => items.filter(Boolean)),
-      meta: pages.meta,
-    };
+    return this.pageService.getMyPages(pagination, dto.pageId);
   }
 
   validateIds(dto: RemovePageMemberDto | UpdatePageMemberRoleDto) {
@@ -602,21 +838,5 @@ export class PageController {
     await this.pageService.updateMyPageColor(dto, user.id);
   }
 
-  @HttpCode(HttpStatus.OK)
-  @Post('/copy')
-  async copyPage(
-    @Body() copyPageDto: CopyPageDto,
-    @AuthUser() user: User,
-    @AuthWorkspace() workspace: Workspace,
-  ) {
-    const pageAbility = await this.pageAbility.createForUser(
-      user,
-      copyPageDto.originPageId,
-    );
-    if (!pageAbility.can(PageCaslAction.Read, PageCaslSubject.Page)) {
-      throw new ForbiddenException();
-    }
 
-    return this.pageService.copyPage(copyPageDto, user.id, workspace.id);
-  }
 }

@@ -7,11 +7,7 @@ import {
 import { CreatePageDto } from '../dto/create-page.dto';
 import { UpdatePageDto } from '../dto/update-page.dto';
 import { PageRepo } from '@docmost/db/repos/page/page.repo';
-import {
-  Page,
-  PageContent,
-  UpdatablePage,
-} from '@docmost/db/types/entity.types';
+import { Page, UpdatablePage } from '@docmost/db/types/entity.types';
 import { PaginationOptions } from '@docmost/db/pagination/pagination-options';
 import {
   executeWithPagination,
@@ -28,10 +24,10 @@ import { calculateBlockHash, executeTx } from '@docmost/db/utils';
 import { PageMemberRepo } from '@docmost/db/repos/page/page-member.repo';
 import { SpaceRole } from 'src/common/helpers/types/permission';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
-import { SidebarPageResultDto } from '../dto/sidebar-page.dto';
+import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 import { MyPageColorDto } from '../dto/update-color.dto';
-import { CopyPageDto } from '../dto/copy-page.dto';
+import { PageBlocksService } from './page-blocks.service';
 
 @Injectable()
 export class PageService {
@@ -42,6 +38,7 @@ export class PageService {
     private pageMemberRepo: PageMemberRepo,
     private attachmentRepo: AttachmentRepo,
     private readonly syncPageRepo: SynchronizedPageRepo,
+    private readonly PageBlocksService: PageBlocksService,
     @InjectKysely() private readonly db: KyselyDB,
   ) {
     this.logger = new Logger('PageService');
@@ -49,16 +46,14 @@ export class PageService {
 
   async findById(
     pageId: string,
-    opts?: {
-      includeContent?: boolean;
-      includeYdoc?: boolean;
-      includeSpace?: boolean;
-    },
+    includeContent?: boolean,
+    includeYdoc?: boolean,
+    includeSpace?: boolean,
   ): Promise<Page> {
     return this.pageRepo.findById(pageId, {
-      includeContent: opts?.includeContent,
-      includeYdoc: opts?.includeYdoc,
-      includeSpace: opts?.includeSpace,
+      includeContent,
+      includeYdoc,
+      includeSpace,
     });
   }
 
