@@ -77,7 +77,11 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
 
   // Инициализируем контент блока
   const initializeBlockContent = useMemo(() => {
-    if (!block.content) {
+    console.log('[BlockEditor] Initializing content for block:', block.id, 'content:', block.content);
+    
+    // Проверяем, что контент существует и не является null/undefined
+    if (!block.content || block.content === null || block.content === undefined) {
+      console.log('[BlockEditor] No content found, creating empty paragraph');
       // Если контента нет, создаем пустой параграф
       return {
         type: "doc",
@@ -96,28 +100,46 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
     if (typeof block.content === 'string') {
       try {
         normalizedContent = JSON.parse(block.content);
+        console.log('[BlockEditor] Parsed string content:', normalizedContent);
       } catch (e) {
         console.warn('Failed to parse block content:', block.content);
         normalizedContent = null;
       }
     } else {
       normalizedContent = block.content;
+      console.log('[BlockEditor] Using object content:', normalizedContent);
     }
 
-    // Убеждаемся, что контент имеет правильную структуру
-    if (normalizedContent && normalizedContent.content && Array.isArray(normalizedContent.content)) {
+    // Проверяем, что нормализованный контент имеет правильную структуру
+    if (normalizedContent && 
+        typeof normalizedContent === 'object' && 
+        normalizedContent.type === 'doc' && 
+        normalizedContent.content && 
+        Array.isArray(normalizedContent.content)) {
+      
+      console.log('[BlockEditor] Content has valid structure, processing...');
+      
       // Устанавливаем blockId для всех элементов контента
-      const contentWithBlockId = normalizedContent.content.map((node: any) => ({
-        ...node,
-        attrs: { ...node.attrs, blockId: block.id }
-      }));
+      const contentWithBlockId = normalizedContent.content.map((node: any) => {
+        if (node && typeof node === 'object') {
+          return {
+            ...node,
+            attrs: { ...node.attrs, blockId: block.id }
+          };
+        }
+        return node;
+      }).filter(Boolean); // Удаляем null/undefined элементы
 
-      return {
+      const result = {
         ...normalizedContent,
         content: contentWithBlockId
       };
+      
+      console.log('[BlockEditor] Final processed content:', result);
+      return result;
     }
 
+    console.log('[BlockEditor] Content structure invalid, using fallback');
     // Fallback: создаем параграф с blockId
     return {
       type: "doc",
@@ -187,7 +209,16 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
   const editor = useEditor({
     extensions,
     editable,
-    content: initializeBlockContent,
+    content: initializeBlockContent || {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          attrs: { blockId: block.id },
+          content: []
+        }
+      ]
+    },
     immediatelyRender: false, // Изменено на false для предотвращения ошибок
     shouldRerenderOnTransaction: false, // Изменено на false
     editorProps: {
