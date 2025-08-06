@@ -54,35 +54,39 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
     });
   }, [block.id, block.pageId, collaborationURL, collabQuery?.token, ydoc]);
 
-  // Подключаемся к серверу с задержкой
+  // Подключаемся к серверу с задержкой и ограничением одновременных соединений
   useEffect(() => {
-    if (provider) {
+    if (provider && !isInitialized) {
+      // Увеличиваем задержку для стабильности и добавляем более строгую логику
+      const delay = 2000 + (Math.random() * 3000); // 2-5 секунд
       const timer = setTimeout(() => {
         try {
+          console.log('[BlockEditor] Connecting provider for block:', block.id);
           provider.connect();
           setIsInitialized(true);
         } catch (error) {
           console.error('[BlockEditor] Provider connection error:', error);
         }
-      }, Math.random() * 1000);
+      }, delay);
 
       return () => {
         clearTimeout(timer);
-        try {
-          provider.destroy();
-        } catch (error) {
-          console.error('[BlockEditor] Provider destroy error:', error);
+        if (provider) {
+          try {
+            console.log('[BlockEditor] Destroying provider for block:', block.id);
+            provider.destroy();
+          } catch (error) {
+            console.error('[BlockEditor] Provider destroy error:', error);
+          }
         }
       };
     }
-  }, [provider]);
+  }, [provider, isInitialized, block.id]);
 
-  // Инициализируем контент блока
+  // Инициализируем контент блока с оптимизированной логикой
   const initializeBlockContent = useMemo(() => {
-    console.log('[BlockEditor] Initializing content for block:', block.id, 'content:', block.content);
-    
+    // Уменьшаем количество логов для производительности
     if (!block.content || block.content === null || block.content === undefined) {
-      console.log('[BlockEditor] No content found, creating empty paragraph');
       return {
         type: "doc",
         content: [
@@ -99,46 +103,36 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
     if (typeof block.content === 'string') {
       try {
         normalizedContent = JSON.parse(block.content);
-        console.log('[BlockEditor] Parsed string content:', normalizedContent);
       } catch (e) {
-        console.warn('Failed to parse block content:', block.content);
+        console.warn('[BlockEditor] Failed to parse block content:', block.content);
         normalizedContent = null;
       }
     } else {
       normalizedContent = block.content;
-      console.log('[BlockEditor] Using object content:', normalizedContent);
     }
 
     if (normalizedContent && typeof normalizedContent === 'object') {
+      // Проверяем, что это валидный Tiptap документ
       if (normalizedContent.type === 'doc' && 
           normalizedContent.content && 
           Array.isArray(normalizedContent.content)) {
         
-        console.log('[BlockEditor] Content is already a doc, processing...');
-        
-        const contentWithBlockId = normalizedContent.content.map((node: any) => {
-          if (node && typeof node === 'object') {
-            return {
-              ...node,
-              attrs: { ...node.attrs, blockId: block.id }
-            };
-          }
-          return node;
-        }).filter(Boolean);
+        const contentWithBlockId = normalizedContent.content
+          .filter((node: any) => node && typeof node === 'object')
+          .map((node: any) => ({
+            ...node,
+            attrs: { ...node.attrs, blockId: block.id }
+          }));
 
-        const result = {
+        return {
           ...normalizedContent,
           content: contentWithBlockId
         };
-        
-        console.log('[BlockEditor] Final processed doc content:', result);
-        return result;
       }
       
+      // Если это одиночный элемент, оборачиваем в doc
       if (normalizedContent.type && normalizedContent.type !== 'doc') {
-        console.log('[BlockEditor] Content is a single element, wrapping in doc...');
-        
-        const wrappedContent = {
+        return {
           type: "doc",
           content: [
             {
@@ -147,13 +141,10 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
             }
           ]
         };
-        
-        console.log('[BlockEditor] Wrapped content:', wrappedContent);
-        return wrappedContent;
       }
     }
 
-    console.log('[BlockEditor] Content structure invalid, using fallback');
+    // Fallback для невалидного контента
     return {
       type: "doc",
       content: [
@@ -261,8 +252,12 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
         try {
           editor.storage.pageId = block.pageId;
           editor.storage.blockId = block.id;
-          // Устанавливаем флаг готовности после успешного создания
-          setTimeout(() => setEditorReady(true), 50);
+          // Увеличиваем задержку для стабилизации DOM
+          setTimeout(() => {
+            if (editor && !editor.isDestroyed) {
+              setEditorReady(true);
+            }
+          }, 200);
         } catch (error) {
           console.error('[BlockEditor] Error in onCreate:', error);
         }
@@ -271,7 +266,7 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
     onUpdate: handleEditorUpdate,
   }, [block.id, block.pageId, editable, initializeBlockContent, extensions]);
 
-  if (!editor || !editorReady) {
+  if (!editor || !editorReady || editor.isDestroyed) {
     return (
       <div 
         data-block-id={block.id}

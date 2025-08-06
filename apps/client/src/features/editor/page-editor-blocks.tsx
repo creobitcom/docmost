@@ -113,6 +113,29 @@ export default function PageEditorBlocks({
     }
   }, [fetchBlocks, isInitialized]);
 
+  // Постепенное отображение блоков с оптимизированными параметрами
+  useEffect(() => {
+    if (blocks.length > 0 && visibleBlocks.size === 0) {
+      // Начинаем с первых 2 блоков для большей стабильности
+      const initialBlocks = blocks.slice(0, 2).map(block => block.id);
+      setVisibleBlocks(new Set(initialBlocks));
+
+      // Добавляем остальные блоки по одному для максимальной стабильности
+      let currentIndex = 2;
+      const interval = setInterval(() => {
+        if (currentIndex < blocks.length) {
+          const nextBlock = blocks[currentIndex].id;
+          setVisibleBlocks(prev => new Set([...prev, nextBlock]));
+          currentIndex += 1;
+        } else {
+          clearInterval(interval);
+        }
+      }, 1500); // Увеличили интервал до 1.5 секунды для стабильности
+
+      return () => clearInterval(interval);
+    }
+  }, [blocks]);
+
   // Debounced функция для сохранения блоков на сервере
   const saveBlocksToServer = useDebouncedCallback(async (pageId: string, updatedBlocks: Block[]) => {
     try {

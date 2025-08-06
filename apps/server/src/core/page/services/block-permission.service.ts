@@ -111,11 +111,23 @@ export class BlockPermissionService {
 
   async getAccessiblePageBlocks(pageId: string, userId: string) {
     // Получаем creator_id страницы
-    const page = await this.db
+    console.log('[BlockPermissionService] Starting getAccessiblePageBlocks for pageId:', pageId, 'userId:', userId);
+    
+    const pageQuery = this.db
       .selectFrom('pages')
-      .select(['creatorId'])
-      .where('id', '=', pageId)
-      .executeTakeFirst();
+      .select(['creatorId', 'id', 'title'])
+      .where('id', '=', pageId);
+    
+    console.log('[BlockPermissionService] Page query SQL:', pageQuery.compile());
+    
+    const page = await pageQuery.executeTakeFirst();
+    
+    console.log('[BlockPermissionService] Raw page result:', page);
+    console.log('[BlockPermissionService] Page creatorId type:', typeof page?.creatorId);
+    console.log('[BlockPermissionService] Page creatorId value:', page?.creatorId);
+    console.log('[BlockPermissionService] Page creatorId === null:', page?.creatorId === null);
+    console.log('[BlockPermissionService] Page creatorId === undefined:', page?.creatorId === undefined);
+    
     const isCreator = page?.creatorId === userId;
 
     const hasPageAccess = await this.userHasDirectPageAccess(userId, pageId);
