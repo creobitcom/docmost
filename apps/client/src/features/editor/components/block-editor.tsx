@@ -155,11 +155,9 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
 
   // Настройка расширений для блока
   const extensions = useMemo(() => {
-    if (!provider || !isInitialized) return [];
-
-    return [
+    // Всегда возвращаем базовые расширения, чтобы избежать ошибки схемы
+    const baseExtensions = [
       ...mainExtensions,
-      ...collabExtensions(provider, currentUser?.user),
       // Используем creobitExtentions без BlockId, так как мы настроим его отдельно для каждого блока
       ...creobitExtentions.filter(ext => ext.name !== 'block-id'),
       // Настраиваем BlockId специально для этого блока
@@ -174,6 +172,16 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
         },
       }),
     ];
+
+    // Добавляем коллаборационные расширения только если провайдер инициализирован
+    if (provider && isInitialized && currentUser?.user) {
+      return [
+        ...baseExtensions,
+        ...collabExtensions(provider, currentUser.user),
+      ];
+    }
+
+    return baseExtensions;
   }, [provider, currentUser?.user, block.id, isInitialized]);
 
   const editor = useEditor({
@@ -219,7 +227,7 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
     onUpdate: handleEditorUpdate,
   }, [block.id, block.pageId, editable, initializeBlockContent, extensions]);
 
-  if (!provider || !editor || !isInitialized) {
+  if (!editor) {
     return (
       <div 
         data-block-id={block.id}
