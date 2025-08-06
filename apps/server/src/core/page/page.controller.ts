@@ -523,18 +523,15 @@ export class PageController {
     }
 
     // For backward compatibility with frontend that expects page.content
-    // ALWAYS reconstruct content from blocks to ensure latest data
-    let compatibilityContent = page.content;
+    // Return blocks separately instead of combining them into one document
+    let compatibilityContent = null;
     if (blocks.length > 0) {
-      // Reconstruct content from blocks for frontend compatibility
-      compatibilityContent = {
-        type: 'doc',
-        content: blocks.map(block => block.content).filter(Boolean)
-      };
-      logToFile(`[PageController] Created compatibility content from ${blocks.length} blocks`);
-      logToFile(`[PageController] Compatibility content: ${JSON.stringify(compatibilityContent, null, 2)}`);
+      // Return the first block's content for backward compatibility, but keep blocks separate
+      compatibilityContent = blocks[0]?.content || null;
+      logToFile(`[PageController] Returning ${blocks.length} separate blocks`);
     } else {
       logToFile(`[PageController] No blocks found, using original page.content`);
+      compatibilityContent = page.content;
     }
 
     return { 
