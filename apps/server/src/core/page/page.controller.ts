@@ -237,8 +237,8 @@ export class PageController {
         throw new ForbiddenException('No access to this page');
       }
 
-      // Получаем блоки страницы с правами доступа
-      const blocks = await this.pageService.getPageBlocksWithPermissions(pageId, user.id);
+      // Получаем блоки страницы с правами доступа через BlockPermissionService
+      const blocks = await this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
       
       console.log('[getPageBlocks] Returning blocks:', blocks.length);
       return blocks;
