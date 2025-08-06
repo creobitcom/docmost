@@ -30,6 +30,7 @@ export default function PageEditorBlocks({
   const [currentUser] = useAtom(currentUserAtom);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [visibleBlocks, setVisibleBlocks] = useState<Set<string>>(new Set());
 
   // Функция для загрузки блоков страницы
   const fetchBlocks = useCallback(async () => {
@@ -44,7 +45,32 @@ export default function PageEditorBlocks({
         
         // Извлекаем массив блоков из ответа
         const blocksData = responseData.data || responseData;
-        setBlocks(Array.isArray(blocksData) ? blocksData : []);
+        const blocksArray = Array.isArray(blocksData) ? blocksData : [];
+        setBlocks(blocksArray);
+        
+        // Показываем первые 5 блоков сразу
+        const initialVisibleBlocks = new Set(blocksArray.slice(0, 5).map(block => block.id));
+        setVisibleBlocks(initialVisibleBlocks);
+        
+        // Постепенно показываем остальные блоки
+        if (blocksArray.length > 5) {
+          let currentIndex = 5;
+          const interval = setInterval(() => {
+            if (currentIndex < blocksArray.length) {
+              setVisibleBlocks(prev => {
+                const newSet = new Set(prev);
+                // Показываем по 3 блока за раз
+                for (let i = 0; i < 3 && currentIndex + i < blocksArray.length; i++) {
+                  newSet.add(blocksArray[currentIndex + i].id);
+                }
+                return newSet;
+              });
+              currentIndex += 3;
+            } else {
+              clearInterval(interval);
+            }
+          }, 200); // Задержка 200мс между группами блоков
+        }
       } else {
         console.error('[PageEditorBlocks] Failed to fetch blocks:', response.status);
         // Если блоки не найдены, создаем блок из старого контента
@@ -58,6 +84,7 @@ export default function PageEditorBlocks({
             userPermission: editable ? "edit" : "read"
           };
           setBlocks([fallbackBlock]);
+          setVisibleBlocks(new Set([fallbackBlock.id]));
         }
       }
     } catch (error) {
@@ -73,6 +100,7 @@ export default function PageEditorBlocks({
           userPermission: editable ? "edit" : "read"
         };
         setBlocks([fallbackBlock]);
+        setVisibleBlocks(new Set([fallbackBlock.id]));
       }
     }
   }, [pageId, content, editable]);
@@ -112,6 +140,7 @@ export default function PageEditorBlocks({
       saveBlocksToServer(pageId, updatedBlocks);
       return updatedBlocks;
     });
+    setVisibleBlocks(prev => new Set([...prev, newBlock.id]));
   }, [pageId, saveBlocksToServer]);
 
   // Обработчик удаления блока
@@ -120,6 +149,11 @@ export default function PageEditorBlocks({
       const updatedBlocks = prevBlocks.filter(block => block.id !== blockId);
       saveBlocksToServer(pageId, updatedBlocks);
       return updatedBlocks;
+    });
+    setVisibleBlocks(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(blockId);
+      return newSet;
     });
   }, [pageId, saveBlocksToServer]);
 
@@ -144,7 +178,27 @@ export default function PageEditorBlocks({
   return (
     <div>
       {blocksArray.map((block) => {
-        console.log('[PageEditorBlocks] Rendering block:', block.id, 'hasAccess:', block.hasAccess);
+        console.log('[PageEditorBlocks] Rendering block:', block.id, 'hasAccess:', block.hasAccess, 'visible:', visibleBlocks.has(block.id));
+        
+        // Показываем блок только если он видим
+        if (!visibleBlocks.has(block.id)) {
+          return (
+            <div 
+              key={block.id}
+              style={{ 
+                minHeight: '1.5em',
+                padding: '0.5em',
+                backgroundColor: '#f9f9f9',
+                border: '1px solid #e0e0e0',
+                borderRadius: '4px',
+                marginBottom: '0.5em'
+              }}
+            >
+              Загрузка...
+            </div>
+          );
+        }
+
         return block.hasAccess ? (
           <BlockEditor
             key={block.id}

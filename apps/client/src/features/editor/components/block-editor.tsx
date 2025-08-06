@@ -32,6 +32,7 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
   const [currentUser] = useAtom(currentUserAtom);
   const collaborationURL = useCollaborationUrl();
   const { data: collabQuery } = useCollabToken();
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Создаем отдельный YDoc для каждого блока
   const ydoc = useMemo(() => new Y.Doc(), [block.id]);
@@ -51,12 +52,25 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
     });
   }, [block.id, block.pageId, collaborationURL, collabQuery?.token, ydoc]);
 
-  // Подключаемся к серверу
+  // Подключаемся к серверу с задержкой
   useEffect(() => {
     if (provider) {
-      provider.connect();
+      const timer = setTimeout(() => {
+        try {
+          provider.connect();
+          setIsInitialized(true);
+        } catch (error) {
+          console.error('[BlockEditor] Provider connection error:', error);
+        }
+      }, Math.random() * 1000); // Случайная задержка для предотвращения одновременных подключений
+
       return () => {
-        provider.destroy();
+        clearTimeout(timer);
+        try {
+          provider.destroy();
+        } catch (error) {
+          console.error('[BlockEditor] Provider destroy error:', error);
+        }
       };
     }
   }, [provider]);
@@ -141,7 +155,7 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
 
   // Настройка расширений для блока
   const extensions = useMemo(() => {
-    if (!provider) return [];
+    if (!provider || !isInitialized) return [];
 
     return [
       ...mainExtensions,
@@ -160,14 +174,14 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
         },
       }),
     ];
-  }, [provider, currentUser?.user, block.id]);
+  }, [provider, currentUser?.user, block.id, isInitialized]);
 
   const editor = useEditor({
     extensions,
     editable,
     content: initializeBlockContent,
-    immediatelyRender: true,
-    shouldRerenderOnTransaction: true,
+    immediatelyRender: false, // Изменено на false для предотвращения ошибок
+    shouldRerenderOnTransaction: false, // Изменено на false
     editorProps: {
       scrollThreshold: 80,
       scrollMargin: 80,
@@ -203,11 +217,9 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
       }
     },
     onUpdate: handleEditorUpdate,
-  }, [block.id, block.pageId, editable, initializeBlockContent, provider?.status]);
+  }, [block.id, block.pageId, editable, initializeBlockContent, extensions]);
 
-
-
-  if (!provider || !editor) {
+  if (!provider || !editor || !isInitialized) {
     return (
       <div 
         data-block-id={block.id}
