@@ -1,28 +1,48 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState, forwardRef } from "react";
 import {
-  Modal,
+  Box,
   TextInput,
-  Button,
-  Group,
-  Stack,
   Text,
+  Loader,
   Avatar,
+  Group,
+  ScrollArea,
+  Modal,
+  Button,
   Select,
-  ActionIcon,
-  Tooltip,
+  Divider,
+  Stack,
 } from "@mantine/core";
-import { IconSearch, IconX, IconUserPlus } from "@tabler/icons-react";
+import { IconSearch, IconLink } from "@tabler/icons-react";
+import { useDebouncedValue } from "@mantine/hooks";
+import { useWorkspaceMembersQuery } from "@/features/workspace/queries/workspace-query";
+import { Editor } from "@tiptap/react";
+import { notifications } from "@mantine/notifications";
+import { assignPermissionToBlock } from "@/lib/api-client";
+import { getBlockPermissions, removeBlockPermission, updateBlockPermission } from "@/lib/api-client";
+import { Tooltip, ActionIcon } from '@mantine/core';
+import { getPageInfo } from "@/lib/api-client";
 import { useAtom } from "jotai";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
-import { useDebouncedValue } from "@mantine/hooks";
-import { useSpaceMembersQuery } from "@/features/space/queries/space-query";
-import {
-  assignPermissionToBlock,
-  getBlockPermissions,
-  removeBlockPermission,
-  updateBlockPermission,
-  getPageInfo,
-} from "@/lib/api-client";
+
+interface ItemProps extends React.ComponentPropsWithoutRef<"div"> {
+  label: string;
+  value: string;
+}
+
+const SelectItem = forwardRef<HTMLDivElement, ItemProps>(({ label, value, ...others }, ref) => (
+  <div
+    ref={ref}
+    {...others}
+    style={{
+      padding: 8,
+      color: value === "delete" ? "#fa5252" : undefined,
+    }}
+  >
+    <Text size="sm">{label}</Text>
+  </div>
+));
+SelectItem.displayName = "SelectItem";
 
 interface SearchMenuProps {
   opened: boolean;
@@ -30,16 +50,119 @@ interface SearchMenuProps {
   pageId: string;
 }
 
+interface BlockPermission {
+  userId: string;
+  name: string;
+  permission: "read" | "edit" | "owner";
+  avatarUrl?: string;
+}
+
+interface PagePermission {
+  userId: string;
+  name: string;
+  permission: "read" | "edit" | "owner";
+  avatarUrl?: string;
+}
+
+export function CopyBlockLinkButton({
+  spaceSlug,
+  pageSlug,
+  pageTitle,
+  blockId,
+}: {
+  spaceSlug: string;
+  pageSlug: string;
+  pageTitle: string;
+  blockId: string;
+}) {
+  const handleCopy = async () => {
+    const encodedTitle = encodeURIComponent(pageTitle ?? "");
+    const url = `${window.location.origin}/s/${spaceSlug}/p/${encodedTitle}-${pageSlug}#${blockId}`;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      notifications.show({ message: "Link copied to clipboard", color: "green" });
+    } catch (err) {
+      notifications.show({ message: "Failed to copy link", color: "red" });
+    }
+  };
+
+  return (
+    <Tooltip label="Copy block link">
+      <Button
+        variant="light"
+        leftSection={<IconLink size={16} />}
+        onClick={handleCopy}
+        style={{ flex: 1 }}
+      >
+        Copy link
+      </Button>
+    </Tooltip>
+  );
+}
+
+const permissionOptions = [
+  { label: "Owner", value: "owner" },
+  { label: "Edit", value: "edit" },
+  { label: "Read", value: "read" },
+  { label: "Удалить доступ", value: "delete" },
+];
+
 export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
-  const [currentUser] = useAtom(currentUserAtom);
   const [search, setSearch] = useState("");
-  const [debounced] = useDebouncedValue(search, 500);
+  const [debounced] = useDebouncedValue(search, 300);
+  const [blockPermissions, setBlockPermissions] = useState<BlockPermission[]>([]);
+  const [spaceId, setSpaceId] = useState<string | null>(null);
+  const [pagePermissions, setPagePermissions] = useState<PagePermission[] | null>(null);
+  const [loadingPagePerms, setLoadingPagePerms] = useState(false);
+  const [pageSlug, setPageSlug] = useState<string | null>(null);
+  const [spaceSlug, setSpaceSlug] = useState<string | null>(null);
+  const [pageTitle, setPageTitle] = useState<string | null>(null);
+  const [currentUser] = useAtom(currentUserAtom);
+  const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
   const [isPageCreator, setIsPageCreator] = useState(false);
+
+  useEffect(() => {
+    const fetchPageInfo = async () => {
+      try {
+        const pageResponse = await fetch(`/api/pages/info`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ pageId }),
+        });
+
+        if (pageResponse.ok) {
+          const pageData = await pageResponse.json();
+          const pageInfo = pageData.data;
+          
+          // Используем creatorId напрямую для определения создателя
+          const creatorId = pageInfo?.creator_id || pageInfo?.creatorId || pageInfo?.creator?.id;
+          setIsPageCreator(creatorId === currentUser?.user?.id);
+          
+          // Получаем информацию о странице для копирования ссылки
+          setSpaceSlug(pageInfo?.spaceSlug);
+          setPageSlug(pageInfo?.pageSlug);
+          setPageTitle(pageInfo?.pageTitle);
+        }
+      } catch (e) {
+        console.error("Failed to fetch page info:", e);
+      }
+    };
+
+    fetchPageInfo();
+  }, [pageId, currentUser?.user?.id]);
+
   const [selectedPermissionsMap, setSelectedPermissionsMap] = useState<
     Record<string, "read" | "edit" | "owner">
   >({});
 
-  const { data, isLoading } = useSpaceMembersQuery(debounced);
+  const { data, isLoading } = useWorkspaceMembersQuery({
+    page: 1,
+    limit: 5,
+    query: debounced,
+  });
 
   // Получаем ID текущего блока из выделенного текста
   const getBlockId = (): string | null => {
@@ -52,177 +175,346 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
   };
 
   useEffect(() => {
-    const fetchPageInfo = async () => {
-      try {
-        const pageResponse = await getPageInfo({ pageId });
-        setIsPageCreator(pageResponse.data?.creatorId === currentUser?.user?.id);
-      } catch (e) {
-        console.error("Failed to fetch page info:", e);
-      }
-    };
-
-    if (opened) {
-      fetchPageInfo();
-    }
-  }, [pageId, currentUser?.user?.id, opened]);
-
-  useEffect(() => {
     const fetchPermissions = async () => {
       const blockId = getBlockId();
       if (!blockId) return;
 
       try {
         const result = await getBlockPermissions({ pageId, blockId });
-        const permissionsMap: Record<string, "read" | "edit" | "owner"> = {};
-        result.data?.forEach((permission) => {
-          permissionsMap[permission.userId] = permission.role as "read" | "edit" | "owner";
-        });
-        setSelectedPermissionsMap(permissionsMap);
-      } catch (e) {
-        console.error("Failed to fetch block permissions:", e);
+        setBlockPermissions(
+          result.data?.map((item) => ({
+            userId: item.userId,
+            name: item.name,
+            avatarUrl: item.avatarUrl,
+            permission: item.role,
+          })) || []
+        );
+
+        // Проверяем права текущего пользователя на этот блок
+        const currentUserPermission = result.data?.find(item => item.userId === currentUser?.user?.id);
+        setUserBlockPermission(currentUserPermission?.role || null);
+      } catch (err) {
+        notifications.show({ message: "Failed to load permissions", color: "red" });
       }
     };
 
     if (opened) {
       fetchPermissions();
+    } else {
+      setSearch("");
+      setBlockPermissions([]);
+      setUserBlockPermission(null);
     }
-  }, [pageId, opened]);
+  }, [opened, currentUser?.user?.id, pageId]);
 
-  const handleAssignPermission = async (userId: string, role: "read" | "edit" | "owner") => {
-    const blockId = getBlockId();
-    if (!blockId) return;
+  const blockId = getBlockId();
+
+  const handleSelectUserWithPermission = async (user: any) => {
+    if (!blockId || !pageId) {
+      notifications.show({
+        message: "Block or page ID not found",
+        color: "red",
+      });
+      return;
+    }
+
+    const permission = selectedPermissionsMap[user.id] || "read";
 
     try {
-      await assignPermissionToBlock({ pageId, blockId, userId, role });
-      setSelectedPermissionsMap(prev => ({ ...prev, [userId]: role }));
+      await assignPermissionToBlock({
+        userId: user.id,
+        pageId,
+        blockId,
+        role: permission,
+      });
+
+      notifications.show({ message: "User permission saved", color: "green" });
+
+      setBlockPermissions((prev) => {
+        const exists = prev.find((p) => p.userId === user.id);
+        if (exists) {
+          return prev.map((p) =>
+            p.userId === user.id ? { ...p, permission, name: user.name, avatarUrl: user.avatarUrl } : p
+          );
+        }
+        return [...prev, { userId: user.id, name: user.name, permission, avatarUrl: user.avatarUrl }];
+      });
+
+      setSelectedPermissionsMap((prev) => ({
+        ...prev,
+        [user.id]: permission,
+      }));
+    } catch (error) {
+      notifications.show({
+        message: "Failed to save user permission",
+        color: "red",
+      });
+    }
+  };
+
+  const handleChangePermission = async (
+    userId: string,
+    permission: "read" | "edit" | "owner"
+  ) => {
+    if (!blockId) return;
+
+    const user = data?.items.find((u) => u.id === userId);
+
+    if (!user) {
+      notifications.show({
+        message: "User not found in workspace",
+        color: "red",
+      });
+      return;
+    }
+
+    try {
+      await updateBlockPermission({
+        userId,
+        pageId,
+        blockId,
+        role: permission,
+      });
+
+      setSelectedPermissionsMap((prev) => ({
+        ...prev,
+        [userId]: permission,
+      }));
+
+      setBlockPermissions((prev) =>
+        prev.map((p) =>
+          p.userId === userId
+            ? { ...p, permission }
+            : p
+        )
+      );
+
+      notifications.show({
+        message: `Permission changed to ${permission}`,
+        color: "green",
+      });
     } catch (e) {
-      console.error("Failed to assign permission:", e);
+      notifications.show({
+        message: "Failed to update permission",
+        color: "red",
+      });
     }
   };
 
   const handleRemovePermission = async (userId: string) => {
-    const blockId = getBlockId();
     if (!blockId) return;
 
     try {
-      await removeBlockPermission({ pageId, blockId, userId });
-      setSelectedPermissionsMap(prev => {
-        const newMap = { ...prev };
-        delete newMap[userId];
-        return newMap;
+      await removeBlockPermission({
+        pageId,
+        blockId,
+        userId,
       });
+
+      setBlockPermissions((prev) => prev.filter((p) => p.userId !== userId));
+      setSelectedPermissionsMap((prev) => {
+        const copy = { ...prev };
+        delete copy[userId];
+        return copy;
+      });
+
+      notifications.show({ message: "Access removed", color: "blue" });
     } catch (e) {
-      console.error("Failed to remove permission:", e);
+      notifications.show({ message: "Failed to remove permission", color: "red" });
     }
   };
-
-  const handleUpdatePermission = async (userId: string, role: "read" | "edit" | "owner") => {
-    const blockId = getBlockId();
-    if (!blockId) return;
-
-    try {
-      await updateBlockPermission({ pageId, blockId, userId, role });
-      setSelectedPermissionsMap(prev => ({ ...prev, [userId]: role }));
-    } catch (e) {
-      console.error("Failed to update permission:", e);
-    }
-  };
-
-  const filteredMembers = data?.items?.filter(member => member.type === 'user') || [];
 
   return (
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Управление правами доступа к блоку"
-      size="md"
+      title="Assign permission"
+      size="lg"
+      yOffset="10vh"
+      zIndex={10000}
     >
-      <Stack gap="md">
-        <TextInput
-          placeholder="Поиск пользователей..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          leftSection={<IconSearch size={16} />}
-        />
-
-        <Text size="sm" c="dimmed">
-          Блок: {getBlockId() || "Не выбран"}
-        </Text>
-
-        {filteredMembers.map((member) => {
-          const currentPermission = selectedPermissionsMap[member.id];
-          const isAssigned = !!currentPermission;
-          const isCurrentUser = member.id === currentUser?.user?.id;
-
-          return (
-            <Group key={member.id} justify="space-between" align="center">
-              <Group gap="sm">
-                <Avatar src={member.avatarUrl} size="sm" />
-                <div>
-                  <Text size="sm" fw={500}>
-                    {member.name}
-                    {isCurrentUser && (
-                      <Text size="xs" c="blue" style={{ marginLeft: '4px' }}>
-                        (Вы)
-                      </Text>
-                    )}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {member.email}
-                  </Text>
-                </div>
-              </Group>
-
-              <Group gap="xs">
-                {isAssigned ? (
-                  <>
-                    <Select
-                      size="xs"
-                      value={currentPermission}
-                      onChange={(value) => 
-                        value && handleUpdatePermission(member.id, value as "read" | "edit" | "owner")
-                      }
-                      data={[
-                        { value: "read", label: "Чтение" },
-                        { value: "edit", label: "Редактирование" },
-                        { value: "owner", label: "Владелец" },
-                      ]}
-                      w={120}
-                      disabled={isCurrentUser} // Запрещаем редактирование собственных прав
-                    />
-                    <Tooltip label={isCurrentUser ? "Нельзя удалить собственные права" : "Удалить права"}>
-                      <ActionIcon
-                        size="sm"
-                        variant="subtle"
-                        color="red"
-                        onClick={() => handleRemovePermission(member.id)}
-                        disabled={isCurrentUser} // Запрещаем удаление собственных прав
-                      >
-                        <IconX size={14} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </>
-                ) : (
-                  <Button
-                    size="xs"
-                    leftSection={<IconUserPlus size={14} />}
-                    onClick={() => handleAssignPermission(member.id, "read")}
-                    disabled={isCurrentUser} // Запрещаем добавление собственных прав
-                  >
-                    Добавить
-                  </Button>
-                )}
-              </Group>
-            </Group>
-          );
-        })}
-
-        {filteredMembers.length === 0 && !isLoading && (
-          <Text size="sm" c="dimmed" ta="center">
-            Пользователи не найдены
+      {/* Проверка прав пользователя */}
+      {userBlockPermission !== 'owner' && !isPageCreator && (
+        <Stack gap="md" align="center" py="xl">
+          <Text size="lg" fw={500} color="red">
+            Недостаточно прав
           </Text>
-        )}
-      </Stack>
+          <Text size="sm" color="dimmed" ta="center">
+            Для управления правами доступа к блоку требуются права владельца (owner) или статус создателя страницы.
+          </Text>
+          <Button onClick={onClose} variant="default">
+            Закрыть
+          </Button>
+        </Stack>
+      )}
+
+      {/* Основной контент модалки - показывается только для владельцев или создателей */}
+      {(userBlockPermission === 'owner' || isPageCreator) && (
+        <>
+          {/* --- Новый блок: права доступа на страницу --- */}
+          {pagePermissions && (
+            <>
+              <Divider my="md" />
+              <Text size="sm" fw={500} mb="xs">
+                Page Permissions
+              </Text>
+              {loadingPagePerms ? (
+                <Loader size="sm" />
+              ) : pagePermissions.length === 0 ? (
+                <Text size="xs" color="dimmed">
+                  No permissions found for this page.
+                </Text>
+              ) : (
+                <Stack gap="xs" maw={400}>
+                  {pagePermissions.map((perm) => (
+                    <Group key={perm.userId} gap="sm" justify="apart" wrap="nowrap">
+                      <Group gap="xs" wrap="nowrap">
+                        <Avatar src={perm.avatarUrl} size="sm" />
+                        <Text size="sm">{perm.name}</Text>
+                      </Group>
+                      <Text size="sm" color="dimmed" tt="capitalize" fw={600}>
+                        {perm.permission}
+                      </Text>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+            </>
+          )}
+          {blockPermissions.length > 0 && (
+            <>
+              <Text size="sm" fw={500} mt="md" mb="xs">
+                Shared with
+              </Text>
+              <ScrollArea.Autosize mah={200}>
+                <Stack gap="xs">
+                  {blockPermissions.map((user) => (
+                    <Group
+                      key={user.userId}
+                      justify="space-between"
+                      p="xs"
+                      style={{ borderRadius: 8, border: "1px solid #eee" }}
+                    >
+                      <Group>
+                        <Avatar src={user.avatarUrl} size="sm" />
+                        <Box>
+                          <Text size="sm">{user.name}</Text>
+                        </Box>
+                      </Group>
+                      <Select
+                        searchable={false}
+                        value={user.permission}
+                        onChange={(value) => {
+                          if (value === "delete") {
+                            handleRemovePermission(user.userId);
+                          } else if (value === "read" || value === "edit" || value === "owner") {
+                            handleChangePermission(user.userId, value);
+                          }
+                        }}
+                        data={permissionOptions}
+                        w={130}
+                        renderOption={({ option }) => (
+                          <div
+                            style={{
+                              padding: 8,
+                              color: option.value === "delete" ? "#fa5252" : undefined,
+                            }}
+                          >
+                            {option.label}
+                          </div>
+                        )}
+                        styles={{
+                          dropdown: {
+                            zIndex: 10001,
+                          },
+                        }}
+                      />
+                    </Group>
+                  ))}
+                </Stack>
+              </ScrollArea.Autosize>
+              <Divider my="sm" />
+            </>
+          )}
+
+          <TextInput
+            placeholder="Search user..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            mb="sm"
+          />
+
+          {isLoading ? (
+            <Loader size="sm" />
+          ) : (
+            <ScrollArea.Autosize mah={200}>
+              {data?.items.map((user) => {
+                const permission = selectedPermissionsMap[user.id] || "read";
+
+                return (
+                  <Group
+                    key={user.id}
+                    p="xs"
+                    style={{ cursor: "pointer", borderRadius: 8, justifyContent: "space-between" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f1f3f5")}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  >
+                    {/* user card */}
+                    <Group
+                      style={{ flexGrow: 1 }}
+                      onClick={() => handleSelectUserWithPermission(user)}
+                    >
+                      <Avatar src={user.avatarUrl} size="sm" />
+                      <Box>
+                        <Text size="sm">{user.name}</Text>
+                      </Box>
+                    </Group>
+
+                    {/* permission selector */}
+                    <Select
+                      value={permission}
+                      onChange={(value) => {
+                        if (value === "delete") {
+                          if (blockPermissions.find((p) => p.userId === user.id)) {
+                            handleRemovePermission(user.id);
+                          }
+                        } else if (value === "read" || value === "edit" || value === "owner") {
+                          setSelectedPermissionsMap((prev) => ({
+                            ...prev,
+                            [user.id]: value,
+                          }));
+                        }
+                      }}
+                      data={permissionOptions}
+                      w={120}
+                      styles={{
+                        dropdown: {
+                          zIndex: 10001,
+                        },
+                      }}
+                    />
+                  </Group>
+                );
+              })}
+            </ScrollArea.Autosize>
+          )}
+          <Group grow mt="md">
+            <Button
+              variant="default"
+              style={{ flex: 1 }}
+              onClick={onClose}>
+              Close
+            </Button>
+            <CopyBlockLinkButton
+              spaceSlug={spaceSlug}
+              pageSlug={pageSlug}
+              pageTitle={pageTitle}
+              blockId={blockId}
+            />
+          </Group>
+        </>
+      )}
     </Modal>
   );
 } 
