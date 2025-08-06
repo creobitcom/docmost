@@ -606,8 +606,7 @@ export class PageService {
       for (const block of blocks) {
         const updatedBlock = await this.PageBlocksService.updateBlock(block.id, {
           content: block.content,
-          position: block.position,
-          lastUpdatedById: userId
+          position: block.position
         });
         updatedBlocks.push(updatedBlock);
       }

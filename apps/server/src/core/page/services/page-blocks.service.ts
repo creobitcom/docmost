@@ -394,7 +394,7 @@ export class PageBlocksService {
   }
 
   // Обновляет блок
-  async updateBlock(blockId: string, updateData: { content?: any; position?: number; lastUpdatedById?: string }) {
+  async updateBlock(blockId: string, updateData: { content?: any; position?: number }) {
     const updateValues: any = {};
     
     if (updateData.content !== undefined) {
@@ -402,9 +402,6 @@ export class PageBlocksService {
     }
     if (updateData.position !== undefined) {
       updateValues.position = updateData.position;
-    }
-    if (updateData.lastUpdatedById !== undefined) {
-      updateValues.lastUpdatedById = updateData.lastUpdatedById;
     }
 
     const updated = await this.db
