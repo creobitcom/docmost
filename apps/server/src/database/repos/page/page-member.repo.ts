@@ -196,4 +196,16 @@ export class PageMemberRepo {
       .where('pageId', '=', pageId)
       .execute();
   }
+
+  // Находит участника страницы по userId и pageId
+  async findPageMember(pageId: string, userId: string): Promise<PageMember | null> {
+    const member = await this.db
+      .selectFrom('page_members')
+      .selectAll()
+      .where('pageId', '=', pageId)
+      .where('userId', '=', userId)
+      .executeTakeFirst();
+
+    return member || null;
+  }
 }

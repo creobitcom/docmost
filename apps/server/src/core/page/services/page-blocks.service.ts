@@ -346,4 +346,92 @@ export class PageBlocksService {
       .orderBy('position', 'asc')
       .execute();
   }
+
+  // Получает все блоки страницы
+  async getPageBlocks(pageId: string) {
+    return this.db
+      .selectFrom('blocks')
+      .selectAll()
+      .where('pageId', '=', pageId)
+      .orderBy('position', 'asc')
+      .execute();
+  }
+
+  // Получает доступные блоки для пользователя
+  async getAccessiblePageBlocks(pageId: string, userId: string) {
+    // Получаем все блоки страницы
+    const allBlocks = await this.getPageBlocks(pageId);
+    
+    // Проверяем, является ли пользователь создателем страницы
+    const page = await this.db
+      .selectFrom('pages')
+      .select(['creatorId'])
+      .where('id', '=', pageId)
+      .executeTakeFirst();
+
+    const isPageCreator = page?.creatorId === userId;
+    
+    // Если пользователь является создателем страницы, возвращаем все блоки
+    if (isPageCreator) {
+      return allBlocks;
+    }
+    
+    // Получаем права доступа пользователя
+    const permissions = await this.db
+      .selectFrom('block_permissions')
+      .select(['blockId', 'role'])
+      .where('userId', '=', userId)
+      .where('pageId', '=', pageId)
+      .execute();
+
+    const permissionMap = new Map(permissions.map(p => [p.blockId, p.role]));
+    
+    // Фильтруем блоки по правам доступа
+    return allBlocks.filter(block => {
+      const role = permissionMap.get(block.id);
+      return role === 'owner' || role === 'edit' || role === 'read';
+    });
+  }
+
+  // Обновляет блок
+  async updateBlock(blockId: string, updateData: { content?: any; position?: number; lastUpdatedById?: string }) {
+    const updateValues: any = {};
+    
+    if (updateData.content !== undefined) {
+      updateValues.content = JSON.stringify(updateData.content);
+    }
+    if (updateData.position !== undefined) {
+      updateValues.position = updateData.position;
+    }
+    if (updateData.lastUpdatedById !== undefined) {
+      updateValues.lastUpdatedById = updateData.lastUpdatedById;
+    }
+
+    const updated = await this.db
+      .updateTable('blocks')
+      .set(updateValues)
+      .where('id', '=', blockId)
+      .returningAll()
+      .executeTakeFirst();
+
+    if (!updated) {
+      throw new Error(`Block with id ${blockId} not found`);
+    }
+
+    // Парсим контент для возврата
+    let parsedContent;
+    try {
+      parsedContent = typeof updated.content === 'string'
+        ? JSON.parse(updated.content)
+        : updated.content;
+    } catch (e) {
+      console.warn('Failed to parse block content:', updated.content);
+      parsedContent = null;
+    }
+
+    return {
+      ...updated,
+      content: parsedContent
+    };
+  }
 }

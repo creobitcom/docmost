@@ -12,6 +12,7 @@ import {
   IconStrikethrough,
   IconUnderline,
   IconMessage,
+  IconSearch,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import classes from "./bubble-menu.module.css";
@@ -28,6 +29,9 @@ import { v7 as uuid7 } from "uuid";
 import { isCellSelection, isTextSelected } from "@docmost/editor-ext";
 import { LinkSelector } from "@/features/editor/components/bubble-menu/link-selector.tsx";
 import { useTranslation } from "react-i18next";
+import { SearchMenu } from "./search-menu";
+import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
+import { getBlockPermissions } from "@/lib/api-client";
 
 export interface BubbleMenuItem {
   name: string;
@@ -44,11 +48,48 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
   const { t } = useTranslation();
   const [showCommentPopup, setShowCommentPopup] = useAtom(showCommentPopupAtom);
   const [, setDraftCommentId] = useAtom(draftCommentIdAtom);
+  const [currentUser] = useAtom(currentUserAtom);
   const showCommentPopupRef = useRef(showCommentPopup);
+  
+  // Состояние для SearchMenu
+  const [searchModalOpened, setSearchModalOpened] = useState(false);
+  const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
+  const [isPageCreator, setIsPageCreator] = useState(false);
 
   useEffect(() => {
     showCommentPopupRef.current = showCommentPopup;
   }, [showCommentPopup]);
+
+  // Получаем ID текущего блока из выделенного текста
+  const getCurrentBlockId = (): string | null => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+
+    const range = selection.getRangeAt(0);
+    const blockElement = range.commonAncestorContainer.parentElement?.closest('[data-block-id]');
+    return blockElement?.getAttribute('data-block-id') || null;
+  };
+
+  // Проверяем права пользователя на блок
+  useEffect(() => {
+    const checkUserPermissions = async () => {
+      const blockId = getCurrentBlockId();
+      if (!blockId || !currentUser?.user?.id) return;
+
+      try {
+        const permissions = await getBlockPermissions({ 
+          pageId: props.editor.storage.pageId, 
+          blockId 
+        });
+        const userPermission = permissions.data?.find(p => p.userId === currentUser.user.id);
+        setUserBlockPermission(userPermission?.role || null);
+      } catch (e) {
+        console.error("Failed to check user permissions:", e);
+      }
+    };
+
+    checkUserPermissions();
+  }, [currentUser?.user?.id, props.editor.storage.pageId]);
 
   const items: BubbleMenuItem[] = [
     {
@@ -206,7 +247,30 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
         >
           <IconMessage size={16} stroke={2} />
         </ActionIcon>
+
+        {/* Кнопка управления правами доступа к блоку */}
+        {(userBlockPermission === "owner" || userBlockPermission === "edit" || isPageCreator) && (
+          <Tooltip label="Управление правами доступа" withArrow>
+            <ActionIcon
+              variant="default"
+              size="lg"
+              radius="0"
+              aria-label="Управление правами доступа"
+              style={{ border: "none" }}
+              onClick={() => setSearchModalOpened(true)}
+            >
+              <IconSearch size={16} stroke={2} />
+            </ActionIcon>
+          </Tooltip>
+        )}
       </div>
+
+      {/* Модальное окно управления правами доступа */}
+      <SearchMenu
+        opened={searchModalOpened}
+        onClose={() => setSearchModalOpened(false)}
+        pageId={props.editor.storage.pageId}
+      />
     </BubbleMenu>
   );
 };

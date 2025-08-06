@@ -202,23 +202,74 @@ export class PageController {
     return this.blockPermissionService.getAccessiblePageBlocks(pageId, userId);
   }
 
-  @Get(':id/blocks')
-  async getAllPageBlocks(@Param('id') pageId: string, @AuthUser() user: User) {
-    console.log('[PageController] user:', user);
+  @Get('/:pageId/blocks')
+  async getPageBlocks(@Param('pageId') pageId: string, @AuthUser() user: User) {
+    try {
+      console.log('[getPageBlocks] Request for pageId:', pageId, 'user:', user.id);
+      
+      // Проверяем права доступа к странице
+      const hasPageAccess = await this.pageService.userHasDirectPageAccess(user.id, pageId);
+      if (!hasPageAccess) {
+        throw new ForbiddenException('No access to this page');
+      }
 
-    const page = await this.pageRepo.findById(pageId);
-    if (!page) {
-      throw new NotFoundException('Page not found');
+      // Получаем блоки страницы с правами доступа
+      const blocks = await this.pageService.getPageBlocksWithPermissions(pageId, user.id);
+      
+      console.log('[getPageBlocks] Returning blocks:', blocks.length);
+      return blocks;
+    } catch (error) {
+      console.error('[getPageBlocks] Error:', error);
+      throw error;
     }
+  }
 
-    const pageAbility = await this.pageAbility.createForUser(user, pageId);
-    if (pageAbility.cannot(PageCaslAction.Read, PageCaslSubject.Page)) {
-      throw new ForbiddenException();
+  @Put('/:pageId/blocks')
+  async updatePageBlocks(
+    @Param('pageId') pageId: string, 
+    @Body() body: { blocks: any[] },
+    @AuthUser() user: User
+  ) {
+    try {
+      console.log('[updatePageBlocks] Request for pageId:', pageId, 'blocks count:', body.blocks?.length);
+      
+      // Проверяем права доступа к странице
+      const hasPageAccess = await this.pageService.userHasDirectPageAccess(user.id, pageId);
+      if (!hasPageAccess) {
+        throw new ForbiddenException('No access to this page');
+      }
+
+      // Обновляем блоки
+      const updatedBlocks = await this.pageService.updatePageBlocksViaApi(pageId, body.blocks, user.id);
+      
+      console.log('[updatePageBlocks] Updated blocks:', updatedBlocks.length);
+      return updatedBlocks;
+    } catch (error) {
+      console.error('[updatePageBlocks] Error:', error);
+      throw error;
     }
+  }
 
-    const result = await this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
-    console.log('[PageController] Blocks returned with positions:', result.map(b => ({ id: b.id, position: b.position })));
-    return { data: result, success: true };
+  @Post('/:pageId/migrate-to-blocks')
+  async migrateToBlocks(@Param('pageId') pageId: string, @Body() body: any, @AuthUser() user: User) {
+    try {
+      console.log('[migrateToBlocks] Starting migration for pageId:', pageId, 'user:', user.id);
+      
+      // Проверяем права доступа к странице
+      const hasPageAccess = await this.pageService.userHasDirectPageAccess(user.id, pageId);
+      if (!hasPageAccess) {
+        throw new ForbiddenException('No access to this page');
+      }
+
+      // Выполняем миграцию
+      const migrationResult = await this.pageService.migratePageToBlocks(pageId, user.id);
+      
+      console.log('[migrateToBlocks] Migration completed:', migrationResult);
+      return migrationResult;
+    } catch (error) {
+      console.error('[migrateToBlocks] Error:', error);
+      throw error;
+    }
   }
 
   @HttpCode(HttpStatus.OK)
@@ -890,6 +941,4 @@ export class PageController {
 
     await this.pageService.updateMyPageColor(dto, user.id);
   }
-
-
 }

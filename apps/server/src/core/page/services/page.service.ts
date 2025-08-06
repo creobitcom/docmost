@@ -506,6 +506,181 @@ export class PageService {
   //   // Implementation commented out - feature removed
   //   throw new BadRequestException('Copy page feature is not available');
   // }
+
+  // Проверяет, есть ли у пользователя прямой доступ к странице
+  async userHasDirectPageAccess(userId: string, pageId: string): Promise<boolean> {
+    try {
+      const page = await this.pageRepo.findById(pageId);
+      if (!page) return false;
+
+      // Проверяем, является ли пользователь создателем страницы
+      if (page.creatorId === userId) return true;
+
+      // Проверяем права через PageMemberRepo
+      const pageMember = await this.pageMemberRepo.findPageMember(pageId, userId);
+      return !!pageMember;
+    } catch (error) {
+      this.logger.error(`Error checking page access for user ${userId} on page ${pageId}:`, error);
+      return false;
+    }
+  }
+
+  // Получает блоки страницы с правами доступа пользователя
+  async getPageBlocksWithPermissions(pageId: string, userId: string): Promise<any[]> {
+    try {
+      // Получаем все блоки страницы
+      const blocks = await this.PageBlocksService.getPageBlocks(pageId);
+      
+      // Проверяем, является ли пользователь создателем страницы
+      const page = await this.pageRepo.findById(pageId);
+      const isPageCreator = page?.creatorId === userId;
+      
+      // Получаем права доступа пользователя к блокам
+      const accessibleBlocks = await this.PageBlocksService.getAccessiblePageBlocks(pageId, userId);
+      const accessibleBlockIds = new Set(accessibleBlocks.map(b => b.id));
+
+      // Формируем результат с правами доступа
+      const blocksWithPermissions = await Promise.all(blocks.map(async (block) => {
+        const hasAccess = accessibleBlockIds.has(block.id);
+        let userPermission: string | null = null;
+
+        if (hasAccess) {
+          // Если пользователь является создателем страницы, даем ему права owner
+          if (isPageCreator) {
+            return {
+              ...block,
+              hasAccess: true,
+              userPermission: "owner"
+            };
+          }
+          
+          // Определяем права пользователя
+          // Проверяем права через block_permissions
+          const userPermissionResult = await this.db
+            .selectFrom('block_permissions')
+            .select(['role'])
+            .where('blockId', '=', block.id)
+            .where('userId', '=', userId)
+            .executeTakeFirst();
+          
+          if (userPermissionResult) {
+            return {
+              ...block,
+              hasAccess,
+              userPermission: userPermissionResult.role
+            };
+          } else {
+            return {
+              ...block,
+              hasAccess,
+              userPermission: "read" // По умолчанию
+            };
+          }
+        }
+
+        return {
+          ...block,
+          hasAccess,
+          userPermission
+        };
+      }));
+
+      return blocksWithPermissions;
+    } catch (error) {
+      this.logger.error(`Error getting page blocks with permissions for user ${userId} on page ${pageId}:`, error);
+      return [];
+    }
+  }
+
+  // Обновляет блоки страницы (новая версия для API)
+  async updatePageBlocksViaApi(pageId: string, blocks: any[], userId: string): Promise<any[]> {
+    try {
+      // Проверяем права доступа
+      const hasAccess = await this.userHasDirectPageAccess(userId, pageId);
+      if (!hasAccess) {
+        throw new Error('No access to update page blocks');
+      }
+
+      // Обновляем каждый блок
+      const updatedBlocks = [];
+      for (const block of blocks) {
+        const updatedBlock = await this.PageBlocksService.updateBlock(block.id, {
+          content: block.content,
+          position: block.position,
+          lastUpdatedById: userId
+        });
+        updatedBlocks.push(updatedBlock);
+      }
+
+      return updatedBlocks;
+    } catch (error) {
+      this.logger.error(`Error updating page blocks for user ${userId} on page ${pageId}:`, error);
+      throw error;
+    }
+  }
+
+  // Мигрирует страницу со старой архитектуры в блок-ориентированную
+  async migratePageToBlocks(pageId: string, userId: string): Promise<any> {
+    try {
+      // Проверяем права доступа
+      const hasAccess = await this.userHasDirectPageAccess(userId, pageId);
+      if (!hasAccess) {
+        throw new Error('No access to migrate page');
+      }
+
+      // Получаем страницу
+      const page = await this.pageRepo.findById(pageId, { includeContent: true });
+      if (!page) {
+        throw new Error('Page not found');
+      }
+
+      // Проверяем, есть ли уже блоки
+      const existingBlocks = await this.PageBlocksService.getPageBlocks(pageId);
+      if (existingBlocks.length > 0) {
+        return { message: 'Page already migrated to blocks', blocks: existingBlocks };
+      }
+
+      // Создаем блок из старого контента
+      let blockContent = null;
+      if (page.content) {
+        try {
+          // Если контент в JSON формате, используем его
+          if (typeof page.content === 'object') {
+            blockContent = page.content;
+          } else if (typeof page.content === 'string') {
+            blockContent = JSON.parse(page.content);
+          }
+        } catch (error) {
+          // Если не удалось распарсить, создаем простой параграф
+          blockContent = {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: page.content || "" }]
+              }
+            ]
+          };
+        }
+      }
+
+      // Создаем блок
+      const newBlock = await this.PageBlocksService.createBlock(pageId, {
+        pageId: pageId,
+        blockType: 'paragraph',
+        position: 0,
+        content: blockContent
+      }, userId);
+
+      return { 
+        message: 'Page successfully migrated to blocks', 
+        blocks: [newBlock] 
+      };
+    } catch (error) {
+      this.logger.error(`Error migrating page ${pageId} to blocks:`, error);
+      throw error;
+    }
+  }
 }
 
 /*

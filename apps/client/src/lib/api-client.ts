@@ -75,3 +75,46 @@ function redirectToLogin() {
 }
 
 export default api;
+
+// Функции для работы с блоками и правами доступа
+export const assignPermissionToBlock = async ({ pageId, blockId, userId, role }: {
+  pageId: string;
+  blockId: string;
+  userId: string;
+  role: "read" | "edit" | "owner";
+}) => {
+  return api.post(`/pages/${pageId}/blocks/${blockId}/permissions`, {
+    userId,
+    role
+  });
+};
+
+export const getBlockPermissions = async ({ pageId, blockId }: {
+  pageId: string;
+  blockId: string;
+}) => {
+  return api.get(`/pages/${pageId}/blocks/${blockId}/permissions`);
+};
+
+export const removeBlockPermission = async ({ pageId, blockId, userId }: {
+  pageId: string;
+  blockId: string;
+  userId: string;
+}) => {
+  return api.delete(`/pages/${pageId}/blocks/${blockId}/permissions/${userId}`);
+};
+
+export const updateBlockPermission = async ({ pageId, blockId, userId, role }: {
+  pageId: string;
+  blockId: string;
+  userId: string;
+  role: "read" | "edit" | "owner";
+}) => {
+  return api.put(`/pages/${pageId}/blocks/${blockId}/permissions/${userId}`, {
+    role
+  });
+};
+
+export const getPageInfo = async ({ pageId }: { pageId: string }) => {
+  return api.post('/pages/info', { pageId });
+};

@@ -1,13 +1,13 @@
 import classes from "@/features/editor/styles/editor.module.css";
 import React from "react";
 import { TitleEditor } from "@/features/editor/title-editor";
-import PageEditor from "@/features/editor/page-editor";
+import PageEditorWrapper from "@/features/editor/page-editor-wrapper";
 import { Container } from "@mantine/core";
 import { useAtom } from "jotai";
 import { userAtom } from "@/features/user/atoms/current-user-atom.ts";
 
 const MemoizedTitleEditor = React.memo(TitleEditor);
-const MemoizedPageEditor = React.memo(PageEditor);
+const MemoizedPageEditor = React.memo(PageEditorWrapper);
 
 export interface FullEditorProps {
   pageId: string;
