@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, Suspense } from "react";
 import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -28,21 +28,13 @@ interface BlockEditorProps {
   onBlockUpdate?: (blockId: string, content: any) => void;
 }
 
-export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps) {
+// Компонент-обертка для изоляции редактора
+function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
   const [currentUser] = useAtom(currentUserAtom);
   const collaborationURL = useCollaborationUrl();
   const { data: collabQuery } = useCollabToken();
   const [isInitialized, setIsInitialized] = useState(false);
-  const [shouldCreateEditor, setShouldCreateEditor] = useState(false);
-  
-  // Добавляем задержку перед созданием редактора
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShouldCreateEditor(true);
-    }, 100); // Небольшая задержка для стабилизации DOM
-
-    return () => clearTimeout(timer);
-  }, []);
+  const [editorReady, setEditorReady] = useState(false);
   
   // Создаем отдельный YDoc для каждого блока
   const ydoc = useMemo(() => new Y.Doc(), [block.id]);
@@ -54,7 +46,7 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
 
     return new HocuspocusProvider({
       url: collaborationURL,
-      name: `block.${block.id}.${block.pageId}`, // Формат: block.{blockId}.{pageId}
+      name: `block.${block.id}.${block.pageId}`,
       document: ydoc,
       token,
       connect: false,
@@ -72,7 +64,7 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
         } catch (error) {
           console.error('[BlockEditor] Provider connection error:', error);
         }
-      }, Math.random() * 1000); // Случайная задержка для предотвращения одновременных подключений
+      }, Math.random() * 1000);
 
       return () => {
         clearTimeout(timer);
@@ -89,10 +81,8 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
   const initializeBlockContent = useMemo(() => {
     console.log('[BlockEditor] Initializing content for block:', block.id, 'content:', block.content);
     
-    // Проверяем, что контент существует и не является null/undefined
     if (!block.content || block.content === null || block.content === undefined) {
       console.log('[BlockEditor] No content found, creating empty paragraph');
-      // Если контента нет, создаем пустой параграф
       return {
         type: "doc",
         content: [
@@ -105,7 +95,6 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
       };
     }
 
-    // Если контент есть, нормализуем его
     let normalizedContent;
     if (typeof block.content === 'string') {
       try {
@@ -120,16 +109,13 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
       console.log('[BlockEditor] Using object content:', normalizedContent);
     }
 
-    // Проверяем, что нормализованный контент имеет правильную структуру
     if (normalizedContent && typeof normalizedContent === 'object') {
-      // Если контент уже является полным документом
       if (normalizedContent.type === 'doc' && 
           normalizedContent.content && 
           Array.isArray(normalizedContent.content)) {
         
         console.log('[BlockEditor] Content is already a doc, processing...');
         
-        // Устанавливаем blockId для всех элементов контента
         const contentWithBlockId = normalizedContent.content.map((node: any) => {
           if (node && typeof node === 'object') {
             return {
@@ -138,7 +124,7 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
             };
           }
           return node;
-        }).filter(Boolean); // Удаляем null/undefined элементы
+        }).filter(Boolean);
 
         const result = {
           ...normalizedContent,
@@ -149,11 +135,9 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
         return result;
       }
       
-      // Если контент является отдельным элементом (paragraph, heading и т.д.)
       if (normalizedContent.type && normalizedContent.type !== 'doc') {
         console.log('[BlockEditor] Content is a single element, wrapping in doc...');
         
-        // Оборачиваем элемент в документ
         const wrappedContent = {
           type: "doc",
           content: [
@@ -170,7 +154,6 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
     }
 
     console.log('[BlockEditor] Content structure invalid, using fallback');
-    // Fallback: создаем параграф с blockId
     return {
       type: "doc",
       content: [
@@ -197,7 +180,6 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
     const editorJson = editor.getJSON();
     console.log('[BlockEditor] Editor JSON:', editorJson);
 
-    // Извлекаем только первый элемент контента (содержимое блока)
     const blockContent = editorJson.content?.[0] || null;
     
     if (blockContent) {
@@ -207,17 +189,13 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
 
   // Настройка расширений для блока
   const extensions = useMemo(() => {
-    // Всегда возвращаем базовые расширения, чтобы избежать ошибки схемы
     const baseExtensions = [
       ...mainExtensions,
-      // Используем creobitExtentions без BlockId, так как мы настроим его отдельно для каждого блока
       ...creobitExtentions.filter(ext => ext.name !== 'block-id'),
-      // Настраиваем BlockId специально для этого блока
       BlockId.configure({
         attributeName: "blockId",
         types: ['paragraph', 'heading', 'block'],
         createId: () => {
-          // Проверяем, является ли block.id валидным UUID
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           const result = uuidRegex.test(block.id) ? block.id : window.crypto.randomUUID();
           return result as `${string}-${string}-${string}-${string}-${string}`;
@@ -225,7 +203,6 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
       }),
     ];
 
-    // Добавляем коллаборационные расширения только если провайдер инициализирован
     if (provider && isInitialized && currentUser?.user) {
       return [
         ...baseExtensions,
@@ -249,8 +226,8 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
         }
       ]
     },
-    immediatelyRender: false, // Изменено на false для предотвращения ошибок
-    shouldRerenderOnTransaction: false, // Изменено на false
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: false,
     editorProps: {
       scrollThreshold: 80,
       scrollMargin: 80,
@@ -284,40 +261,17 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
         try {
           editor.storage.pageId = block.pageId;
           editor.storage.blockId = block.id;
+          // Устанавливаем флаг готовности после успешного создания
+          setTimeout(() => setEditorReady(true), 50);
         } catch (error) {
           console.error('[BlockEditor] Error in onCreate:', error);
         }
       }
     },
     onUpdate: handleEditorUpdate,
-  }, [block.id, block.pageId, editable, initializeBlockContent, extensions, shouldCreateEditor]);
+  }, [block.id, block.pageId, editable, initializeBlockContent, extensions]);
 
-  // Добавляем обработку ошибок для редактора
-  useEffect(() => {
-    if (editor) {
-      const handleError = (error: any) => {
-        console.error('[BlockEditor] Editor error:', error);
-      };
-
-      const handleUnhandledRejection = (event: any) => {
-        console.error('[BlockEditor] Unhandled promise rejection:', event.reason);
-      };
-
-      // Добавляем обработчики ошибок
-      window.addEventListener('error', handleError);
-      window.addEventListener('unhandledrejection', handleUnhandledRejection);
-      
-      return () => {
-        window.removeEventListener('error', handleError);
-        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-      };
-    }
-  }, [editor]);
-
-  // Добавляем защиту от DOM-ошибок
-  const [hasError, setHasError] = useState(false);
-
-  if (!shouldCreateEditor) {
+  if (!editor || !editorReady) {
     return (
       <div 
         data-block-id={block.id}
@@ -329,15 +283,37 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
           backgroundColor: '#f9f9f9'
         }}
       >
-        Подготовка блока...
+        Инициализация редактора...
       </div>
     );
   }
 
+  return (
+    <div 
+      data-block-id={block.id}
+      data-position={block.position}
+      style={{ 
+        position: 'relative',
+        marginBottom: '0.5em'
+      }}
+    >
+      <EditorContent editor={editor} />
+      
+      {editor && editor.isEditable && (
+        <EditorBubbleMenu editor={editor} />
+      )}
+    </div>
+  );
+}
+
+// Основной компонент с Suspense
+export function BlockEditor(props: BlockEditorProps) {
+  const [hasError, setHasError] = useState(false);
+
   if (hasError) {
     return (
       <div 
-        data-block-id={block.id}
+        data-block-id={props.block.id}
         style={{ 
           minHeight: '1.5em', 
           padding: '0.5em',
@@ -352,10 +328,10 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
     );
   }
 
-  if (!editor) {
-    return (
+  return (
+    <Suspense fallback={
       <div 
-        data-block-id={block.id}
+        data-block-id={props.block.id}
         style={{ 
           minHeight: '1.5em', 
           padding: '0.5em',
@@ -366,24 +342,51 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
       >
         Загрузка блока...
       </div>
-    );
+    }>
+      <ErrorBoundary onError={() => setHasError(true)}>
+        <EditorWrapper {...props} />
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+// Компонент для обработки ошибок
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError: () => void },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; onError: () => void }) {
+    super(props);
+    this.state = { hasError: false };
   }
 
-  return (
-    <div 
-      data-block-id={block.id}
-      data-position={block.position}
-      style={{ 
-        position: 'relative',
-        marginBottom: '0.5em'
-      }}
-      onError={() => setHasError(true)}
-    >
-      <EditorContent editor={editor} />
-      
-      {editor && editor.isEditable && (
-        <EditorBubbleMenu editor={editor} />
-      )}
-    </div>
-  );
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[BlockEditor] Error caught by boundary:', error, errorInfo);
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div 
+          style={{ 
+            minHeight: '1.5em', 
+            padding: '0.5em',
+            border: '1px solid #ff6b6b',
+            borderRadius: '4px',
+            backgroundColor: '#ffe6e6',
+            color: '#d63031'
+          }}
+        >
+          Ошибка рендеринга блока
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 } 
