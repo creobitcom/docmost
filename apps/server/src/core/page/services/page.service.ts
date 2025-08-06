@@ -516,6 +516,32 @@ export class PageService {
       // Проверяем, является ли пользователь создателем страницы
       if (page.creatorId === userId) return true;
 
+      // Проверяем роль пользователя в таблице users
+      const userRole = await this.db
+        .selectFrom('users')
+        .select(['role'])
+        .where('id', '=', userId)
+        .executeTakeFirst();
+
+      // Проверяем роль пользователя в таблице spaceMembers
+      const spaceMemberRole = page.spaceId ? await this.db
+        .selectFrom('spaceMembers')
+        .select(['role'])
+        .where('userId', '=', userId)
+        .where('spaceId', '=', page.spaceId)
+        .where('deletedAt', 'is', null)
+        .executeTakeFirst() : null;
+
+      // Пользователь имеет права owner если:
+      // 1. Он создатель страницы (уже проверено выше)
+      // 2. У него роль 'owner' в таблице users
+      // 3. У него роль 'admin' или 'owner' в таблице spaceMembers
+      const hasOwnerRights = userRole?.role === 'owner' ||
+        spaceMemberRole?.role === 'admin' ||
+        spaceMemberRole?.role === 'owner';
+
+      if (hasOwnerRights) return true;
+
       // Проверяем права через PageMemberRepo
       const pageMember = await this.pageMemberRepo.findPageMember(pageId, userId);
       return !!pageMember;
