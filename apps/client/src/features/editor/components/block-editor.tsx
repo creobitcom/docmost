@@ -33,6 +33,16 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
   const collaborationURL = useCollaborationUrl();
   const { data: collabQuery } = useCollabToken();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [shouldCreateEditor, setShouldCreateEditor] = useState(false);
+  
+  // Добавляем задержку перед созданием редактора
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShouldCreateEditor(true);
+    }, 100); // Небольшая задержка для стабилизации DOM
+
+    return () => clearTimeout(timer);
+  }, []);
   
   // Создаем отдельный YDoc для каждого блока
   const ydoc = useMemo(() => new Y.Doc(), [block.id]);
@@ -280,7 +290,7 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
       }
     },
     onUpdate: handleEditorUpdate,
-  }, [block.id, block.pageId, editable, initializeBlockContent, extensions]);
+  }, [block.id, block.pageId, editable, initializeBlockContent, extensions, shouldCreateEditor]);
 
   // Добавляем обработку ошибок для редактора
   useEffect(() => {
@@ -289,14 +299,58 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
         console.error('[BlockEditor] Editor error:', error);
       };
 
-      // Добавляем обработчик ошибок
+      const handleUnhandledRejection = (event: any) => {
+        console.error('[BlockEditor] Unhandled promise rejection:', event.reason);
+      };
+
+      // Добавляем обработчики ошибок
       window.addEventListener('error', handleError);
+      window.addEventListener('unhandledrejection', handleUnhandledRejection);
       
       return () => {
         window.removeEventListener('error', handleError);
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
       };
     }
   }, [editor]);
+
+  // Добавляем защиту от DOM-ошибок
+  const [hasError, setHasError] = useState(false);
+
+  if (!shouldCreateEditor) {
+    return (
+      <div 
+        data-block-id={block.id}
+        style={{ 
+          minHeight: '1.5em', 
+          padding: '0.5em',
+          border: '1px solid #e0e0e0',
+          borderRadius: '4px',
+          backgroundColor: '#f9f9f9'
+        }}
+      >
+        Подготовка блока...
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div 
+        data-block-id={block.id}
+        style={{ 
+          minHeight: '1.5em', 
+          padding: '0.5em',
+          border: '1px solid #ff6b6b',
+          borderRadius: '4px',
+          backgroundColor: '#ffe6e6',
+          color: '#d63031'
+        }}
+      >
+        Ошибка загрузки блока. Попробуйте обновить страницу.
+      </div>
+    );
+  }
 
   if (!editor) {
     return (
@@ -323,6 +377,7 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
         position: 'relative',
         marginBottom: '0.5em'
       }}
+      onError={() => setHasError(true)}
     >
       <EditorContent editor={editor} />
       
