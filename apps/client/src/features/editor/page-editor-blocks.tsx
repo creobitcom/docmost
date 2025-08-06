@@ -157,6 +157,129 @@ export default function PageEditorBlocks({
   }, 3000);
 
   // Обработчик создания нового блока
+  const handleCreateBlock = useCallback((blockId: string) => {
+    console.log('[PageEditorBlocks] handleCreateBlock called with blockId:', blockId);
+    
+    const newBlockId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newBlock: Block = {
+      id: newBlockId,
+      pageId,
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            attrs: { blockId: newBlockId },
+            content: []
+          }
+        ]
+      },
+      position: blocks.length,
+      hasAccess: true,
+      userPermission: editable ? "edit" : "read"
+    };
+
+    console.log('[PageEditorBlocks] Creating new block:', newBlock);
+
+    setBlocks(prevBlocks => {
+      const updatedBlocks = [...prevBlocks, newBlock];
+      // Откладываем сохранение на сервер
+      setTimeout(() => saveBlocksToServer(pageId, updatedBlocks), 0);
+      return updatedBlocks;
+    });
+    
+    setVisibleBlocks(prev => new Set([...prev, newBlock.id]));
+    
+    // Фокусируемся на новом блоке с задержкой
+    setTimeout(() => {
+      try {
+        const newBlockElement = document.querySelector(`[data-block-id="${newBlock.id}"]`);
+        if (newBlockElement && newBlockElement.isConnected) {
+          const editorElement = newBlockElement.querySelector('.ProseMirror');
+          if (editorElement && editorElement instanceof HTMLElement && editorElement.offsetParent !== null) {
+            editorElement.focus();
+          }
+        }
+      } catch (error) {
+        console.warn('[PageEditorBlocks] Error focusing new block:', error);
+      }
+    }, 100);
+  }, [pageId, blocks.length, editable, saveBlocksToServer]);
+
+  // Обработчик удаления блока
+  const handleDeleteBlock = useCallback((blockId: string) => {
+    console.log('[PageEditorBlocks] handleDeleteBlock called with blockId:', blockId);
+    
+    const currentBlockIndex = blocks.findIndex(block => block.id === blockId);
+    const targetBlockId = currentBlockIndex > 0 ? blocks[currentBlockIndex - 1].id : 
+                         currentBlockIndex < blocks.length - 1 ? blocks[currentBlockIndex + 1].id : null;
+
+    console.log('[PageEditorBlocks] Deleting block at index:', currentBlockIndex, 'targetBlockId:', targetBlockId);
+
+    setBlocks(prevBlocks => {
+      const updatedBlocks = prevBlocks.filter(block => block.id !== blockId);
+      // Откладываем сохранение на сервер
+      setTimeout(() => saveBlocksToServer(pageId, updatedBlocks), 0);
+      return updatedBlocks;
+    });
+    
+    setVisibleBlocks(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(blockId);
+      return newSet;
+    });
+
+    // Фокусируемся на соседнем блоке с задержкой
+    if (targetBlockId) {
+      setTimeout(() => {
+        try {
+          const targetBlockElement = document.querySelector(`[data-block-id="${targetBlockId}"]`);
+          if (targetBlockElement && targetBlockElement.isConnected) {
+            const editorElement = targetBlockElement.querySelector('.ProseMirror');
+            if (editorElement && editorElement instanceof HTMLElement && editorElement.offsetParent !== null) {
+              editorElement.focus();
+            }
+          }
+        } catch (error) {
+          console.warn('[PageEditorBlocks] Error focusing target block:', error);
+        }
+      }, 100);
+    }
+  }, [blocks, pageId, saveBlocksToServer]);
+
+  // Обработчик фокуса на блоке
+  const handleFocusBlock = useCallback((blockId: string, direction: 'up' | 'down') => {
+    console.log('[PageEditorBlocks] handleFocusBlock called with blockId:', blockId, 'direction:', direction);
+    
+    const currentBlockIndex = blocks.findIndex(block => block.id === blockId);
+    let targetBlockId: string | null = null;
+
+    if (direction === 'up' && currentBlockIndex > 0) {
+      targetBlockId = blocks[currentBlockIndex - 1].id;
+    } else if (direction === 'down' && currentBlockIndex < blocks.length - 1) {
+      targetBlockId = blocks[currentBlockIndex + 1].id;
+    }
+
+    console.log('[PageEditorBlocks] Focusing block at index:', currentBlockIndex, 'targetBlockId:', targetBlockId);
+
+    if (targetBlockId) {
+      setTimeout(() => {
+        try {
+          const targetBlockElement = document.querySelector(`[data-block-id="${targetBlockId}"]`);
+          if (targetBlockElement && targetBlockElement.isConnected) {
+            const editorElement = targetBlockElement.querySelector('.ProseMirror');
+            if (editorElement && editorElement instanceof HTMLElement && editorElement.offsetParent !== null) {
+              editorElement.focus();
+            }
+          }
+        } catch (error) {
+          console.warn('[PageEditorBlocks] Error focusing block:', error);
+        }
+      }, 50);
+    }
+  }, [blocks]);
+
+  // Обработчик создания нового блока (для обратной совместимости)
   const handleBlockCreated = useCallback((newBlock: Block) => {
     setBlocks(prevBlocks => {
       const updatedBlocks = [...prevBlocks, newBlock];
@@ -166,7 +289,7 @@ export default function PageEditorBlocks({
     setVisibleBlocks(prev => new Set([...prev, newBlock.id]));
   }, [pageId, saveBlocksToServer]);
 
-  // Обработчик удаления блока
+  // Обработчик удаления блока (для обратной совместимости)
   const handleBlockDeleted = useCallback((blockId: string) => {
     setBlocks(prevBlocks => {
       const updatedBlocks = prevBlocks.filter(block => block.id !== blockId);
@@ -222,12 +345,21 @@ export default function PageEditorBlocks({
           );
         }
 
+        console.log('[PageEditorBlocks] Rendering BlockEditor for block:', block.id, {
+          hasCreateBlock: !!handleCreateBlock,
+          hasDeleteBlock: !!handleDeleteBlock,
+          hasFocusBlock: !!handleFocusBlock
+        });
+        
         return block.hasAccess ? (
           <BlockEditor
             key={block.id}
             block={block}
             editable={editable && (block.userPermission === "edit" || block.userPermission === "owner")}
             onBlockUpdate={handleBlockUpdate}
+            onCreateBlock={handleCreateBlock}
+            onDeleteBlock={handleDeleteBlock}
+            onFocusBlock={handleFocusBlock}
           />
         ) : (
           <div 

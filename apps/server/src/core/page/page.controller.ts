@@ -123,13 +123,14 @@ export class PageController {
   }
 
   @HttpCode(HttpStatus.OK)
-  @Get('blockPermissions/:pageId/:blockId')
+  @Get(':pageId/blocks/:blockId/permissions')
   async getBlockPermissions(
     @Param('pageId') pageId: string,
     @Param('blockId') blockId: string,
     @AuthUser() user: User,
   ) {
     console.log('[getBlockPermissions] Starting with pageId:', pageId, 'blockId:', blockId, 'user.id:', user.id);
+    logToFile(`[getBlockPermissions] Starting with pageId: ${pageId}, blockId: ${blockId}, user.id: ${user.id}`);
 
     // Получаем информацию о странице
     const page = await this.db
@@ -457,6 +458,13 @@ export class PageController {
   @Post('/info')
   async getPage(@Body() dto: PageInfoDto, @AuthUser() user: User): Promise<any> {
     logToFile(`[PageController] getPage called with dto: ${JSON.stringify(dto)} user: ${user.id}`);
+    
+    // Дополнительная валидация pageId
+    if (!dto.pageId || dto.pageId.trim() === '') {
+      logToFile(`[PageController] getPage error: pageId is empty or invalid: "${dto.pageId}"`);
+      throw new BadRequestException('pageId should not be empty');
+    }
+    
     const page = await this.pageRepo.findById(dto.pageId, {
       includeSpace: true,
       includeContent: true,

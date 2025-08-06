@@ -21,7 +21,7 @@ import { notifications } from "@mantine/notifications";
 import { assignPermissionToBlock } from "@/lib/api-client";
 import { getBlockPermissions, removeBlockPermission, updateBlockPermission } from "@/lib/api-client";
 import { Tooltip, ActionIcon } from '@mantine/core';
-import { getPageInfo } from "@/lib/api-client";
+import { getPageInfo, getUserSpaceRole } from "@/lib/api-client";
 import { useAtom } from "jotai";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
 
@@ -121,9 +121,16 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
   const [currentUser] = useAtom(currentUserAtom);
   const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
   const [isPageCreator, setIsPageCreator] = useState(false);
+  const [hasAdminRights, setHasAdminRights] = useState(false);
 
   useEffect(() => {
     const fetchPageInfo = async () => {
+      // Проверяем, что pageId не пустой
+      if (!pageId || pageId.trim() === '') {
+        console.log('[SearchMenu] Empty pageId, skipping fetch');
+        return;
+      }
+      
       try {
         const pageResponse = await fetch(`/api/pages/info`, {
           method: 'POST',
@@ -141,6 +148,40 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
           const creatorId = pageInfo?.creator_id || pageInfo?.creatorId || pageInfo?.creator?.id;
           setIsPageCreator(creatorId === currentUser?.user?.id);
           
+          // Проверяем права администратора
+          const userRole = currentUser?.user?.role;
+          const hasOwnerRole = userRole === 'owner';
+          const hasAdminRole = userRole === 'admin';
+          
+          // Получаем роль пользователя в пространстве
+          let hasSpaceAdminRights = false;
+          if (pageInfo?.spaceId && currentUser?.user?.id) {
+            try {
+              const spaceMemberData = await getUserSpaceRole({
+                spaceId: pageInfo.spaceId,
+                userId: currentUser.user.id
+              });
+              const spaceMemberRole = spaceMemberData?.data?.role;
+              hasSpaceAdminRights = spaceMemberRole === 'admin' || spaceMemberRole === 'owner';
+            } catch (e) {
+              console.error("Failed to fetch space member role:", e);
+            }
+          }
+          
+          // Если у пользователя есть права owner или admin (в users или spaceMembers), даем доступ
+          const finalHasAdminRights = hasOwnerRole || hasAdminRole || hasSpaceAdminRights;
+          setHasAdminRights(finalHasAdminRights);
+          
+          console.log('[SearchMenu] Admin rights check:', {
+            userId: currentUser?.user?.id,
+            userRole,
+            hasOwnerRole,
+            hasAdminRole,
+            hasSpaceAdminRights,
+            finalHasAdminRights,
+            isPageCreator: creatorId === currentUser?.user?.id
+          });
+          
           // Получаем информацию о странице для копирования ссылки
           setSpaceSlug(pageInfo?.spaceSlug);
           setPageSlug(pageInfo?.pageSlug);
@@ -152,7 +193,7 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
     };
 
     fetchPageInfo();
-  }, [pageId, currentUser?.user?.id]);
+  }, [pageId, currentUser?.user?.id, currentUser?.user?.role]);
 
   const [selectedPermissionsMap, setSelectedPermissionsMap] = useState<
     Record<string, "read" | "edit" | "owner">
@@ -177,7 +218,10 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
   useEffect(() => {
     const fetchPermissions = async () => {
       const blockId = getBlockId();
-      if (!blockId) return;
+      if (!blockId || !pageId || pageId.trim() === '') {
+        console.log('[SearchMenu] Missing blockId or pageId for permissions fetch:', { blockId, pageId });
+        return;
+      }
 
       try {
         const result = await getBlockPermissions({ pageId, blockId });
@@ -334,13 +378,13 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
       zIndex={10000}
     >
       {/* Проверка прав пользователя */}
-      {userBlockPermission !== 'owner' && !isPageCreator && (
+      {userBlockPermission !== 'owner' && !isPageCreator && !hasAdminRights && (
         <Stack gap="md" align="center" py="xl">
           <Text size="lg" fw={500} color="red">
             Недостаточно прав
           </Text>
           <Text size="sm" color="dimmed" ta="center">
-            Для управления правами доступа к блоку требуются права владельца (owner) или статус создателя страницы.
+            Для управления правами доступа к блоку требуются права владельца (owner), статус создателя страницы или права администратора.
           </Text>
           <Button onClick={onClose} variant="default">
             Закрыть
@@ -348,8 +392,17 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
         </Stack>
       )}
 
-      {/* Основной контент модалки - показывается только для владельцев или создателей */}
-      {(userBlockPermission === 'owner' || isPageCreator) && (
+      {/* Основной контент модалки - показывается для владельцев, создателей или администраторов */}
+      {(() => {
+        const shouldShowContent = userBlockPermission === 'owner' || isPageCreator || hasAdminRights;
+        console.log('[SearchMenu] Content visibility check:', {
+          userBlockPermission,
+          isPageCreator,
+          hasAdminRights,
+          shouldShowContent
+        });
+        return shouldShowContent;
+      })() && (
         <>
           {/* --- Новый блок: права доступа на страницу --- */}
           {pagePermissions && (

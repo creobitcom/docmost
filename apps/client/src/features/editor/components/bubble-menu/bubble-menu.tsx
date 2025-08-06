@@ -31,7 +31,7 @@ import { LinkSelector } from "@/features/editor/components/bubble-menu/link-sele
 import { useTranslation } from "react-i18next";
 import { SearchMenu } from "./search-menu";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
-import { getBlockPermissions } from "@/lib/api-client";
+import { getBlockPermissions, getUserSpaceRole } from "@/lib/api-client";
 
 export interface BubbleMenuItem {
   name: string;
@@ -55,6 +55,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
   const [searchModalOpened, setSearchModalOpened] = useState(false);
   const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
   const [isPageCreator, setIsPageCreator] = useState(false);
+  const [hasAdminRights, setHasAdminRights] = useState(false);
 
   useEffect(() => {
     showCommentPopupRef.current = showCommentPopup;
@@ -70,20 +71,24 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
     return blockElement?.getAttribute('data-block-id') || null;
   };
 
-  // Проверяем права пользователя на блок и статус создателя
-  useEffect(() => {
-    const checkUserPermissions = async () => {
-      const blockId = getCurrentBlockId();
-      if (!blockId || !currentUser?.user?.id) {
-        setUserBlockPermission(null);
-        setIsPageCreator(false);
-        return;
-      }
+      // Проверяем права пользователя на блок и статус создателя
+    useEffect(() => {
+      const checkUserPermissions = async () => {
+        const blockId = getCurrentBlockId();
+        const pageId = props.editor.storage.pageId;
+        
+        if (!blockId || !currentUser?.user?.id || !pageId) {
+          console.log('[BubbleMenu] Missing required data:', { blockId, userId: currentUser?.user?.id, pageId });
+          setUserBlockPermission(null);
+          setIsPageCreator(false);
+          setHasAdminRights(false);
+          return;
+        }
 
       try {
         // Проверяем права на блок
         const result = await getBlockPermissions({ 
-          pageId: props.editor.storage.pageId, 
+          pageId, 
           blockId 
         });
         const currentUserPermission = result.data?.find(item => item.userId === currentUser.user.id);
@@ -95,7 +100,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ pageId: props.editor.storage.pageId }),
+          body: JSON.stringify({ pageId }),
         });
 
         if (pageResponse.ok) {
@@ -107,12 +112,41 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           const isCreator = creatorId === currentUser?.user?.id;
           setIsPageCreator(isCreator);
 
+          // Проверяем права администратора
+          const userRole = currentUser?.user?.role;
+          const hasOwnerRole = userRole === 'owner';
+          const hasAdminRole = userRole === 'admin';
+          
+          // Получаем роль пользователя в пространстве
+          let hasSpaceAdminRights = false;
+          if (pageInfo?.spaceId && currentUser?.user?.id) {
+            try {
+              const spaceMemberData = await getUserSpaceRole({
+                spaceId: pageInfo.spaceId,
+                userId: currentUser.user.id
+              });
+              const spaceMemberRole = spaceMemberData?.data?.role;
+              hasSpaceAdminRights = spaceMemberRole === 'admin' || spaceMemberRole === 'owner';
+            } catch (e) {
+              console.error("Failed to fetch space member role:", e);
+            }
+          }
+          
+          // Если у пользователя есть права owner или admin (в users или spaceMembers), даем доступ
+          const finalHasAdminRights = hasOwnerRole || hasAdminRole || hasSpaceAdminRights;
+          setHasAdminRights(finalHasAdminRights);
+
           console.log('[BubbleMenu] User permissions check:', {
             userId: currentUser?.user?.id,
             pageCreatorId: creatorId,
             isPageCreator: isCreator,
             userBlockPermission: currentUserPermission?.role,
-            shouldShowSearchButton: isCreator || currentUserPermission?.role === 'owner'
+            userRole,
+            hasOwnerRole,
+            hasAdminRole,
+            hasSpaceAdminRights,
+            finalHasAdminRights,
+            shouldShowSearchButton: isCreator || currentUserPermission?.role === 'owner' || finalHasAdminRights
           });
         }
       } catch (err) {
@@ -294,8 +328,8 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           <IconMessage size={16} stroke={2} />
         </ActionIcon>
 
-        {/* Показываем кнопку поиска только для владельцев или создателей страницы */}
-        {(userBlockPermission === 'owner' || isPageCreator) && (
+        {/* Показываем кнопку поиска для владельцев, создателей или администраторов */}
+        {(userBlockPermission === 'owner' || isPageCreator || hasAdminRights) && (
           <Tooltip label="Search Users" withArrow>
             <ActionIcon
               variant="default"
@@ -315,11 +349,13 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
       </div>
 
       {/* Модальное окно управления правами доступа */}
-      <SearchMenu
-        opened={searchModalOpened}
-        onClose={() => setSearchModalOpened(false)}
-        pageId={props.editor.storage.pageId}
-      />
+      {props.editor.storage.pageId && (
+        <SearchMenu
+          opened={searchModalOpened}
+          onClose={() => setSearchModalOpened(false)}
+          pageId={props.editor.storage.pageId}
+        />
+      )}
     </BubbleMenu>
   );
 };

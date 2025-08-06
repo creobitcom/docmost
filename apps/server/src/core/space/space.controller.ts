@@ -3,9 +3,11 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Get,
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Param,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -166,6 +168,32 @@ export class SpaceController {
       workspace.id,
       pagination,
     );
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Get(':spaceId/members/:userId/role')
+  async getUserSpaceRole(
+    @Param('spaceId') spaceId: string,
+    @Param('userId') userId: string,
+    @AuthUser() user: User,
+  ) {
+    // Пользователь может получить свою роль или роль других пользователей в пространстве
+    const ability = await this.spaceAbility.createForUser(
+      user,
+      spaceId,
+    );
+
+    if (ability.cannot(SpaceCaslAction.Read, SpaceCaslSubject.Member)) {
+      throw new ForbiddenException();
+    }
+
+    const spaceMember = await this.spaceMemberRepo.getSpaceMemberByTypeId(spaceId, { userId });
+    
+    if (!spaceMember) {
+      return { role: null };
+    }
+
+    return { role: spaceMember.role };
   }
 
   @HttpCode(HttpStatus.OK)

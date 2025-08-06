@@ -77,6 +77,8 @@ import { BlockId } from "@/features/editor/extensions/block-id";
 import { BlockPosition } from "@/features/editor/extensions/block-position";
 import { BlockTypes } from "@/features/editor/utils/block-types";
 import { SmartEnter } from "@/features/editor/extensions/smart-enter";
+
+
 import Document from "@tiptap/extension-document";
 
 
@@ -254,4 +256,5 @@ export const creobitExtentions = [
   SmartEnter.configure({
     types: ["paragraph"],
   }),
+
 ] as any;

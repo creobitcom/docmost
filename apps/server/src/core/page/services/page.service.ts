@@ -650,16 +650,45 @@ export class PageService {
         throw new Error('No access to update page blocks');
       }
 
-      // Обновляем каждый блок
+      // Получаем все существующие блоки страницы
+      const existingBlocks = await this.PageBlocksService.getPageBlocks(pageId);
+      const existingBlockIds = new Set(existingBlocks.map(block => block.id));
+      const newBlockIds = new Set(blocks.map(block => block.id));
+
+      // Находим блоки, которые нужно удалить (есть в базе, но нет в новом списке)
+      const blocksToDelete = existingBlocks.filter(block => !newBlockIds.has(block.id));
+
+      // Удаляем блоки, которых нет в новом списке
+      for (const blockToDelete of blocksToDelete) {
+        await this.PageBlocksService.deleteBlock(blockToDelete.id);
+        console.log(`[updatePageBlocksViaApi] Deleted block: ${blockToDelete.id}`);
+      }
+
+      // Обновляем или создаем блоки
       const updatedBlocks = [];
       for (const block of blocks) {
-        const updatedBlock = await this.PageBlocksService.updateBlock(block.id, {
-          content: block.content,
-          position: block.position
-        });
+        let updatedBlock;
+
+        if (existingBlockIds.has(block.id)) {
+          // Обновляем существующий блок
+          updatedBlock = await this.PageBlocksService.updateBlock(block.id, {
+            content: block.content,
+            position: block.position
+          });
+        } else {
+          // Создаем новый блок
+          updatedBlock = await this.PageBlocksService.createBlock(pageId, {
+            pageId: pageId,
+            blockType: block.blockType || 'paragraph',
+            position: block.position,
+            content: block.content
+          }, userId);
+        }
+
         updatedBlocks.push(updatedBlock);
       }
 
+      console.log(`[updatePageBlocksViaApi] Updated ${updatedBlocks.length} blocks, deleted ${blocksToDelete.length} blocks`);
       return updatedBlocks;
     } catch (error) {
       this.logger.error(`Error updating page blocks for user ${userId} on page ${pageId}:`, error);

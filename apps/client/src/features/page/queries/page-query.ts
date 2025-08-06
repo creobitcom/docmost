@@ -52,21 +52,47 @@ export function usePageQuery(
   IPage & { originPageId?: string; isSyncedPage?: boolean },
   Error
 > {
+  // Дополнительная проверка для предотвращения запросов с пустым pageId
+  const isValidPageId = pageInput.pageId && 
+                       typeof pageInput.pageId === 'string' && 
+                       pageInput.pageId.trim().length > 0;
+
+  // Добавляем отладочную информацию
+  if (!isValidPageId) {
+    console.warn('[usePageQuery] Invalid pageId:', pageInput.pageId, 'type:', typeof pageInput.pageId);
+  }
+
   const query = useQuery({
     queryKey: ["pages", pageInput.pageId],
-    queryFn: () => getPageById(pageInput),
-    enabled: !!pageInput.pageId,
+    queryFn: () => {
+      // Дополнительная проверка перед выполнением запроса
+      if (!isValidPageId) {
+        console.error('[usePageQuery] Attempting to make request with invalid pageId:', pageInput.pageId);
+        throw new Error("Invalid pageId provided");
+      }
+      console.log('[usePageQuery] Making request with pageId:', pageInput.pageId);
+      return getPageById(pageInput);
+    },
+    enabled: !!isValidPageId,
     staleTime: 5 * 60 * 1000,
+    retry: (failureCount, error) => {
+      // Не повторяем запросы с невалидным pageId
+      if (error.message === "Invalid pageId provided") {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
+  
   useEffect(() => {
-    if (query.data) {
+    if (query.data && isValidPageId) {
       if (isValidUuid(pageInput.pageId)) {
         queryClient.setQueryData(["pages", query.data.slugId], query.data);
       } else {
         queryClient.setQueryData(["pages", query.data.id], query.data);
       }
     }
-  }, [query.data]);
+  }, [query.data, isValidPageId, pageInput.pageId]);
 
   return query;
 }

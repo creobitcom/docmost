@@ -1,15 +1,29 @@
-import React, { useEffect, useMemo, useState, Suspense } from "react";
+import React, { useEffect, useMemo, useState, Suspense, useRef, useCallback } from "react";
 import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { mainExtensions, collabExtensions, creobitExtentions } from "@/features/editor/extensions/extensions";
 import { BlockId } from "@/features/editor/extensions/block-id";
+import "@/features/editor/styles/drag-handle.css";
+
 import { useAtom } from "jotai";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
 import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
 import { useCollabToken } from "@/features/auth/queries/auth-query.tsx";
 import { useDebouncedCallback } from '@mantine/hooks';
 import { EditorBubbleMenu } from "@/features/editor/components/bubble-menu/bubble-menu";
+import TableCellMenu from "@/features/editor/components/table/table-cell-menu.tsx";
+import TableMenu from "@/features/editor/components/table/table-menu.tsx";
+import ImageMenu from "@/features/editor/components/image/image-menu.tsx";
+import CalloutMenu from "@/features/editor/components/callout/callout-menu.tsx";
+import VideoMenu from "@/features/editor/components/video/video-menu.tsx";
+import LinkMenu from "@/features/editor/components/link/link-menu.tsx";
+import ExcalidrawMenu from "./excalidraw/excalidraw-menu";
+import DrawioMenu from "./drawio/drawio-menu";
+import {
+  handleFileDrop,
+  handlePaste,
+} from "@/features/editor/components/common/editor-paste-handler.tsx";
 
 
 interface Block {
@@ -26,25 +40,44 @@ interface BlockEditorProps {
   block: Block;
   editable: boolean;
   onBlockUpdate?: (blockId: string, content: any) => void;
+  onCreateBlock?: (blockId: string) => void;
+  onDeleteBlock?: (blockId: string) => void;
+  onFocusBlock?: (blockId: string, direction: 'up' | 'down') => void;
 }
 
 // Компонент-обертка для изоляции редактора
-function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
+function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDeleteBlock, onFocusBlock }: BlockEditorProps) {
   const [currentUser] = useAtom(currentUserAtom);
   const collaborationURL = useCollaborationUrl();
   const { data: collabQuery } = useCollabToken();
-  const [isInitialized, setIsInitialized] = useState(false);
   const [editorReady, setEditorReady] = useState(false);
+  const [isDestroying, setIsDestroying] = useState(false);
+  const [shouldRender, setShouldRender] = useState(true);
   
+  // Refs для более надежного управления жизненным циклом
+  const editorRef = useRef<any>(null);
+  const ydocRef = useRef<Y.Doc | null>(null);
+  const providerRef = useRef<HocuspocusProvider | null>(null);
+  const mountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  const domElementRef = useRef<HTMLElement | null>(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+
   // Создаем отдельный YDoc для каждого блока
-  const ydoc = useMemo(() => new Y.Doc(), [block.id]);
+  const ydoc = useMemo(() => {
+    if (!isMountedRef.current) return null;
+    const newYdoc = new Y.Doc();
+    ydocRef.current = newYdoc;
+    return newYdoc;
+  }, [block.id]);
   
   // Создаем HocuspocusProvider для блока
   const provider = useMemo(() => {
+    if (!isMountedRef.current || !ydoc) return null;
     const token = collabQuery?.token;
     if (!token) return null;
 
-    return new HocuspocusProvider({
+    const newProvider = new HocuspocusProvider({
       url: collaborationURL,
       name: `block.${block.id}.${block.pageId}`,
       document: ydoc,
@@ -52,17 +85,18 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
       connect: false,
       preserveConnection: false,
     });
+    providerRef.current = newProvider;
+    return newProvider;
   }, [block.id, block.pageId, collaborationURL, collabQuery?.token, ydoc]);
 
   // Временно отключаем WebSocket для тестирования
   useEffect(() => {
-    if (provider && !isInitialized) {
+    if (provider && isMountedRef.current) {
       // Временно не подключаемся к WebSocket для исключения проблем с сетью
       console.log('[BlockEditor] Skipping WebSocket connection for block:', block.id);
-      setIsInitialized(true);
       
       return () => {
-        if (provider) {
+        if (provider && isMountedRef.current) {
           try {
             console.log('[BlockEditor] Destroying provider for block:', block.id);
             provider.destroy();
@@ -72,10 +106,11 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
         }
       };
     }
-  }, [provider, isInitialized, block.id]);
+  }, [provider, block.id]);
 
   // Инициализируем контент блока с оптимизированной логикой
   const initializeBlockContent = useMemo(() => {
+    if (!isMountedRef.current) return null;
     // Уменьшаем количество логов для производительности
     if (!block.content || block.content === null || block.content === undefined) {
       return {
@@ -150,27 +185,32 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
 
   // Debounced функция для обновления блока
   const debouncedUpdateBlock = useDebouncedCallback((newContent: any) => {
-    if (onBlockUpdate) {
+    if (onBlockUpdate && isMountedRef.current && !isDestroying) {
       onBlockUpdate(block.id, newContent);
     }
   }, 2000);
 
   // Обработчик обновления редактора
-  const handleEditorUpdate = ({ editor }: { editor: any }) => {
-    if (editor.isEmpty) return;
+  const handleEditorUpdate = useCallback(({ editor }: { editor: any }) => {
+    if (!editor || isDestroying || editor.isEmpty || !isMountedRef.current) return;
     
-    const editorJson = editor.getJSON();
-    console.log('[BlockEditor] Editor JSON:', editorJson);
+    try {
+      const editorJson = editor.getJSON();
+      console.log('[BlockEditor] Editor JSON:', editorJson);
 
-    const blockContent = editorJson.content?.[0] || null;
-    
-    if (blockContent) {
-      debouncedUpdateBlock(blockContent);
+      const blockContent = editorJson.content?.[0] || null;
+      
+      if (blockContent) {
+        debouncedUpdateBlock(blockContent);
+      }
+    } catch (error) {
+      console.error('[BlockEditor] Error in handleEditorUpdate:', error);
     }
-  };
+  }, [isDestroying, debouncedUpdateBlock]);
 
   // Настройка расширений для блока (временно без коллаборации)
   const extensions = useMemo(() => {
+    if (!isMountedRef.current) return [];
     return [
       ...mainExtensions,
       ...creobitExtentions.filter(ext => ext.name !== 'block-id'),
@@ -201,11 +241,23 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
     },
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
+    enableCoreExtensions: true,
+    parseOptions: {
+      preserveWhitespace: 'full',
+    },
     editorProps: {
       scrollThreshold: 80,
       scrollMargin: 80,
       handleDOMEvents: {
-        keydown: (_view, event) => {
+        keydown: (view, event) => {
+          if (isDestroying || !isMountedRef.current) return false;
+          
+          // Дополнительная проверка на существование view и DOM
+          if (!view || !view.dom || !view.dom.isConnected) {
+            return false;
+          }
+          
+          // Проверяем наличие активных меню
           if (["ArrowUp", "ArrowDown", "Enter"].includes(event.key)) {
             const slashCommand = document.querySelector("#slash-command");
             if (slashCommand) {
@@ -226,59 +278,262 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
               return true;
             }
           }
+
+          // Обработка навигации по блокам
+          if (["ArrowUp", "ArrowDown", "Enter", "Backspace"].includes(event.key)) {
+            try {
+              const { selection } = view.state;
+              const { $from } = selection;
+              const currentBlockId = $from.node().attrs?.blockId || block.id;
+
+              if (currentBlockId) {
+                switch (event.key) {
+                  case "Enter":
+                    if (onCreateBlock && isMountedRef.current) {
+                      event.preventDefault();
+                      console.log(`[BlockEditor] Creating new block from ${currentBlockId}`);
+                      onCreateBlock(currentBlockId);
+                      return true;
+                    }
+                    break;
+                  case "Backspace":
+                    // Проверяем, что блок пустой и курсор в начале
+                    const isEmpty = $from.parent.content.size === 0 || 
+                                   ($from.parent.content.size === 1 && 
+                                    $from.parent.firstChild?.type.name === 'hardBreak');
+                    const isAtStart = $from.parentOffset === 0;
+                    
+                    if (isEmpty && isAtStart && onDeleteBlock && isMountedRef.current) {
+                      event.preventDefault();
+                      console.log(`[BlockEditor] Deleting block ${currentBlockId}`);
+                      onDeleteBlock(currentBlockId);
+                      return true;
+                    }
+                    break;
+                  case "ArrowUp":
+                    if (onFocusBlock && $from.parentOffset === 0 && isMountedRef.current) {
+                      event.preventDefault();
+                      console.log(`[BlockEditor] Focusing block up from ${currentBlockId}`);
+                      onFocusBlock(currentBlockId, 'up');
+                      return true;
+                    }
+                    break;
+                  case "ArrowDown":
+                    if (onFocusBlock && $from.parentOffset === $from.parent.content.size && isMountedRef.current) {
+                      event.preventDefault();
+                      console.log(`[BlockEditor] Focusing block down from ${currentBlockId}`);
+                      onFocusBlock(currentBlockId, 'down');
+                      return true;
+                    }
+                    break;
+                }
+              }
+            } catch (error) {
+              console.warn('[BlockEditor] Error in keydown handler:', error);
+              return false;
+            }
+          }
+          
+          return false;
         },
       },
     },
     onCreate({ editor }) {
-      if (editor) {
-        try {
-          editor.storage.pageId = block.pageId;
-          editor.storage.blockId = block.id;
-          // Увеличиваем задержку для стабилизации DOM
-          setTimeout(() => {
-            if (editor && !editor.isDestroyed) {
-              setEditorReady(true);
-            }
-          }, 200);
-        } catch (error) {
-          console.error('[BlockEditor] Error in onCreate:', error);
-        }
+      console.log(`[BlockEditor] onCreate called for block ${block.id}`);
+      
+      if (!isMountedRef.current) {
+        console.log(`[BlockEditor] Component not mounted for block ${block.id}`);
+        return;
       }
+      
+      editorRef.current = editor;
+      domElementRef.current = editor.view.dom;
+      
+      // Устанавливаем pageId в storage для доступа в bubble menu
+      if (editor && block.pageId) {
+        editor.storage.pageId = block.pageId;
+        console.log(`[BlockEditor] Set pageId in storage for block ${block.id}:`, block.pageId);
+      }
+      
+      console.log(`[BlockEditor] Editor created for block ${block.id}:`, {
+        hasEditor: !!editor,
+        hasView: !!editor?.view,
+        hasDom: !!editor?.view?.dom,
+        pageId: editor?.storage?.pageId
+      });
+      
+      // Используем requestAnimationFrame для более стабильного рендеринга
+      requestAnimationFrame(() => {
+        if (isMountedRef.current) {
+          console.log(`[BlockEditor] Setting editor ready for block ${block.id}`);
+          setEditorReady(true);
+        } else {
+          console.log(`[BlockEditor] Component unmounted during onCreate for block ${block.id}`);
+        }
+      });
     },
     onUpdate: handleEditorUpdate,
-  }, [block.id, block.pageId, editable, initializeBlockContent, extensions]);
+  }, [block.id, editable, initializeBlockContent, onCreateBlock, onDeleteBlock, onFocusBlock, isDestroying, isMountedRef]);
 
-  if (!editor || !editorReady || editor.isDestroyed) {
-    return (
-      <div 
-        data-block-id={block.id}
-        style={{ 
-          minHeight: '1.5em', 
-          padding: '0.5em',
-          border: '1px solid #e0e0e0',
-          borderRadius: '4px',
-          backgroundColor: '#f9f9f9'
-        }}
-      >
-        Инициализация редактора...
-      </div>
-    );
-  }
+  // Улучшенный cleanup для редактора и YDoc
+  useEffect(() => {
+    return () => {
+      // Устанавливаем флаги уничтожения
+      setIsDestroying(true);
+      setShouldRender(false);
+      isMountedRef.current = false;
+      
+      // Очищаем таймауты
+      if (mountTimeoutRef.current) {
+        clearTimeout(mountTimeoutRef.current);
+        mountTimeoutRef.current = null;
+      }
+      
+      // Немедленно уничтожаем редактор
+      if (editorRef.current && !editorRef.current.isDestroyed) {
+        try {
+          console.log('[BlockEditor] Destroying editor for block:', block.id);
+          editorRef.current.destroy();
+        } catch (error) {
+          console.error('[BlockEditor] Error destroying editor:', error);
+        }
+        editorRef.current = null;
+      }
+      
+      // Уничтожаем provider
+      if (providerRef.current) {
+        try {
+          console.log('[BlockEditor] Destroying provider for block:', block.id);
+          providerRef.current.destroy();
+        } catch (error) {
+          console.error('[BlockEditor] Provider destroy error:', error);
+        }
+        providerRef.current = null;
+      }
+      
+      // Уничтожаем YDoc
+      if (ydocRef.current) {
+        try {
+          console.log('[BlockEditor] Destroying YDoc for block:', block.id);
+          ydocRef.current.destroy();
+        } catch (error) {
+          console.error('[BlockEditor] Error destroying YDoc:', error);
+        }
+        ydocRef.current = null;
+      }
+    };
+  }, [block.id]);
+
+  // Улучшенная проверка для рендеринга
+  const shouldRenderEditor = useMemo(() => {
+    const canRender = shouldRender && 
+                     !isDestroying && 
+                     editorReady && 
+                     editor && 
+                     !editor.isDestroyed && 
+                     editor.view && 
+                     editor.view.dom && 
+                     isMountedRef.current;
+    
+    // Добавляем отладочную информацию
+    if (!canRender) {
+      console.log(`[BlockEditor] Cannot render block ${block.id}:`, {
+        shouldRender,
+        isDestroying,
+        editorReady,
+        hasEditor: !!editor,
+        editorDestroyed: editor?.isDestroyed,
+        hasView: !!editor?.view,
+        hasDom: !!editor?.view?.dom,
+        isMounted: isMountedRef.current
+      });
+    }
+    
+    return canRender;
+  }, [shouldRender, isDestroying, editorReady, editor, isMountedRef, block.id]);
 
   return (
     <div 
       data-block-id={block.id}
-      data-position={block.position}
       style={{ 
-        position: 'relative',
-        marginBottom: '0.5em'
+        minHeight: '1.5em', 
+        padding: '0.5em',
+        border: '1px solid #e0e0e0',
+        borderRadius: '4px',
+        backgroundColor: '#ffffff'
       }}
     >
-      <EditorContent editor={editor} />
-      
-      {editor && editor.isEditable && (
-        <EditorBubbleMenu editor={editor} />
-      )}
+      {(() => {
+        try {
+                      // Показываем редактор если он готов, или пытаемся его показать
+            if (editor && !editor.isDestroyed && editor.view && editor.view.dom) {
+              return (
+                <div>
+                  <div ref={menuContainerRef}>
+                    <EditorContent 
+                      editor={editor} 
+                      ref={(el) => {
+                        if (el && isMountedRef.current) {
+                          domElementRef.current = el;
+                        }
+                      }}
+                    />
+
+                    {editor && editor.isEditable && !isDestroying && isMountedRef.current && (
+                      <div>
+                        <EditorBubbleMenu editor={editor} />
+                        <TableMenu editor={editor} />
+                        <TableCellMenu editor={editor} appendTo={menuContainerRef} />
+                        <ImageMenu editor={editor} />
+                        <VideoMenu editor={editor} />
+                        <CalloutMenu editor={editor} />
+                        <ExcalidrawMenu editor={editor} />
+                        <DrawioMenu editor={editor} />
+                        <LinkMenu editor={editor} appendTo={menuContainerRef} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+          
+          // Показываем состояние загрузки
+          if (isDestroying) {
+            return (
+              <div style={{ 
+                minHeight: '1.5em',
+                color: '#666',
+                fontStyle: 'italic'
+              }}>
+                Удаление блока...
+              </div>
+            );
+          }
+          
+          return (
+            <div style={{ 
+              minHeight: '1.5em',
+              color: '#666',
+              fontStyle: 'italic'
+            }}>
+              Загрузка блока...
+            </div>
+          );
+        } catch (error) {
+          console.error('[BlockEditor] Rendering error:', error);
+          return (
+            <div style={{ 
+              padding: '0.5em',
+              border: '1px solid #ff6b6b',
+              borderRadius: '4px',
+              backgroundColor: '#ffe6e6',
+              color: '#d63031'
+            }}>
+              Ошибка рендеринга редактора
+            </div>
+          );
+        }
+      })()}
     </div>
   );
 }

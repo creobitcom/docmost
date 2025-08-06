@@ -192,26 +192,28 @@ export default function PageEditor({
         }
       },
       onUpdate({ editor }) {
-        if (editor.isEmpty) return;
-        const editorJson = editor.getJSON();
-        //update local page cache to reduce flickers
-        debouncedUpdateContent(editorJson);
+        // Отключено для новой системы блоков
+        // if (editor.isEmpty) return;
+        // const editorJson = editor.getJSON();
+        // //update local page cache to reduce flickers
+        // debouncedUpdateContent(editorJson);
       },
     },
     [pageId, editable, content, remoteProvider?.status], // Add content to dependencies
   );
 
-  const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
-    const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
+  // Отключено для новой системы блоков
+  // const debouncedUpdateContent = useDebouncedCallback((newContent: any) => {
+  //   const pageData = queryClient.getQueryData<IPage>(["pages", slugId]);
 
-    if (pageData) {
-      queryClient.setQueryData(["pages", slugId], {
-        ...pageData,
-        content: newContent,
-        updatedAt: new Date(),
-      });
-    }
-  }, 3000);
+  //   if (pageData) {
+  //     queryClient.setQueryData(["pages", slugId], {
+  //       ...pageData,
+  //       content: newContent,
+  //       updatedAt: new Date(),
+  //     });
+  //   }
+  // }, 3000);
 
   const handleActiveCommentEvent = (event) => {
     const { commentId } = event.detail;

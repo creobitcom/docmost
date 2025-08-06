@@ -380,4 +380,20 @@ export class PageBlocksService {
       content: parsedContent
     };
   }
+
+  // Удаляет блок
+  async deleteBlock(blockId: string) {
+    const deleted = await this.db
+      .deleteFrom('blocks')
+      .where('id', '=', blockId)
+      .returningAll()
+      .executeTakeFirst();
+
+    if (!deleted) {
+      throw new Error(`Block with id ${blockId} not found`);
+    }
+
+    console.log(`[PageBlocksService] Deleted block: ${blockId}`);
+    return deleted;
+  }
 }

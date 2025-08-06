@@ -118,3 +118,7 @@ export const updateBlockPermission = async ({ pageId, blockId, userId, role }: {
 export const getPageInfo = async ({ pageId }: { pageId: string }) => {
   return api.post('/pages/info', { pageId });
 };
+
+export const getUserSpaceRole = async ({ spaceId, userId }: { spaceId: string; userId: string }) => {
+  return api.get(`/spaces/${spaceId}/members/${userId}/role`);
+};

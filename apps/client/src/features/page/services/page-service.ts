@@ -24,6 +24,7 @@ export async function createPage(data: Partial<IPage>): Promise<IPage> {
 export async function getPageById(
   pageInput: Partial<IPageInput>,
 ): Promise<IPage & { originPageId?: string; isSyncedPage?: boolean }> {
+  console.log("[getPageById] Making request with pageInput:", pageInput);
   const req = await api.post<IPage>("/pages/info", pageInput);
   console.log("[req.data]");
   console.log(req.data);
