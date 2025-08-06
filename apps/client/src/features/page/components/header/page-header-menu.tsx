@@ -29,7 +29,6 @@ import { PageWidthToggle } from "@/features/user/components/page-width-pref.tsx"
 import { Trans, useTranslation } from "react-i18next";
 import ExportModal from "@/components/common/export-modal";
 import {
-  pageEditorAtom,
   yjsConnectionStatusAtom,
 } from "@/features/editor/atoms/editor-atoms.ts";
 import { formattedDate, timeAgo } from "@/lib/time.ts";
@@ -102,7 +101,7 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
     movePageModalOpened,
     { open: openMovePageModal, close: closeMoveSpaceModal },
   ] = useDisclosure(false);
-  const [pageEditor] = useAtom(pageEditorAtom);
+
   const pageUpdatedAt = useTimeAgo(page.updatedAt);
 
   const handleCopyLink = () => {
@@ -217,7 +216,7 @@ function PageActionMenu({ readOnly }: PageActionMenuProps) {
                 <div style={{ width: 210 }}>
                   <Text size="xs" c="dimmed" truncate="end">
                     {t("Word count: {{wordCount}}", {
-                      wordCount: pageEditor?.storage?.characterCount?.words(),
+                      wordCount: "calculating...",
                     })}
                   </Text>
 

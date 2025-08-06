@@ -4,7 +4,7 @@ import classes from "./comment.module.css";
 import { useAtom, useAtomValue } from "jotai";
 import { timeAgo } from "@/lib/time";
 import CommentEditor from "@/features/comment/components/comment-editor";
-import { pageEditorAtom } from "@/features/editor/atoms/editor-atoms";
+
 import CommentActions from "@/features/comment/components/comment-actions";
 import CommentMenu from "@/features/comment/components/comment-menu";
 import { useHover } from "@mantine/hooks";
@@ -24,7 +24,7 @@ function CommentListItem({ comment }: CommentListItemProps) {
   const { hovered, ref } = useHover();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const editor = useAtomValue(pageEditorAtom);
+
   const [content, setContent] = useState<string>(comment.content);
   const updateCommentMutation = useUpdateCommentMutation();
   const deleteCommentMutation = useDeleteCommentMutation(comment.pageId);
@@ -49,7 +49,8 @@ function CommentListItem({ comment }: CommentListItemProps) {
   async function handleDeleteComment() {
     try {
       await deleteCommentMutation.mutateAsync(comment.id);
-      editor?.commands.unsetComment(comment.id);
+      // TODO: В блочной архитектуре нужно обновить логику удаления комментариев
+      // editor?.commands.unsetComment(comment.id);
     } catch (error) {
       console.error("Failed to delete comment:", error);
     }

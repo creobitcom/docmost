@@ -70,26 +70,72 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
     return blockElement?.getAttribute('data-block-id') || null;
   };
 
-  // Проверяем права пользователя на блок
+  // Проверяем права пользователя на блок и статус создателя
   useEffect(() => {
     const checkUserPermissions = async () => {
       const blockId = getCurrentBlockId();
-      if (!blockId || !currentUser?.user?.id) return;
+      if (!blockId || !currentUser?.user?.id) {
+        setUserBlockPermission(null);
+        setIsPageCreator(false);
+        return;
+      }
 
       try {
-        const permissions = await getBlockPermissions({ 
+        // Проверяем права на блок
+        const result = await getBlockPermissions({ 
           pageId: props.editor.storage.pageId, 
           blockId 
         });
-        const userPermission = permissions.data?.find(p => p.userId === currentUser.user.id);
-        setUserBlockPermission(userPermission?.role || null);
-      } catch (e) {
-        console.error("Failed to check user permissions:", e);
+        const currentUserPermission = result.data?.find(item => item.userId === currentUser.user.id);
+        setUserBlockPermission(currentUserPermission?.role || null);
+
+        // Проверяем, является ли пользователь создателем страницы
+        const pageResponse = await fetch(`/api/pages/info`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ pageId: props.editor.storage.pageId }),
+        });
+
+        if (pageResponse.ok) {
+          const pageData = await pageResponse.json();
+          const pageInfo = pageData.data;
+          
+          // Проверяем разные варианты имени поля creator
+          const creatorId = pageInfo?.creator_id || pageInfo?.creatorId || pageInfo?.creator?.id;
+          const isCreator = creatorId === currentUser?.user?.id;
+          setIsPageCreator(isCreator);
+
+          console.log('[BubbleMenu] User permissions check:', {
+            userId: currentUser?.user?.id,
+            pageCreatorId: creatorId,
+            isPageCreator: isCreator,
+            userBlockPermission: currentUserPermission?.role,
+            shouldShowSearchButton: isCreator || currentUserPermission?.role === 'owner'
+          });
+        }
+      } catch (err) {
+        console.error("Failed to check user permissions:", err);
+        setUserBlockPermission(null);
+        setIsPageCreator(false);
       }
     };
 
+    // Проверяем права при изменении выделения
+    const handleSelectionUpdate = () => {
+      checkUserPermissions();
+    };
+
+    props.editor.on('selectionUpdate', handleSelectionUpdate);
+
+    // Начальная проверка
     checkUserPermissions();
-  }, [currentUser?.user?.id, props.editor.storage.pageId]);
+
+    return () => {
+      props.editor.off('selectionUpdate', handleSelectionUpdate);
+    };
+  }, [props.editor, currentUser?.user?.id]);
 
   const items: BubbleMenuItem[] = [
     {
@@ -248,16 +294,19 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           <IconMessage size={16} stroke={2} />
         </ActionIcon>
 
-        {/* Кнопка управления правами доступа к блоку */}
-        {(userBlockPermission === "owner" || userBlockPermission === "edit" || isPageCreator) && (
-          <Tooltip label="Управление правами доступа" withArrow>
+        {/* Показываем кнопку поиска только для владельцев или создателей страницы */}
+        {(userBlockPermission === 'owner' || isPageCreator) && (
+          <Tooltip label="Search Users" withArrow>
             <ActionIcon
               variant="default"
               size="lg"
               radius="0"
-              aria-label="Управление правами доступа"
+              aria-label="Search"
               style={{ border: "none" }}
-              onClick={() => setSearchModalOpened(true)}
+              onClick={() => {
+                console.log('[BubbleMenu] Search button clicked, opening modal');
+                setSearchModalOpened(true);
+              }}
             >
               <IconSearch size={16} stroke={2} />
             </ActionIcon>

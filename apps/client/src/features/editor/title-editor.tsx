@@ -7,7 +7,6 @@ import { Text } from "@tiptap/extension-text";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { useAtomValue } from "jotai";
 import {
-  pageEditorAtom,
   titleEditorAtom,
 } from "@/features/editor/atoms/editor-atoms";
 import { useUpdatePageMutation } from "@/features/page/queries/page-query";
@@ -41,7 +40,7 @@ export function TitleEditor({
 }: TitleEditorProps) {
   const { t } = useTranslation();
   const { mutateAsync: updatePageMutationAsync } = useUpdatePageMutation();
-  const pageEditor = useAtomValue(pageEditorAtom);
+
   const [, setTitleEditor] = useAtom(titleEditorAtom);
   const emit = useQueryEmit();
   const navigate = useNavigate();
@@ -139,7 +138,7 @@ export function TitleEditor({
   }, [pageId]);
 
   function handleTitleKeyDown(event) {
-    if (!titleEditor || !pageEditor || event.shiftKey) return;
+    if (!titleEditor || event.shiftKey) return;
 
     const { key } = event;
     const { $head } = titleEditor.state.selection;
@@ -150,7 +149,14 @@ export function TitleEditor({
       (key === "ArrowRight" && !$head.nodeAfter);
 
     if (shouldFocusEditor) {
-      pageEditor.commands.focus("start");
+      // В блочной архитектуре фокусируемся на первом блоке
+      const firstBlock = document.querySelector('[data-block-id]') as HTMLElement;
+      if (firstBlock) {
+        const editorElement = firstBlock.querySelector('[contenteditable="true"]') as HTMLElement;
+        if (editorElement) {
+          editorElement.focus();
+        }
+      }
     }
   }
 

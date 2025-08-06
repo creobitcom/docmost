@@ -6,12 +6,12 @@ import React, { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { TableOfContents } from "@/features/editor/components/table-of-contents/table-of-contents.tsx";
 import { useAtomValue } from "jotai";
-import { pageEditorAtom } from "@/features/editor/atoms/editor-atoms.ts";
+
 
 export default function Aside() {
   const [{ tab }] = useAtom(asideStateAtom);
   const { t } = useTranslation();
-  const pageEditor = useAtomValue(pageEditorAtom);
+
 
   let title: string;
   let component: ReactNode;
@@ -22,7 +22,7 @@ export default function Aside() {
       title = "Comments";
       break;
     case "toc":
-      component = <TableOfContents editor={pageEditor} />;
+      component = <div>Table of contents - temporarily disabled in block architecture</div>;
       title = "Table of contents";
       break;
     default:

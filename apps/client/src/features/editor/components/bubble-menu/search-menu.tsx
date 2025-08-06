@@ -152,6 +152,7 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
         {filteredMembers.map((member) => {
           const currentPermission = selectedPermissionsMap[member.id];
           const isAssigned = !!currentPermission;
+          const isCurrentUser = member.id === currentUser?.user?.id;
 
           return (
             <Group key={member.id} justify="space-between" align="center">
@@ -160,6 +161,11 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
                 <div>
                   <Text size="sm" fw={500}>
                     {member.name}
+                    {isCurrentUser && (
+                      <Text size="xs" c="blue" style={{ marginLeft: '4px' }}>
+                        (Вы)
+                      </Text>
+                    )}
                   </Text>
                   <Text size="xs" c="dimmed">
                     {member.email}
@@ -182,13 +188,15 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
                         { value: "owner", label: "Владелец" },
                       ]}
                       w={120}
+                      disabled={isCurrentUser} // Запрещаем редактирование собственных прав
                     />
-                    <Tooltip label="Удалить права">
+                    <Tooltip label={isCurrentUser ? "Нельзя удалить собственные права" : "Удалить права"}>
                       <ActionIcon
                         size="sm"
                         variant="subtle"
                         color="red"
                         onClick={() => handleRemovePermission(member.id)}
+                        disabled={isCurrentUser} // Запрещаем удаление собственных прав
                       >
                         <IconX size={14} />
                       </ActionIcon>
@@ -199,6 +207,7 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
                     size="xs"
                     leftSection={<IconUserPlus size={14} />}
                     onClick={() => handleAssignPermission(member.id, "read")}
+                    disabled={isCurrentUser} // Запрещаем добавление собственных прав
                   >
                     Добавить
                   </Button>

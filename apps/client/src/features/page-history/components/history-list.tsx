@@ -11,7 +11,6 @@ import { useAtom } from "jotai";
 import { useCallback, useEffect } from "react";
 import { Button, ScrollArea, Group, Divider, Text } from "@mantine/core";
 import {
-  pageEditorAtom,
   titleEditorAtom,
 } from "@/features/editor/atoms/editor-atoms";
 import { modals } from "@mantine/modals";
@@ -39,7 +38,7 @@ function HistoryList({ pageId }: Props) {
   } = usePageHistoryListQuery(pageId);
   const { data: activeHistoryData } = usePageHistoryQuery(activeHistoryId);
 
-  const [mainEditor] = useAtom(pageEditorAtom);
+
   const [mainEditorTitle] = useAtom(titleEditorAtom);
   const [, setHistoryModalOpen] = useAtom(historyAtoms);
 
@@ -69,13 +68,14 @@ function HistoryList({ pageId }: Props) {
         .clearContent()
         .setContent(activeHistoryData.title, true)
         .run();
-      mainEditor
-        .chain()
-        .clearContent()
-        .setContent(activeHistoryData.content)
-        .run();
+      // TODO: В блочной архитектуре нужно обновить логику восстановления
+      // mainEditor
+      //   .chain()
+      //   .clearContent()
+      //   .setContent(activeHistoryData.content)
+      //   .run();
       setHistoryModalOpen(false);
-      notifications.show({ message: t("Successfully restored") });
+      notifications.show({ message: t("Title restored, content restoration temporarily disabled in block architecture") });
     }
   }, [activeHistoryData]);
 

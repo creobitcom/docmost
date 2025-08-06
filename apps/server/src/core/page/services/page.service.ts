@@ -530,11 +530,11 @@ export class PageService {
     try {
       // Получаем все блоки страницы
       const blocks = await this.PageBlocksService.getPageBlocks(pageId);
-      
+
       // Проверяем, является ли пользователь создателем страницы
       const page = await this.pageRepo.findById(pageId);
       const isPageCreator = page?.creatorId === userId;
-      
+
       // Получаем права доступа пользователя к блокам
       const accessibleBlocks = await this.PageBlocksService.getAccessiblePageBlocks(pageId, userId);
       const accessibleBlockIds = new Set(accessibleBlocks.map(b => b.id));
@@ -553,7 +553,7 @@ export class PageService {
               userPermission: "owner"
             };
           }
-          
+
           // Определяем права пользователя
           // Проверяем права через block_permissions
           const userPermissionResult = await this.db
@@ -562,7 +562,7 @@ export class PageService {
             .where('blockId', '=', block.id)
             .where('userId', '=', userId)
             .executeTakeFirst();
-          
+
           if (userPermissionResult) {
             return {
               ...block,
@@ -671,9 +671,9 @@ export class PageService {
         content: blockContent
       }, userId);
 
-      return { 
-        message: 'Page successfully migrated to blocks', 
-        blocks: [newBlock] 
+      return {
+        message: 'Page successfully migrated to blocks',
+        blocks: [newBlock]
       };
     } catch (error) {
       this.logger.error(`Error migrating page ${pageId} to blocks:`, error);

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import PageEditor from "./page-editor";
 import PageEditorBlocks from "./page-editor-blocks";
 
 interface PageEditorWrapperProps {
@@ -15,8 +14,8 @@ export default function PageEditorWrapper({
   content,
   syncPageOriginId,
 }: PageEditorWrapperProps) {
-  const [useBlockArchitecture, setUseBlockArchitecture] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [hasBlocks, setHasBlocks] = useState(false);
 
   // Проверяем, есть ли уже блоки для этой страницы
   useEffect(() => {
@@ -28,13 +27,20 @@ export default function PageEditorWrapper({
         
         if (response.ok) {
           const blocks = await response.json();
-          // Если есть блоки, используем новую архитектуру
+          // Если есть блоки, используем их
           if (blocks && blocks.length > 0) {
-            setUseBlockArchitecture(true);
+            setHasBlocks(true);
+          } else {
+            // Если блоков нет, автоматически мигрируем
+            await migrateToBlocks();
           }
+        } else {
+          // Если запрос не удался, все равно мигрируем
+          await migrateToBlocks();
         }
       } catch (error) {
-        console.log('[PageEditorWrapper] No blocks found, using legacy architecture');
+        console.log('[PageEditorWrapper] Error checking blocks, migrating:', error);
+        await migrateToBlocks();
       }
     };
 
@@ -43,6 +49,8 @@ export default function PageEditorWrapper({
 
   // Функция для миграции в блок-архитектуру
   const migrateToBlocks = async () => {
+    if (isMigrating) return;
+    
     setIsMigrating(true);
     try {
       const response = await fetch(`/api/pages/${pageId}/migrate-to-blocks`, {
@@ -50,80 +58,51 @@ export default function PageEditorWrapper({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({}), // Добавляем пустое тело запроса
+        body: JSON.stringify({}),
         credentials: "include",
       });
 
       if (response.ok) {
         const result = await response.json();
-        console.log('[PageEditorWrapper] Migration result:', result);
-        setUseBlockArchitecture(true);
+        console.log('[PageEditorWrapper] Migration completed:', result);
+        setHasBlocks(true);
       } else {
         console.error('[PageEditorWrapper] Migration failed:', response.status);
+        // Даже если миграция не удалась, показываем блоки (они могут быть пустыми)
+        setHasBlocks(true);
       }
     } catch (error) {
       console.error('[PageEditorWrapper] Migration error:', error);
+      // Даже при ошибке показываем блоки
+      setHasBlocks(true);
     } finally {
       setIsMigrating(false);
     }
   };
 
-  // Переключатель архитектуры
-  const toggleArchitecture = () => {
-    if (useBlockArchitecture) {
-      setUseBlockArchitecture(false);
-    } else {
-      migrateToBlocks();
-    }
-  };
-
-  return (
-    <div>
-      {/* Переключатель архитектуры */}
+  // Показываем индикатор загрузки во время миграции
+  if (isMigrating) {
+    return (
       <div style={{ 
-        position: 'fixed', 
-        top: '10px', 
-        right: '10px', 
-        zIndex: 1000,
-        background: 'white',
-        padding: '10px',
-        border: '1px solid #ccc',
-        borderRadius: '4px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        padding: '20px', 
+        textAlign: 'center',
+        color: '#666'
       }}>
-        <div style={{ marginBottom: '5px', fontSize: '12px' }}>
-          Архитектура: {useBlockArchitecture ? 'Блоки' : 'Легаси'}
+        <div>Миграция контента в блочную архитектуру...</div>
+        <div style={{ fontSize: '12px', marginTop: '5px' }}>
+          Это может занять несколько секунд
         </div>
-        <button 
-          onClick={toggleArchitecture}
-          disabled={isMigrating}
-          style={{
-            padding: '5px 10px',
-            fontSize: '12px',
-            cursor: isMigrating ? 'not-allowed' : 'pointer',
-            opacity: isMigrating ? 0.5 : 1
-          }}
-        >
-          {isMigrating ? 'Миграция...' : 'Переключить'}
-        </button>
       </div>
+    );
+  }
 
-      {/* Рендерим соответствующий редактор */}
-      {useBlockArchitecture ? (
-        <PageEditorBlocks
-          pageId={pageId}
-          editable={editable}
-          content={content}
-          syncPageOriginId={syncPageOriginId}
-        />
-      ) : (
-        <PageEditor
-          pageId={pageId}
-          editable={editable}
-          content={content}
-          syncPageOriginId={syncPageOriginId}
-        />
-      )}
-    </div>
+  // Всегда используем блочную архитектуру
+  return (
+    <PageEditorBlocks
+      pageId={pageId}
+      editable={editable}
+      content={content}
+      syncPageOriginId={syncPageOriginId}
+    />
   );
 } 
