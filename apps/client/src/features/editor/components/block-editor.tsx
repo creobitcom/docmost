@@ -111,32 +111,52 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
     }
 
     // Проверяем, что нормализованный контент имеет правильную структуру
-    if (normalizedContent && 
-        typeof normalizedContent === 'object' && 
-        normalizedContent.type === 'doc' && 
-        normalizedContent.content && 
-        Array.isArray(normalizedContent.content)) {
-      
-      console.log('[BlockEditor] Content has valid structure, processing...');
-      
-      // Устанавливаем blockId для всех элементов контента
-      const contentWithBlockId = normalizedContent.content.map((node: any) => {
-        if (node && typeof node === 'object') {
-          return {
-            ...node,
-            attrs: { ...node.attrs, blockId: block.id }
-          };
-        }
-        return node;
-      }).filter(Boolean); // Удаляем null/undefined элементы
+    if (normalizedContent && typeof normalizedContent === 'object') {
+      // Если контент уже является полным документом
+      if (normalizedContent.type === 'doc' && 
+          normalizedContent.content && 
+          Array.isArray(normalizedContent.content)) {
+        
+        console.log('[BlockEditor] Content is already a doc, processing...');
+        
+        // Устанавливаем blockId для всех элементов контента
+        const contentWithBlockId = normalizedContent.content.map((node: any) => {
+          if (node && typeof node === 'object') {
+            return {
+              ...node,
+              attrs: { ...node.attrs, blockId: block.id }
+            };
+          }
+          return node;
+        }).filter(Boolean); // Удаляем null/undefined элементы
 
-      const result = {
-        ...normalizedContent,
-        content: contentWithBlockId
-      };
+        const result = {
+          ...normalizedContent,
+          content: contentWithBlockId
+        };
+        
+        console.log('[BlockEditor] Final processed doc content:', result);
+        return result;
+      }
       
-      console.log('[BlockEditor] Final processed content:', result);
-      return result;
+      // Если контент является отдельным элементом (paragraph, heading и т.д.)
+      if (normalizedContent.type && normalizedContent.type !== 'doc') {
+        console.log('[BlockEditor] Content is a single element, wrapping in doc...');
+        
+        // Оборачиваем элемент в документ
+        const wrappedContent = {
+          type: "doc",
+          content: [
+            {
+              ...normalizedContent,
+              attrs: { ...normalizedContent.attrs, blockId: block.id }
+            }
+          ]
+        };
+        
+        console.log('[BlockEditor] Wrapped content:', wrappedContent);
+        return wrappedContent;
+      }
     }
 
     console.log('[BlockEditor] Content structure invalid, using fallback');
@@ -251,12 +271,32 @@ export function BlockEditor({ block, editable, onBlockUpdate }: BlockEditorProps
     },
     onCreate({ editor }) {
       if (editor) {
-        editor.storage.pageId = block.pageId;
-        editor.storage.blockId = block.id;
+        try {
+          editor.storage.pageId = block.pageId;
+          editor.storage.blockId = block.id;
+        } catch (error) {
+          console.error('[BlockEditor] Error in onCreate:', error);
+        }
       }
     },
     onUpdate: handleEditorUpdate,
   }, [block.id, block.pageId, editable, initializeBlockContent, extensions]);
+
+  // Добавляем обработку ошибок для редактора
+  useEffect(() => {
+    if (editor) {
+      const handleError = (error: any) => {
+        console.error('[BlockEditor] Editor error:', error);
+      };
+
+      // Добавляем обработчик ошибок
+      window.addEventListener('error', handleError);
+      
+      return () => {
+        window.removeEventListener('error', handleError);
+      };
+    }
+  }, [editor]);
 
   if (!editor) {
     return (
