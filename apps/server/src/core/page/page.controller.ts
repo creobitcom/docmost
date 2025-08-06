@@ -416,7 +416,7 @@ export class PageController {
     };
     let blocks = await this.blockPermissionService.getAccessiblePageBlocks(page.id, user.id);
 
-    const syncPage = await this.syncPageService.findByReferenceId(page.id);
+      const syncPage = await this.syncPageService.findByReferenceId(page.id);
 
     if (syncPage) {
       const originPage = await this.pageRepo.findById(syncPage.originPageId, {
