@@ -507,14 +507,24 @@ export class PageService {
   //   throw new BadRequestException('Copy page feature is not available');
   // }
 
-  // Проверяет, есть ли у пользователя прямой доступ к странице
+    // Проверяет, есть ли у пользователя прямой доступ к странице
   async userHasDirectPageAccess(userId: string, pageId: string): Promise<boolean> {
     try {
+      console.log(`[PageService] userHasDirectPageAccess called for userId: ${userId}, pageId: ${pageId}`);
+
       const page = await this.pageRepo.findById(pageId);
-      if (!page) return false;
+      if (!page) {
+        console.log(`[PageService] Page not found for pageId: ${pageId}`);
+        return false;
+      }
+
+      console.log(`[PageService] Page found: creatorId: ${page.creatorId}, spaceId: ${page.spaceId}`);
 
       // Проверяем, является ли пользователь создателем страницы
-      if (page.creatorId === userId) return true;
+      if (page.creatorId === userId) {
+        console.log(`[PageService] User is page creator`);
+        return true;
+      }
 
       // Проверяем роль пользователя в таблице users
       const userRole = await this.db
@@ -522,6 +532,8 @@ export class PageService {
         .select(['role'])
         .where('id', '=', userId)
         .executeTakeFirst();
+
+      console.log(`[PageService] User role from users table:`, userRole?.role);
 
       // Проверяем роль пользователя в таблице spaceMembers
       const spaceMemberRole = page.spaceId ? await this.db
@@ -532,6 +544,8 @@ export class PageService {
         .where('deletedAt', 'is', null)
         .executeTakeFirst() : null;
 
+      console.log(`[PageService] Space member role:`, spaceMemberRole?.role);
+
       // Пользователь имеет права owner если:
       // 1. Он создатель страницы (уже проверено выше)
       // 2. У него роль 'owner' в таблице users
@@ -540,11 +554,20 @@ export class PageService {
         spaceMemberRole?.role === 'admin' ||
         spaceMemberRole?.role === 'owner';
 
-      if (hasOwnerRights) return true;
+      console.log(`[PageService] Has owner rights:`, hasOwnerRights);
+
+      if (hasOwnerRights) {
+        console.log(`[PageService] Returning true due to owner rights`);
+        return true;
+      }
 
       // Проверяем права через PageMemberRepo
       const pageMember = await this.pageMemberRepo.findPageMember(pageId, userId);
-      return !!pageMember;
+      const hasPageMemberAccess = !!pageMember;
+
+      console.log(`[PageService] Has page member access:`, hasPageMemberAccess);
+
+      return hasPageMemberAccess;
     } catch (error) {
       this.logger.error(`Error checking page access for user ${userId} on page ${pageId}:`, error);
       return false;
