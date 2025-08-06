@@ -54,23 +54,14 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
     });
   }, [block.id, block.pageId, collaborationURL, collabQuery?.token, ydoc]);
 
-  // Подключаемся к серверу с задержкой и ограничением одновременных соединений
+  // Временно отключаем WebSocket для тестирования
   useEffect(() => {
     if (provider && !isInitialized) {
-      // Увеличиваем задержку для стабильности и добавляем более строгую логику
-      const delay = 2000 + (Math.random() * 3000); // 2-5 секунд
-      const timer = setTimeout(() => {
-        try {
-          console.log('[BlockEditor] Connecting provider for block:', block.id);
-          provider.connect();
-          setIsInitialized(true);
-        } catch (error) {
-          console.error('[BlockEditor] Provider connection error:', error);
-        }
-      }, delay);
-
+      // Временно не подключаемся к WebSocket для исключения проблем с сетью
+      console.log('[BlockEditor] Skipping WebSocket connection for block:', block.id);
+      setIsInitialized(true);
+      
       return () => {
-        clearTimeout(timer);
         if (provider) {
           try {
             console.log('[BlockEditor] Destroying provider for block:', block.id);
@@ -178,9 +169,9 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
     }
   };
 
-  // Настройка расширений для блока
+  // Настройка расширений для блока (временно без коллаборации)
   const extensions = useMemo(() => {
-    const baseExtensions = [
+    return [
       ...mainExtensions,
       ...creobitExtentions.filter(ext => ext.name !== 'block-id'),
       BlockId.configure({
@@ -193,16 +184,7 @@ function EditorWrapper({ block, editable, onBlockUpdate }: BlockEditorProps) {
         },
       }),
     ];
-
-    if (provider && isInitialized && currentUser?.user) {
-      return [
-        ...baseExtensions,
-        ...collabExtensions(provider, currentUser.user),
-      ];
-    }
-
-    return baseExtensions;
-  }, [provider, currentUser?.user, block.id, isInitialized]);
+  }, [block.id]);
 
   const editor = useEditor({
     extensions,

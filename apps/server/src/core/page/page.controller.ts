@@ -154,7 +154,8 @@ export class PageController {
       throw new ForbiddenException('Page creatorId is null');
     }
     console.log('[getBlockPermissions] user.id:', user.id, 'page.creatorId:', page.creatorId, 'typeof user.id:', typeof user.id, 'typeof creatorId:', typeof page.creatorId);
-    const isCreator = page.creatorId === user.id;
+    console.log('[getBlockPermissions] String comparison:', String(page.creatorId) === String(user.id));
+    const isCreator = String(page.creatorId) === String(user.id);
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
