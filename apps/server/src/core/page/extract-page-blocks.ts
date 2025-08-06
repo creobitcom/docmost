@@ -18,13 +18,14 @@ export function extractTopLevelBlocks(content: any, pageId: string) {
 
   return content.content
     .filter((block: any) => !!block.attrs?.blockId)
-    .map((block: any) => {
+    .map((block: any, index: number) => {
       const textContent = extractTextFromContent(block.content);
 
       return {
         blockId: block.attrs.blockId,
         blockType: block.type,
         pageId,
+        position: block.attrs?.position || index, // Используем position из атрибутов или индекс
         content: block.content,
       };
     })

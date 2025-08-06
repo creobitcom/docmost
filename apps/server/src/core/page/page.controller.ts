@@ -131,34 +131,57 @@ export class PageController {
   ) {
     console.log('[getBlockPermissions] Starting with pageId:', pageId, 'blockId:', blockId, 'user.id:', user.id);
 
-    // Логируем SQL-запрос
-    const query = this.db
+    // Получаем информацию о странице
+    const page = await this.db
       .selectFrom('pages')
-      .select('creatorId')
-      .where('id', '=', pageId);
-
-    console.log('[getBlockPermissions] SQL Query:', query.compile());
-
-    const page = await query.executeTakeFirst() as any;
+      .select(['creatorId', 'spaceId'])
+      .where('id', '=', pageId)
+      .executeTakeFirst() as any;
 
     console.log('[getBlockPermissions] Raw page result:', page);
-    console.log('[getBlockPermissions] Page creatorId:', page?.creatorId);
-    console.log('[getBlockPermissions] Page creatorId type:', typeof page?.creatorId);
 
     if (!page) {
       console.error('[getBlockPermissions] Page not found for id:', pageId);
       throw new NotFoundException('Page not found');
     }
-    if (!page.creatorId) {
-      console.error('[getBlockPermissions] Page creatorId is null for id:', pageId);
-      throw new ForbiddenException('Page creatorId is null');
-    }
-    console.log('[getBlockPermissions] user.id:', user.id, 'page.creatorId:', page.creatorId, 'typeof user.id:', typeof user.id, 'typeof creatorId:', typeof page.creatorId);
-    console.log('[getBlockPermissions] String comparison:', String(page.creatorId) === String(user.id));
+
     const isCreator = String(page.creatorId) === String(user.id);
 
-    // Если пользователь не создатель, проверяем его права на блок
-    if (!isCreator) {
+    // Проверяем роль пользователя в таблице users
+    const userRole = await this.db
+      .selectFrom('users')
+      .select(['role'])
+      .where('id', '=', user.id)
+      .executeTakeFirst();
+
+    // Проверяем роль пользователя в таблице spaceMembers
+    const spaceMemberRole = page?.spaceId ? await this.db
+      .selectFrom('spaceMembers')
+      .select(['role'])
+      .where('userId', '=', user.id)
+      .where('spaceId', '=', page.spaceId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst() : null;
+
+    // Пользователь имеет права owner если:
+    // 1. Он создатель страницы
+    // 2. У него роль 'owner' в таблице users
+    // 3. У него роль 'admin' или 'owner' в таблице spaceMembers
+    const hasOwnerRights = isCreator || 
+      userRole?.role === 'owner' || 
+      spaceMemberRole?.role === 'admin' || 
+      spaceMemberRole?.role === 'owner';
+
+    console.log('[getBlockPermissions] User role check:', {
+      userId: user.id,
+      userRole: userRole?.role,
+      spaceMemberRole: spaceMemberRole?.role,
+      hasOwnerRights,
+      isCreator
+    });
+
+    // Если пользователь не имеет прав owner, проверяем его права на блок
+    if (!hasOwnerRights) {
       const blockPermission = await this.db
         .selectFrom('block_permissions')
         .select('permission')
@@ -292,17 +315,42 @@ export class PageController {
       throw new ForbiddenException('Users cannot modify their own permissions');
     }
 
-    // Проверяем, является ли пользователь создателем страницы
+    // Получаем информацию о странице
     const page = await this.db
       .selectFrom('pages')
-      .select('creatorId')
+      .select(['creatorId', 'spaceId'])
       .where('id', '=', pageId)
       .executeTakeFirst() as any;
 
-    const isCreator = page?.creatorId === user.id;
+    const isCreator = String(page?.creatorId) === String(user.id);
 
-    // Если пользователь не создатель, проверяем его права на блок
-    if (!isCreator) {
+    // Проверяем роль пользователя в таблице users
+    const userRole = await this.db
+      .selectFrom('users')
+      .select(['role'])
+      .where('id', '=', user.id)
+      .executeTakeFirst();
+
+    // Проверяем роль пользователя в таблице spaceMembers
+    const spaceMemberRole = page?.spaceId ? await this.db
+      .selectFrom('spaceMembers')
+      .select(['role'])
+      .where('userId', '=', user.id)
+      .where('spaceId', '=', page.spaceId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst() : null;
+
+    // Пользователь имеет права owner если:
+    // 1. Он создатель страницы
+    // 2. У него роль 'owner' в таблице users
+    // 3. У него роль 'admin' или 'owner' в таблице spaceMembers
+    const hasOwnerRights = isCreator || 
+      userRole?.role === 'owner' || 
+      spaceMemberRole?.role === 'admin' || 
+      spaceMemberRole?.role === 'owner';
+
+    // Если пользователь не имеет прав owner, проверяем его права на блок
+    if (!hasOwnerRights) {
       const blockPermission = await this.db
         .selectFrom('block_permissions')
         .select('permission')
@@ -352,17 +400,42 @@ export class PageController {
       throw new ForbiddenException('Users cannot delete their own permissions');
     }
 
-    // Проверяем, является ли пользователь создателем страницы
+    // Получаем информацию о странице
     const page = await this.db
       .selectFrom('pages')
-      .select('creatorId')
+      .select(['creatorId', 'spaceId'])
       .where('id', '=', dto.pageId)
       .executeTakeFirst() as any;
 
-    const isCreator = page?.creatorId === user.id;
+    const isCreator = String(page?.creatorId) === String(user.id);
 
-    // Если пользователь не создатель, проверяем его права на блок
-    if (!isCreator) {
+    // Проверяем роль пользователя в таблице users
+    const userRole = await this.db
+      .selectFrom('users')
+      .select(['role'])
+      .where('id', '=', user.id)
+      .executeTakeFirst();
+
+    // Проверяем роль пользователя в таблице spaceMembers
+    const spaceMemberRole = page?.spaceId ? await this.db
+      .selectFrom('spaceMembers')
+      .select(['role'])
+      .where('userId', '=', user.id)
+      .where('spaceId', '=', page.spaceId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst() : null;
+
+    // Пользователь имеет права owner если:
+    // 1. Он создатель страницы
+    // 2. У него роль 'owner' в таблице users
+    // 3. У него роль 'admin' или 'owner' в таблице spaceMembers
+    const hasOwnerRights = isCreator || 
+      userRole?.role === 'owner' || 
+      spaceMemberRole?.role === 'admin' || 
+      spaceMemberRole?.role === 'owner';
+
+    // Если пользователь не имеет прав owner, проверяем его права на блок
+    if (!hasOwnerRights) {
       const blockPermission = await this.db
         .selectFrom('block_permissions')
         .select('permission')

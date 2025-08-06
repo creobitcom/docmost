@@ -102,94 +102,43 @@ export class PageBlocksService {
           continue;
         }
 
-                // Радикально нормализуем содержимое блока, чтобы гарантировать один параграф
+                // Сохраняем оригинальную структуру блока, но добавляем необходимые атрибуты
         const content = block.content as any;
 
-        // Извлекаем текстовый контент из любого источника
-        let textContent = [];
-        let textValue = '';
-
-        // Функция для извлечения текста из любого узла или массива узлов
-        const extractText = (node) => {
-          if (!node) return '';
-
-          if (typeof node === 'string') return node;
-
-          if (node.text) return node.text;
-
-          if (node.content) {
-            if (Array.isArray(node.content)) {
-              return node.content.map(extractText).join('');
-            }
-            return extractText(node.content);
+        // Если контент уже является объектом с правильной структурой, используем его
+        if (content && typeof content === 'object' && content.type) {
+          // Добавляем blockId и position к атрибутам, если их нет
+          if (content.attrs) {
+            content.attrs.blockId = content.attrs.blockId || block.blockId;
+            content.attrs.position = content.attrs.position || block.position || 0;
+          } else {
+            content.attrs = {
+              blockId: block.blockId,
+              position: block.position || 0
+            };
           }
-
-          return '';
-        };
-
-        // Извлекаем текст из различных форматов контента
-        if (content) {
-          if (content.type === 'doc' && Array.isArray(content.content)) {
-            textValue = extractText(content);
-          } else if (content.type === 'paragraph') {
-            textValue = extractText(content);
-          } else if (typeof content === 'string') {
-            try {
-              const parsed = JSON.parse(content);
-              textValue = extractText(parsed);
-            } catch (e) {
-              textValue = content;
-            }
+          
+          // Если это документ с несколькими элементами, берем только первый
+          if (content.type === 'doc' && Array.isArray(content.content) && content.content.length > 1) {
+            console.warn(`[PageBlocksService] Multiple elements detected in block ${block.blockId}, keeping only first element`);
+            content.content = [content.content[0]];
           }
-        }
-
-        // Если есть текст, создаем текстовый узел
-        if (textValue) {
-          textContent = [{ type: 'text', text: textValue }];
-        }
-
-        // Создаем новый документ с одним параграфом
-        block.content = {
-          type: 'doc',
-          content: [
-            {
-              type: 'paragraph',
-              attrs: {
-                textAlign: 'left',
-                blockId: block.blockId,
-                position: block.position || 0
-              },
-              content: textValue ? [{ type: 'text', text: textValue }] : []
-            }
-          ]
-        };
-
-        console.log(`[PageBlocksService] Normalized content for block ${block.blockId} with text: ${textValue.substring(0, 30)}${textValue.length > 30 ? '...' : ''}`);
-
-        // Дополнительная проверка - если в контенте все еще несколько параграфов, оставляем только первый
-        if (block.content.content && block.content.content.length > 1) {
-          console.warn(`[PageBlocksService] Multiple paragraphs detected in block ${block.blockId}, fixing...`);
-
-          const firstParagraph = block.content.content[0];
-          const firstParagraphText = extractText(firstParagraph);
-
+          
+          block.content = content;
+        } else {
+          // Если контент не в правильном формате, создаем простой параграф
           block.content = {
-            type: 'doc',
-            content: [
-              {
-                type: 'paragraph',
-                attrs: {
-                  textAlign: 'left',
-                  blockId: block.blockId,
-                  position: block.position || 0
-                },
-                content: firstParagraphText ? [{ type: 'text', text: firstParagraphText }] : []
-              }
-            ]
+            type: 'paragraph',
+            attrs: {
+              blockId: block.blockId,
+              position: block.position || 0,
+              textAlign: 'left'
+            },
+            content: content ? [{ type: 'text', text: String(content) }] : []
           };
-
-          console.log(`[PageBlocksService] Fixed multiple paragraphs for block ${block.blockId}`);
         }
+
+        console.log(`[PageBlocksService] Processed content for block ${block.blockId} with type: ${block.content.type}`);
 
 
         if (existingIdSet.has(block.blockId)) {

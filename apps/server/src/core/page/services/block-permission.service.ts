@@ -117,7 +117,7 @@ export class BlockPermissionService {
     
     const pageQuery = this.db
       .selectFrom('pages')
-      .select(['creatorId', 'id', 'title'])
+      .select(['creatorId', 'id', 'title', 'spaceId'])
       .where('id', '=', pageId);
     
     console.log('[BlockPermissionService] Page query SQL:', pageQuery.compile());
@@ -134,6 +134,39 @@ export class BlockPermissionService {
     console.log('[BlockPermissionService] String comparison:', String(page?.creatorId) === String(userId));
     
     const isCreator = String(page?.creatorId) === String(userId);
+
+    // Проверяем роль пользователя в таблице users
+    const userRole = await this.db
+      .selectFrom('users')
+      .select(['role'])
+      .where('id', '=', userId)
+      .executeTakeFirst();
+
+    // Проверяем роль пользователя в таблице spaceMembers
+    const spaceMemberRole = page?.spaceId ? await this.db
+      .selectFrom('spaceMembers')
+      .select(['role'])
+      .where('userId', '=', userId)
+      .where('spaceId', '=', page.spaceId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst() : null;
+
+    // Пользователь имеет права owner если:
+    // 1. Он создатель страницы
+    // 2. У него роль 'owner' в таблице users
+    // 3. У него роль 'admin' или 'owner' в таблице space_members
+    const hasOwnerRights = isCreator || 
+      userRole?.role === 'owner' || 
+      spaceMemberRole?.role === 'admin' || 
+      spaceMemberRole?.role === 'owner';
+
+    console.log('[BlockPermissionService] User role check:', {
+      userId,
+      userRole: userRole?.role,
+      spaceMemberRole: spaceMemberRole?.role,
+      hasOwnerRights,
+      isCreator
+    });
 
     const hasPageAccess = await this.userHasDirectPageAccess(userId, pageId);
 
@@ -184,8 +217,9 @@ export class BlockPermissionService {
     const result = blocks.map((block) => {
       const userIsBlockCreator = block.creatorId === userId;
 
-      // Если пользователь — создатель страницы, всегда owner-доступ ко всем блокам
-      if (isCreator || userIsBlockCreator) {
+      // Если пользователь имеет права owner (создатель страницы, owner в users, admin/owner в space_members), 
+      // всегда owner-доступ ко всем блокам
+      if (hasOwnerRights || userIsBlockCreator) {
         // Парсим контент из JSON строки
         let parsedContent;
         try {
@@ -204,7 +238,7 @@ export class BlockPermissionService {
           blockType: block.blockType,
           position: block.position,
           hasAccess: true,
-          userPermission: isCreator ? 'page-owner' : 'block-owner',
+          userPermission: hasOwnerRights ? 'owner' : 'block-owner',
           content: parsedContent,
         };
       }
