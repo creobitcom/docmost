@@ -354,6 +354,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           opened={searchModalOpened}
           onClose={() => setSearchModalOpened(false)}
           pageId={props.editor.storage.pageId}
+          blockId={props.editor.storage.blockId}
         />
       )}
     </BubbleMenu>

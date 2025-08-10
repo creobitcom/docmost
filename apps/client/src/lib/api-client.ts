@@ -83,9 +83,13 @@ export const assignPermissionToBlock = async ({ pageId, blockId, userId, role }:
   userId: string;
   role: "read" | "edit" | "owner";
 }) => {
-  return api.post(`/pages/${pageId}/blocks/${blockId}/permissions`, {
+  // Сервер ожидает POST /pages/blockPermissions с pageId, blockId, userId, permission
+  return api.post(`/pages/blockPermissions`, {
+    pageId,
+    blockId,
     userId,
-    role
+    permission: role,
+    role,
   });
 };
 
@@ -101,7 +105,8 @@ export const removeBlockPermission = async ({ pageId, blockId, userId }: {
   blockId: string;
   userId: string;
 }) => {
-  return api.delete(`/pages/${pageId}/blocks/${blockId}/permissions/${userId}`);
+  // Сервер ожидает DELETE /pages/blockPermissions c body
+  return api.delete(`/pages/blockPermissions`, { data: { pageId, blockId, userId } });
 };
 
 export const updateBlockPermission = async ({ pageId, blockId, userId, role }: {
@@ -110,8 +115,13 @@ export const updateBlockPermission = async ({ pageId, blockId, userId, role }: {
   userId: string;
   role: "read" | "edit" | "owner";
 }) => {
-  return api.put(`/pages/${pageId}/blocks/${blockId}/permissions/${userId}`, {
-    role
+  // Сервер использует тот же POST для апдейта (upsert)
+  return api.post(`/pages/blockPermissions`, {
+    pageId,
+    blockId,
+    userId,
+    permission: role,
+    role,
   });
 };
 

@@ -31,6 +31,7 @@ export default function PageEditorBlocks({
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [visibleBlocks, setVisibleBlocks] = useState<Set<string>>(new Set());
+  const [dropIndicator, setDropIndicator] = useState<{ targetId: string | null; position: 'before' | 'after' | null }>({ targetId: null, position: null });
 
   // Функция для загрузки блоков страницы
   const fetchBlocks = useCallback(async () => {
@@ -137,8 +138,11 @@ export default function PageEditorBlocks({
   }, [blocks]);
 
   // Debounced функция для сохранения блоков на сервере
+  const ENABLE_SERVER_BLOCKS_API = true;
+
   const saveBlocksToServer = useDebouncedCallback(async (pageId: string, updatedBlocks: Block[]) => {
     try {
+      if (!ENABLE_SERVER_BLOCKS_API) return;
       const response = await fetch(`/api/pages/${pageId}/blocks`, {
         method: 'PUT',
         headers: {
@@ -155,6 +159,50 @@ export default function PageEditorBlocks({
       console.error('[PageEditorBlocks] Error saving blocks:', error);
     }
   }, 3000);
+
+  // Сохранение только позиций (без контента), чтобы не перетирать данные
+  const saveBlockPositionsToServer = useDebouncedCallback(async (pageId: string, updatedBlocks: Block[]) => {
+    try {
+      if (!ENABLE_SERVER_BLOCKS_API) return;
+      const payload = updatedBlocks.map(b => ({ id: b.id, position: b.position }));
+      const response = await fetch(`/api/pages/${pageId}/blocks`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: "include",
+        body: JSON.stringify({ blocks: payload }),
+      });
+
+      if (!response.ok) {
+        console.error('[PageEditorBlocks] Failed to save block positions:', response.status);
+      }
+    } catch (error) {
+      console.error('[PageEditorBlocks] Error saving block positions:', error);
+    }
+  }, 500);
+
+  // Сохранение одного блока (контент + позиция) — точечно, чтобы избежать перезаписей
+  const saveSingleBlockToServer = useDebouncedCallback(async (pageId: string, block: Block) => {
+    try {
+      if (!ENABLE_SERVER_BLOCKS_API) return;
+      const payload = [{ id: block.id, position: block.position, content: block.content }];
+      const response = await fetch(`/api/pages/${pageId}/blocks`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: "include",
+        body: JSON.stringify({ blocks: payload }),
+      });
+
+      if (!response.ok) {
+        console.error('[PageEditorBlocks] Failed to save block:', block.id, response.status);
+      }
+    } catch (error) {
+      console.error('[PageEditorBlocks] Error saving single block:', error);
+    }
+  }, 500);
 
   // Обработчик создания нового блока
   const handleCreateBlock = useCallback((blockId: string) => {
@@ -306,23 +354,107 @@ export default function PageEditorBlocks({
   // Обработчик обновления блока
   const handleBlockUpdate = useCallback((blockId: string, newContent: any) => {
     setBlocks(prevBlocks => {
-      const updatedBlocks = prevBlocks.map(block => 
-        block.id === blockId 
-          ? { ...block, content: newContent }
-          : block
+      const updatedBlocks = prevBlocks.map(block =>
+        block.id === blockId ? { ...block, content: newContent } : block,
       );
-      saveBlocksToServer(pageId, updatedBlocks);
+      const updated = updatedBlocks.find(b => b.id === blockId);
+      if (updated) {
+        // сохраняем только изменённый блок
+        saveSingleBlockToServer(pageId, updated);
+      }
       return updatedBlocks;
     });
-  }, [pageId, saveBlocksToServer]);
+  }, [pageId]);
+
+  // DRAG & DROP сортировка блоков
+  const dragStateRef = React.useRef<{ draggingId: string | null }>({ draggingId: null });
+
+  const onDragHandleStart = useCallback((e: React.DragEvent) => {
+    const blockElement = (e.currentTarget as HTMLElement)?.closest('[data-block-id]') as HTMLElement | null;
+    const blockId = blockElement?.getAttribute('data-block-id') || null;
+    if (!blockId) return;
+    dragStateRef.current.draggingId = blockId;
+    e.dataTransfer.setData('application/x-block-id', blockId);
+    e.dataTransfer.effectAllowed = 'move';
+    // Не даём событию подниматься в TipTap/PM
+    e.stopPropagation();
+    // Чуть менее навязчивый drag-образ
+    if (blockElement) {
+      const img = document.createElement('div');
+      img.style.width = '1px';
+      img.style.height = '1px';
+      document.body.appendChild(img);
+      e.dataTransfer.setDragImage(img, 0, 0);
+      setTimeout(() => document.body.removeChild(img), 0);
+    }
+  }, []);
+
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer?.types.includes('application/x-block-id')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const targetEl = (e.target as HTMLElement)?.closest('[data-block-id]') as HTMLElement | null;
+    if (!targetEl) {
+      setDropIndicator({ targetId: null, position: null });
+      return;
+    }
+    const rect = targetEl.getBoundingClientRect();
+    const isBefore = e.clientY < (rect.top + rect.height / 2);
+    const targetId = targetEl.getAttribute('data-block-id');
+    if (targetId) {
+      setDropIndicator((prev) => (
+        prev.targetId === targetId && prev.position === (isBefore ? 'before' : 'after')
+          ? prev
+          : { targetId, position: isBefore ? 'before' : 'after' }
+      ));
+    } else {
+      setDropIndicator({ targetId: null, position: null });
+    }
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer?.types.includes('application/x-block-id')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const fromId = dragStateRef.current.draggingId || e.dataTransfer.getData('application/x-block-id');
+    const target = (e.target as HTMLElement)?.closest('[data-block-id]') as HTMLElement | null;
+    const toId = target?.getAttribute('data-block-id') || dropIndicator.targetId || null;
+    if (!fromId || !toId || fromId === toId) return;
+
+    setBlocks(prev => {
+      const current = [...prev];
+      const fromIndex = current.findIndex(b => b.id === fromId);
+      const toIndex = current.findIndex(b => b.id === toId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const [moved] = current.splice(fromIndex, 1);
+      // Вычисляем индекс вставки на основе before/after, как в tiptap
+      let insertIndex = toIndex;
+      const pos = dropIndicator.position;
+      if (pos === 'after') insertIndex = toIndex + 1;
+      if (fromIndex < insertIndex) insertIndex -= 1; // скорректировать из-за вырезания
+      current.splice(insertIndex, 0, moved);
+      // пересчёт позиций
+      const updated = current.map((b, idx) => ({ ...b, position: idx }));
+      // сохраняем позиции на сервер
+      setTimeout(() => saveBlockPositionsToServer(pageId, updated), 0);
+      return updated;
+    });
+    dragStateRef.current.draggingId = null;
+    setDropIndicator({ targetId: null, position: null });
+  }, [pageId]);
 
   console.log('[PageEditorBlocks] Rendering blocks:', blocks);
 
   // Убеждаемся, что blocks является массивом
   const blocksArray = Array.isArray(blocks) ? blocks : [];
 
+  const onDragEnd = useCallback(() => {
+    dragStateRef.current.draggingId = null;
+    setDropIndicator({ targetId: null, position: null });
+  }, []);
+
   return (
-    <div>
+    <div onDragOver={onDragOver} onDragOverCapture={onDragOver} onDrop={onDrop} onDropCapture={onDrop} onDragEnd={onDragEnd}>
       {blocksArray.map((block) => {
         console.log('[PageEditorBlocks] Rendering block:', block.id, 'hasAccess:', block.hasAccess, 'visible:', visibleBlocks.has(block.id));
         
@@ -351,19 +483,23 @@ export default function PageEditorBlocks({
           hasFocusBlock: !!handleFocusBlock
         });
         
-        return block.hasAccess ? (
-          <BlockEditor
-            key={block.id}
-            block={block}
-            editable={editable && (block.userPermission === "edit" || block.userPermission === "owner")}
-            onBlockUpdate={handleBlockUpdate}
-            onCreateBlock={handleCreateBlock}
-            onDeleteBlock={handleDeleteBlock}
-            onFocusBlock={handleFocusBlock}
-          />
-        ) : (
+        return (
+          <React.Fragment key={block.id}>
+            {dropIndicator.targetId === block.id && dropIndicator.position === 'before' && (
+              <div className="drop-indicator" />
+            )}
+            {block.hasAccess ? (
+              <BlockEditor
+                block={block}
+                editable={editable && (block.userPermission === "edit" || block.userPermission === "owner")}
+                onBlockUpdate={handleBlockUpdate}
+                onDragHandleStart={onDragHandleStart}
+                onCreateBlock={handleCreateBlock}
+                onDeleteBlock={handleDeleteBlock}
+                onFocusBlock={handleFocusBlock}
+              />
+            ) : (
           <div 
-            key={block.id}
             style={{ 
               padding: '1em',
               backgroundColor: '#f5f5f5',
@@ -376,6 +512,11 @@ export default function PageEditorBlocks({
               Нет доступа к этому блоку (ID: {block.id})
             </p>
           </div>
+            )}
+            {dropIndicator.targetId === block.id && dropIndicator.position === 'after' && (
+              <div className="drop-indicator" />
+            )}
+          </React.Fragment>
         );
       })}
 

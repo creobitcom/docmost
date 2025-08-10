@@ -4,6 +4,7 @@ import { HocuspocusProvider } from "@hocuspocus/provider";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { mainExtensions, collabExtensions, creobitExtentions } from "@/features/editor/extensions/extensions";
 import { BlockId } from "@/features/editor/extensions/block-id";
+import Document from "@tiptap/extension-document";
 import "@/features/editor/styles/drag-handle.css";
 
 import { useAtom } from "jotai";
@@ -43,10 +44,11 @@ interface BlockEditorProps {
   onCreateBlock?: (blockId: string) => void;
   onDeleteBlock?: (blockId: string) => void;
   onFocusBlock?: (blockId: string, direction: 'up' | 'down') => void;
+  onDragHandleStart?: (e: React.DragEvent) => void;
 }
 
 // Компонент-обертка для изоляции редактора
-function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDeleteBlock, onFocusBlock }: BlockEditorProps) {
+function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDeleteBlock, onFocusBlock, onDragHandleStart }: BlockEditorProps) {
   const [currentUser] = useAtom(currentUserAtom);
   const collaborationURL = useCollaborationUrl();
   const { data: collabQuery } = useCollabToken();
@@ -89,23 +91,25 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
     return newProvider;
   }, [block.id, block.pageId, collaborationURL, collabQuery?.token, ydoc]);
 
-  // Временно отключаем WebSocket для тестирования
+  // Подключаем WebSocket-провайдера на время жизни компонента
   useEffect(() => {
-    if (provider && isMountedRef.current) {
-      // Временно не подключаемся к WebSocket для исключения проблем с сетью
-      console.log('[BlockEditor] Skipping WebSocket connection for block:', block.id);
-      
-      return () => {
-        if (provider && isMountedRef.current) {
-          try {
-            console.log('[BlockEditor] Destroying provider for block:', block.id);
-            provider.destroy();
-          } catch (error) {
-            console.error('[BlockEditor] Provider destroy error:', error);
-          }
-        }
-      };
+    if (!provider || !isMountedRef.current) return;
+    try {
+      console.log('[BlockEditor] Connecting provider for block:', block.id);
+      provider.connect();
+    } catch (error) {
+      console.error('[BlockEditor] Provider connection error:', error);
     }
+    return () => {
+      if (provider) {
+        try {
+          console.log('[BlockEditor] Destroying provider for block:', block.id);
+          provider.destroy();
+        } catch (error) {
+          console.error('[BlockEditor] Provider destroy error:', error);
+        }
+      }
+    };
   }, [provider, block.id]);
 
   // Инициализируем контент блока с оптимизированной логикой
@@ -211,9 +215,24 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
   // Настройка расширений для блока (временно без коллаборации)
   const extensions = useMemo(() => {
     if (!isMountedRef.current) return [];
+    // Исключаем расширения, конфликтующие с блоковым DnD (иначе TipTap будет переносить контент)
+    const filteredMain = (mainExtensions as any[]).filter((ext: any) => {
+      const name = (ext && (ext.name || ext?.config?.name))?.toString().toLowerCase();
+      // ВАЖНО: исключаем кастомный Document с контент-выражением (block|container)+
+      // для блочного редактора нужен базовый Document без групп
+      return name !== 'doc' && name !== 'global-drag-handle' && name !== 'selection' && name !== 'blockgroup' && name !== 'block-group';
+    });
+
+    const filteredCreobit = (creobitExtentions as any[]).filter((ext: any) => {
+      const name = (ext && (ext.name || ext?.config?.name))?.toString().toLowerCase();
+      return name !== 'block-id' && name !== 'global-drag-handle' && name !== 'selection' && name !== 'blockgroup' && name !== 'block-group';
+    });
+
     return [
-      ...mainExtensions,
-      ...creobitExtentions.filter(ext => ext.name !== 'block-id'),
+      // Подключаем стандартный Document, чтобы избежать ошибки схемы
+      Document,
+      ...filteredMain,
+      ...filteredCreobit,
       BlockId.configure({
         attributeName: "blockId",
         types: ['paragraph', 'heading', 'block'],
@@ -239,7 +258,7 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
         }
       ]
     },
-    immediatelyRender: false,
+     immediatelyRender: true,
     shouldRerenderOnTransaction: false,
     enableCoreExtensions: true,
     parseOptions: {
@@ -248,7 +267,38 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
     editorProps: {
       scrollThreshold: 80,
       scrollMargin: 80,
+      // На уровне ProseMirror полностью блокируем drop для DnD блоков
+      handleDrop: (_view, event) => {
+        try {
+          const types = (event as DragEvent).dataTransfer?.types;
+          if (types && Array.from(types).includes('application/x-block-id')) {
+            event.preventDefault();
+            return true;
+          }
+        } catch {}
+        return false;
+      },
       handleDOMEvents: {
+          dragover: (_view, event) => {
+            try {
+              const types = (event as DragEvent).dataTransfer?.types;
+              if (types && Array.from(types).includes('application/x-block-id')) {
+                event.preventDefault();
+                return true;
+              }
+            } catch {}
+            return false;
+          },
+          drop: (_view, event) => {
+            try {
+              const types = (event as DragEvent).dataTransfer?.types;
+              if (types && Array.from(types).includes('application/x-block-id')) {
+                event.preventDefault();
+                return true;
+              }
+            } catch {}
+            return false;
+          },
         keydown: (view, event) => {
           if (isDestroying || !isMountedRef.current) return false;
           
@@ -352,7 +402,10 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
       // Устанавливаем pageId в storage для доступа в bubble menu
       if (editor && block.pageId) {
         editor.storage.pageId = block.pageId;
-        console.log(`[BlockEditor] Set pageId in storage for block ${block.id}:`, block.pageId);
+        editor.storage.blockId = block.id;
+      }
+      if (currentUser?.user?.id) {
+        editor.storage.userId = currentUser.user.id;
       }
       
       console.log(`[BlockEditor] Editor created for block ${block.id}:`, {
@@ -460,7 +513,8 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
         padding: '0.5em',
         border: '1px solid #e0e0e0',
         borderRadius: '4px',
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        position: 'relative'
       }}
     >
       {(() => {
@@ -469,6 +523,14 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
             if (editor && !editor.isDestroyed && editor.view && editor.view.dom) {
               return (
                 <div>
+                  {/* Drag handle */}
+                  <div
+                    className="block-drag-handle"
+                    contentEditable={false}
+                    draggable={true}
+                    onDragStart={onDragHandleStart}
+                    title="Перетащите для изменения позиции"
+                  />
                   <div ref={menuContainerRef}>
                     <EditorContent 
                       editor={editor} 
@@ -479,7 +541,7 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
                       }}
                     />
 
-                    {editor && editor.isEditable && !isDestroying && isMountedRef.current && (
+                     {editor && editor.isEditable && !isDestroying && isMountedRef.current && (
                       <div>
                         <EditorBubbleMenu editor={editor} />
                         <TableMenu editor={editor} />

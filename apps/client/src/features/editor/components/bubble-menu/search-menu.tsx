@@ -108,7 +108,7 @@ const permissionOptions = [
   { label: "Удалить доступ", value: "delete" },
 ];
 
-export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
+export function SearchMenu({ opened, onClose, pageId, blockId: externalBlockId }: SearchMenuProps & { blockId?: string | null }) {
   const [search, setSearch] = useState("");
   const [debounced] = useDebouncedValue(search, 300);
   const [blockPermissions, setBlockPermissions] = useState<BlockPermission[]>([]);
@@ -205,13 +205,15 @@ export function SearchMenu({ opened, onClose, pageId }: SearchMenuProps) {
     query: debounced,
   });
 
-  // Получаем ID текущего блока из выделенного текста
+  // Получаем ID текущего блока: сначала из editor.storage, иначе из выделения
   const getBlockId = (): string | null => {
+    if (externalBlockId) return externalBlockId;
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return null;
-
     const range = selection.getRangeAt(0);
-    const blockElement = range.commonAncestorContainer.parentElement?.closest('[data-block-id]');
+    const blockElement = range.commonAncestorContainer instanceof Element
+      ? (range.commonAncestorContainer as Element).closest('[data-block-id]')
+      : (range.commonAncestorContainer.parentElement?.closest('[data-block-id]'));
     return blockElement?.getAttribute('data-block-id') || null;
   };
 
