@@ -511,9 +511,9 @@ function EditorWrapper({ block, editable, onBlockUpdate, onCreateBlock, onDelete
       style={{ 
         minHeight: '1.5em', 
         padding: '0.5em',
-        border: '1px solid #e0e0e0',
-        borderRadius: '4px',
-        backgroundColor: '#ffffff',
+        border: 'none',
+        borderRadius: '0',
+        backgroundColor: 'transparent',
         position: 'relative'
       }}
     >
