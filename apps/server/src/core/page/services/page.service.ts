@@ -29,7 +29,7 @@ import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
 import { SidebarPageDto, SidebarPageResultDto } from '../dto/sidebar-page.dto';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 import { MyPageColorDto } from '../dto/update-color.dto';
-import { PageBlocksService } from './page-blocks.service';
+// import { PageBlocksService } from './page-blocks.service';
 
 @Injectable()
 export class PageService {
@@ -40,7 +40,6 @@ export class PageService {
     private pageMemberRepo: PageMemberRepo,
     private attachmentRepo: AttachmentRepo,
     private readonly syncPageRepo: SynchronizedPageRepo,
-    private readonly PageBlocksService: PageBlocksService,
     @InjectKysely() private readonly db: KyselyDB,
   ) {
     this.logger = new Logger('PageService');
@@ -559,7 +558,7 @@ export class PageService {
       .where('id', '=', id)
       .execute();
 
-      await this.PageBlocksService.saveFromTiptapJson(id, dto.content, userId);
+    // Сохранение блоков делается на клиенте через /pages/blocks/:pageId
 
   }
 
@@ -592,8 +591,37 @@ export class PageService {
   }
 
   async saveBlocksForPage(pageId: string, blocks: any[], userId: string) {
-    // Просто делегируем в PageBlocksService
-    await this.PageBlocksService.saveBlocksForPage(pageId, blocks, userId);
+    await this.db.transaction().execute(async (trx) => {
+      const existingBlocks = await this.pageRepo.getExistingPageBlocks(pageId, trx);
+      const existingBlocksMap = new Map(existingBlocks.map((b) => [b.id, b]));
+
+      const incomingIds = new Set((blocks || []).map((b: any) => b.blockId).filter(Boolean));
+      const toDelete = existingBlocks.filter((b) => !incomingIds.has(b.id));
+
+      for (const removed of toDelete) {
+        await this.pageRepo.deleteBlock(removed.id, trx);
+      }
+
+      for (const incoming of blocks || []) {
+        const blockId: string | undefined = incoming?.blockId;
+        const blockType: string | undefined = incoming?.blockType;
+        let blockNode: any = incoming?.content ?? {};
+
+        if (!blockNode || typeof blockNode !== 'object') continue;
+        blockNode.attrs = blockNode.attrs || {};
+        if (blockId) blockNode.attrs.blockId = blockId;
+        if (!blockNode.type && blockType) blockNode.type = blockType;
+
+        const calculatedHash = calculateBlockHash(blockNode);
+        const existed = blockId ? existingBlocksMap.get(blockId) : undefined;
+
+        if (!existed) {
+          await this.pageRepo.createBlock(blockNode, blockId, pageId, calculatedHash, trx);
+        } else if (existed.stateHash !== calculatedHash) {
+          await this.pageRepo.updateExistingBlock(blockNode, blockId, calculatedHash, trx);
+        }
+      }
+    });
   }
 
   async getMyPages(

@@ -96,7 +96,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
           },
           body: JSON.stringify({ pageId }),
         });
-        
+
         if (pageResponse.ok) {
           const pageData = await pageResponse.json();
           setIsPageCreator(pageData.creator_id === currentUser.user.id);
@@ -113,7 +113,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
     };
 
     editor.on('selectionUpdate', handleSelectionUpdate);
-    
+
     // Начальная проверка
     checkUserPermissions();
 

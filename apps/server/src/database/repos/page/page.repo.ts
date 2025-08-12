@@ -30,6 +30,25 @@ export class PageRepo {
     this.logger = new Logger('PageRepo');
   }
 
+  private ensureValidBlockJson(original: any): any {
+    // Гарантируем, что контент блока не null и является объектом TipTap
+    let block = original;
+    if (!block || typeof block !== 'object') {
+      block = { type: 'paragraph', attrs: { textAlign: 'left' }, content: [] };
+      return block;
+    }
+    if (typeof block.type !== 'string' || block.type.length === 0) {
+      block.type = 'paragraph';
+    }
+    // attrs всегда объект
+    block.attrs = block.attrs || {};
+    // content должен быть массивом (может быть пустым)
+    if (block.content == null) {
+      block.content = [];
+    }
+    return block;
+  }
+
   private baseFields: Array<keyof Page> = [
     'id',
     'slugId',
@@ -176,15 +195,15 @@ export class PageRepo {
   ): Promise<void> {
     const db = dbOrTx(this.db, trx);
     this.logger.debug('Inserting block: ', block);
-
+    const safeBlock = this.ensureValidBlockJson(block);
     await db
       .insertInto('blocks')
       .values({
         id: blockId,
         pageId: pageId,
-        position: block?.attrs.position,
-        content: block,
-        blockType: block?.type,
+        position: safeBlock?.attrs?.position,
+        content: safeBlock,
+        blockType: safeBlock?.type,
         createdAt: new Date(),
         updatedAt: new Date(),
         stateHash: calculatedHash,
@@ -200,12 +219,12 @@ export class PageRepo {
   ): Promise<void> {
     const db = dbOrTx(this.db, trx);
     this.logger.debug('Updating block: ', block);
-
+    const safeBlock = this.ensureValidBlockJson(block);
     await db
       .updateTable('blocks')
       .set({
-        position: block?.attrs.position,
-        content: block,
+        position: safeBlock?.attrs?.position,
+        content: safeBlock,
         updatedAt: new Date(),
         stateHash: calculatedHash,
       })

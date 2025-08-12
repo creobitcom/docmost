@@ -6,7 +6,6 @@ import { PageMemberService } from './services/page-member.service';
 import { SynchronizedPageService } from './services/synchronized-page.service';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
 import { BlockPermissionService } from './services/block-permission.service';
-import { PageBlocksService } from './services/page-blocks.service';
 import { KyselyProvider } from '../../database/kysely.provider';
 import { DatabaseModule } from '@docmost/db/database.module';
 @Module({
@@ -14,7 +13,6 @@ import { DatabaseModule } from '@docmost/db/database.module';
   controllers: [PageController],
   providers: [
     KyselyProvider,
-    PageBlocksService,
     PageService,
     PageHistoryService,
     PageMemberService,
@@ -22,7 +20,6 @@ import { DatabaseModule } from '@docmost/db/database.module';
     BlockPermissionService,
   ],
   exports: [
-    PageBlocksService,
     KyselyProvider,
     PageService,
     PageHistoryService,

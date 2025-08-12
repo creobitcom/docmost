@@ -149,6 +149,19 @@ export class BlockPermissionService {
       .orderBy('b.position')
       .execute();
 
+    // Создатель страницы видит все блоки без записей в blockPermissions
+    if (isCreator) {
+      return blocks.map((block) => ({
+        id: block.id,
+        pageId: block.pageId,
+        blockType: block.blockType,
+        position: block.position,
+        hasAccess: true,
+        //userPermission: 'owner',
+        content: (typeof block.content === 'string' ? JSON.parse(block.content) : block.content) ?? null,
+      }));
+    }
+
     const pageMember = await this.db
       .selectFrom('pageMembers')
       .select(['id', 'source'])

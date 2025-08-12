@@ -56,12 +56,12 @@ import { SpaceIdDto } from '../space/dto/space-id.dto';
 import { MyPageColorDto } from './dto/update-color.dto';
 import { MyPagesDto } from './dto/my-pages.dto';
 import { BlockPermissionService } from './services/block-permission.service';
-import { PageBlocksService } from './services/page-blocks.service';
 import { UpdatePageBlocksDto } from './dto/update-page-block.dto';
 import { extractTopLevelBlocks } from './extract-page-blocks';
 import { InjectKysely } from 'nestjs-kysely';
 import { KyselyDB } from '@docmost/db/types/kysely.types';
 import { SkipTransform } from '../../common/decorators/skip-transform.decorator';
+import { sql } from 'kysely';
 interface Request {
   user: { id: string, user: { id: string } };
 }
@@ -71,7 +71,6 @@ interface Request {
 @Controller('pages')
 export class PageController {
   constructor(
-    private readonly pageBlocksService: PageBlocksService,
     private readonly pageService: PageService,
     private readonly pageMemberService: PageMemberService,
     private readonly pageMemberRepo: PageMemberRepo,
@@ -106,7 +105,7 @@ export class PageController {
       throw new ForbiddenException();
     }
 
-    await this.pageBlocksService.saveBlocksForPage(pageId, dto.blocks, user.id);
+    await this.pageService.saveBlocksForPage(pageId, dto.blocks, user.id);
     return { success: true };
   }
 
@@ -158,11 +157,11 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select('creator_id')
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
       .where('id', '=', pageId)
       .executeTakeFirst();
 
-    const isCreator = page?.creator_id === user.id;
+    const isCreator = (page as any)?.creatorId === user.id;
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -219,11 +218,11 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select('creator_id')
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
       .where('id', '=', pageId)
       .executeTakeFirst();
 
-    const isCreator = page?.creator_id === user.id;
+    const isCreator = (page as any)?.creatorId === user.id;
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -280,11 +279,11 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select('creator_id')
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
       .where('id', '=', dto.pageId)
       .executeTakeFirst();
 
-    const isCreator = page?.creator_id === user.id;
+    const isCreator = (page as any)?.creatorId === user.id;
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -357,7 +356,9 @@ export class PageController {
       page.icon = originPage.icon;
     }
 
-    return { ...page, blocks, membership };
+    // Добавляем alias для совместимости клиентского кода: creator_id
+    const creator_id = (page as any)?.creator_id ?? (page as any)?.creatorId ?? null;
+    return { ...page, creator_id, blocks, membership };
   }
 
   @HttpCode(HttpStatus.OK)
@@ -405,7 +406,7 @@ export class PageController {
 
     if (updatePageDto.content) {
       const blocks = extractTopLevelBlocks(updatePageDto.content, updatePageDto.pageId);
-      await this.pageBlocksService.saveBlocksForPage(updatePageDto.pageId, blocks, user.id);
+      await this.pageService.saveBlocksForPage(updatePageDto.pageId, blocks, user.id);
     }
 
     if (page.isSynced) {
@@ -799,6 +800,7 @@ export class PageController {
   async myPages(
     @Query() dto: MyPagesDto,
     @Query() pagination: PaginationOptions,
+    @AuthUser() user: User,
   ) {
     return this.pageService.getMyPages(pagination, dto.pageId);
   }

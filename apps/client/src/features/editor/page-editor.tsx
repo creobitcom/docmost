@@ -150,7 +150,7 @@ function BlockEditor({ block, editable, onBlockCreated, onBlockDeleted, allBlock
         // Проверяем, соответствует ли текущий блок по blockId из HTML
         const currentBlockId = paragraphs[0]?.attrs?.blockId;
         const existingBlockId = existingBlock.id;
-        
+
         // Если это текущий блок - обновляем его контент
         if (currentBlockId === existingBlockId) {
           return {
@@ -174,12 +174,14 @@ function BlockEditor({ block, editable, onBlockCreated, onBlockDeleted, allBlock
     }
   }, 2000);
 
+  const extensions = useMemo(() => ([
+    ...mainExtensions,
+    ...collabExtensions(provider, currentUser?.user),
+    ...creobitExtentions,
+  ]), [provider, currentUser?.user]);
+
   const editor = useEditor({
-    extensions: [
-      ...mainExtensions,
-      ...collabExtensions(provider, currentUser?.user),
-      ...creobitExtentions
-    ],
+    extensions,
     editable,
     content: contentToInit,
     editorProps: {
@@ -251,7 +253,7 @@ function BlockEditor({ block, editable, onBlockCreated, onBlockDeleted, allBlock
   useEffect(() => {
     const yXmlFragment = ydoc.getXmlFragment("content");
     if (yXmlFragment.length === 0) {
-      const tempYdoc = TiptapTransformer.toYdoc(contentToInit, "default");
+      const tempYdoc = TiptapTransformer.toYdoc(contentToInit, "default", extensions as any);
       const tempFragment = tempYdoc.getXmlFragment("content");
       let nodes = [];
       if (tempFragment && typeof tempFragment.toArray === "function") {
