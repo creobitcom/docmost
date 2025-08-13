@@ -53,6 +53,7 @@ interface SearchMenuProps {
   onSelect: (user: any) => void;
   editor: Editor;
   pageId: string;
+  isPageCreator?: boolean;
 }
 
 interface BlockPermission {
@@ -117,7 +118,7 @@ const permissionOptions = [
   { label: "Удалить доступ", value: "delete" },
 ];
 
-export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMenuProps) => {
+export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCreator: isPageCreatorProp }: SearchMenuProps) => {
   const [search, setSearch] = useState("");
   const [debounced] = useDebouncedValue(search, 300);
   const [blockPermissions, setBlockPermissions] = useState<BlockPermission[]>([]);
@@ -129,7 +130,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const [currentUser] = useAtom(currentUserAtom);
   const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
-  const [isPageCreator, setIsPageCreator] = useState(false);
+  const [isPageCreator, setIsPageCreator] = useState(!!isPageCreatorProp);
 
   useEffect(() => {
     const fetchPageInfo = async () => {
@@ -151,7 +152,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
         
         if (pageResponse.ok) {
           const pageData = await pageResponse.json();
-          setIsPageCreator(pageData.creator_id === currentUser?.user?.id);
+          setIsPageCreator((prev) => prev || pageData.creator_id === currentUser?.user?.id);
         }
       } catch (e) {
         console.error("Failed to fetch page info:", e);
@@ -159,7 +160,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId }: SearchMe
     };
 
     fetchPageInfo();
-  }, [pageId, currentUser?.user?.id]);
+  }, [pageId, currentUser?.user?.id, isPageCreatorProp]);
 
   const [selectedPermissionsMap, setSelectedPermissionsMap] = useState<
     Record<string, "read" | "edit" | "owner">

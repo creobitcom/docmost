@@ -85,7 +85,14 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
       try {
         // Проверяем права на блок
         const result = await getBlockPermissions({ pageId, blockId });
+        console.log('[BubbleMenu][Perm] Inputs:', { pageId, blockId, currentUserId: currentUser.user.id });
+        console.log('[BubbleMenu][Perm] Raw block permissions result:', result);
         const currentUserPermission = result.find(item => item.id === currentUser.user.id);
+        console.log('[BubbleMenu][Perm] Matched user permission:', {
+          userId: currentUser.user.id,
+          found: !!currentUserPermission,
+          permission: currentUserPermission?.permission || null,
+        });
         setUserBlockPermission(currentUserPermission?.permission || null);
 
         // Проверяем, является ли пользователь создателем страницы
@@ -99,7 +106,17 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
 
         if (pageResponse.ok) {
           const pageData = await pageResponse.json();
-          setIsPageCreator(pageData.creator_id === currentUser.user.id);
+          const creatorId = (pageData?.data?.creator_id ?? pageData?.creator_id) as string | undefined;
+          const isCreator = creatorId === currentUser.user.id;
+          console.log('[BubbleMenu][Perm] Creator compare:', { creatorId, currentUserId: currentUser.user.id, isCreator });
+          setIsPageCreator(isCreator);
+
+          const computedShowSearch = isCreator || (currentUserPermission?.permission === 'owner');
+          console.log('[BubbleMenu][Perm] Should show Search button:', {
+            isCreator,
+            userBlockPermission: currentUserPermission?.permission || null,
+            result: computedShowSearch,
+          });
         }
       } catch (err) {
         console.error("Failed to check user permissions:", err);
@@ -287,6 +304,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
               onClose={() => setSearchModalOpened(false)}
               editor={editor}
               pageId={pageId}
+              isPageCreator={isPageCreator}
               onSelect={(user) => {
                 console.log("Выбран пользователь:", user);
                 setIsSearchOpen(false);
