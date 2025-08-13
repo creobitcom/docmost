@@ -13,20 +13,17 @@ import {
   Divider,
   Stack,
 } from "@mantine/core";
-import { IconSearch } from "@tabler/icons-react";
+import { IconSearch, IconLink } from "@tabler/icons-react";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useWorkspaceMembersQuery } from "@/features/workspace/queries/workspace-query";
 import { Editor } from "@tiptap/react";
 import { notifications } from "@mantine/notifications";
 import { assignPermissionToBlock } from "@/lib/api-client";
-import { getBlockPermissions, getPagePermissions, removeBlockPermission, updateBlockPermission } from "@/lib/api-client";
+import { getBlockPermissions, removeBlockPermission, updateBlockPermission } from "@/lib/api-client";
 import { Tooltip, ActionIcon } from '@mantine/core';
-import { IconLink } from '@tabler/icons-react';
-import { getPageInfo } from "@/lib/api-client";
-import axios from "axios";
+import { getPageInfo, getUserSpaceRole } from "@/lib/api-client";
 import { useAtom } from "jotai";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
-
 
 interface ItemProps extends React.ComponentPropsWithoutRef<"div"> {
   label: string;
@@ -48,12 +45,9 @@ const SelectItem = forwardRef<HTMLDivElement, ItemProps>(({ label, value, ...oth
 SelectItem.displayName = "SelectItem";
 
 interface SearchMenuProps {
-  open: boolean;
+  opened: boolean;
   onClose: () => void;
-  onSelect: (user: any) => void;
-  editor: Editor;
   pageId: string;
-  isPageCreator?: boolean;
 }
 
 interface BlockPermission {
@@ -107,10 +101,6 @@ export function CopyBlockLinkButton({
   );
 }
 
-
-
-
-
 const permissionOptions = [
   { label: "Owner", value: "owner" },
   { label: "Edit", value: "edit" },
@@ -118,7 +108,7 @@ const permissionOptions = [
   { label: "Удалить доступ", value: "delete" },
 ];
 
-export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCreator: isPageCreatorProp }: SearchMenuProps) => {
+export function SearchMenu({ opened, onClose, pageId, blockId: externalBlockId }: SearchMenuProps & { blockId?: string | null }) {
   const [search, setSearch] = useState("");
   const [debounced] = useDebouncedValue(search, 300);
   const [blockPermissions, setBlockPermissions] = useState<BlockPermission[]>([]);
@@ -130,18 +120,18 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
   const [pageTitle, setPageTitle] = useState<string | null>(null);
   const [currentUser] = useAtom(currentUserAtom);
   const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
-  const [isPageCreator, setIsPageCreator] = useState(!!isPageCreatorProp);
+  const [isPageCreator, setIsPageCreator] = useState(false);
+  const [hasAdminRights, setHasAdminRights] = useState(false);
 
   useEffect(() => {
     const fetchPageInfo = async () => {
+      // Проверяем, что pageId не пустой
+      if (!pageId || pageId.trim() === '') {
+        console.log('[SearchMenu] Empty pageId, skipping fetch');
+        return;
+      }
+
       try {
-        const res = await getPageInfo(pageId);
-        setSpaceSlug(res.spaceSlug);
-        setPageSlug(res.pageSlug);
-        setPageTitle(res.pageTitle);
-        
-        // Проверяем, является ли текущий пользователь создателем страницы
-        // Для этого нужно получить информацию о странице с создателем
         const pageResponse = await fetch(`/api/pages/info`, {
           method: 'POST',
           headers: {
@@ -149,10 +139,53 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
           },
           body: JSON.stringify({ pageId }),
         });
-        
+
         if (pageResponse.ok) {
           const pageData = await pageResponse.json();
-          setIsPageCreator((prev) => prev || pageData.creator_id === currentUser?.user?.id);
+          const pageInfo = pageData.data;
+
+          // Используем creatorId напрямую для определения создателя
+          const creatorId = pageInfo?.creator_id || pageInfo?.creatorId || pageInfo?.creator?.id;
+          setIsPageCreator(creatorId === currentUser?.user?.id);
+
+          // Проверяем права администратора
+          const userRole = currentUser?.user?.role;
+          const hasOwnerRole = userRole === 'owner';
+          const hasAdminRole = userRole === 'admin';
+
+          // Получаем роль пользователя в пространстве
+          let hasSpaceAdminRights = false;
+          if (pageInfo?.spaceId && currentUser?.user?.id) {
+            try {
+              const spaceMemberData = await getUserSpaceRole({
+                spaceId: pageInfo.spaceId,
+                userId: currentUser.user.id
+              });
+              const spaceMemberRole = spaceMemberData?.data?.role;
+              hasSpaceAdminRights = spaceMemberRole === 'admin' || spaceMemberRole === 'owner';
+            } catch (e) {
+              console.error("Failed to fetch space member role:", e);
+            }
+          }
+
+          // Если у пользователя есть права owner или admin (в users или spaceMembers), даем доступ
+          const finalHasAdminRights = hasOwnerRole || hasAdminRole || hasSpaceAdminRights;
+          setHasAdminRights(finalHasAdminRights);
+
+          console.log('[SearchMenu] Admin rights check:', {
+            userId: currentUser?.user?.id,
+            userRole,
+            hasOwnerRole,
+            hasAdminRole,
+            hasSpaceAdminRights,
+            finalHasAdminRights,
+            isPageCreator: creatorId === currentUser?.user?.id
+          });
+
+          // Получаем информацию о странице для копирования ссылки
+          setSpaceSlug(pageInfo?.spaceSlug);
+          setPageSlug(pageInfo?.pageSlug);
+          setPageTitle(pageInfo?.pageTitle);
         }
       } catch (e) {
         console.error("Failed to fetch page info:", e);
@@ -160,7 +193,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
     };
 
     fetchPageInfo();
-  }, [pageId, currentUser?.user?.id, isPageCreatorProp]);
+  }, [pageId, currentUser?.user?.id, currentUser?.user?.role]);
 
   const [selectedPermissionsMap, setSelectedPermissionsMap] = useState<
     Record<string, "read" | "edit" | "owner">
@@ -172,59 +205,57 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
     query: debounced,
   });
 
+  // Получаем ID текущего блока: сначала из editor.storage, иначе из выделения
+  const getBlockId = (): string | null => {
+    if (externalBlockId) return externalBlockId;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+    const range = selection.getRangeAt(0);
+    const blockElement = range.commonAncestorContainer instanceof Element
+      ? (range.commonAncestorContainer as Element).closest('[data-block-id]')
+      : (range.commonAncestorContainer.parentElement?.closest('[data-block-id]'));
+    return blockElement?.getAttribute('data-block-id') || null;
+  };
+
   useEffect(() => {
     const fetchPermissions = async () => {
       const blockId = getBlockId();
-      if (!blockId) return;
+      if (!blockId || !pageId || pageId.trim() === '') {
+        console.log('[SearchMenu] Missing blockId or pageId for permissions fetch:', { blockId, pageId });
+        return;
+      }
 
       try {
         const result = await getBlockPermissions({ pageId, blockId });
         setBlockPermissions(
-          result.map((item) => ({
-            userId: item.id,
+          result.data?.map((item) => ({
+            userId: item.userId,
             name: item.name,
             avatarUrl: item.avatarUrl,
-            permission: item.permission,
-          }))
+            permission: item.role,
+          })) || []
         );
 
         // Проверяем права текущего пользователя на этот блок
-        const currentUserPermission = result.find(item => item.id === currentUser?.user?.id);
-        setUserBlockPermission(currentUserPermission?.permission || null);
+        const currentUserPermission = result.data?.find(item => item.userId === currentUser?.user?.id);
+        setUserBlockPermission(currentUserPermission?.role || null);
       } catch (err) {
         notifications.show({ message: "Failed to load permissions", color: "red" });
       }
     };
 
-    if (open) {
+    if (opened) {
       fetchPermissions();
     } else {
       setSearch("");
       setBlockPermissions([]);
       setUserBlockPermission(null);
     }
-  }, [open, currentUser?.user?.id]);
-  const getBlockId = () => {
-    const { state } = editor;
-    const { selection } = state;
-    const fromPos = selection.from;
-    let foundNode = null;
+  }, [opened, currentUser?.user?.id, pageId]);
 
-    state.doc.nodesBetween(fromPos, fromPos, (node) => {
-      if (node.attrs?.blockId) {
-        foundNode = node;
-        return false;
-      }
-      return true;
-    });
-
-    return foundNode?.attrs?.blockId;
-  };
   const blockId = getBlockId();
 
   const handleSelectUserWithPermission = async (user: any) => {
-    //const blockId = getBlockId();
-
     if (!blockId || !pageId) {
       notifications.show({
         message: "Block or page ID not found",
@@ -240,18 +271,11 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
         userId: user.id,
         pageId,
         blockId,
-        role: user.role,
+        role: permission,
         permission,
       });
 
       notifications.show({ message: "User permission saved", color: "green" });
-
-      onSelect({
-        id: user.id,
-        label: user.name,
-        entityType: "user",
-        avatarUrl: user.avatarUrl,
-      });
 
       setBlockPermissions((prev) => {
         const exists = prev.find((p) => p.userId === user.id);
@@ -297,7 +321,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
         pageId,
         blockId,
         permission,
-        role: user.role,
+        role: String(permission),
       });
 
       setSelectedPermissionsMap((prev) => ({
@@ -308,7 +332,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
       setBlockPermissions((prev) =>
         prev.map((p) =>
           p.userId === userId
-            ? { ...p, permission, role: user.role }
+            ? { ...p, permission }
             : p
         )
       );
@@ -324,8 +348,6 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
       });
     }
   };
-
-
 
   const handleRemovePermission = async (userId: string) => {
     if (!blockId) return;
@@ -352,7 +374,7 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
 
   return (
     <Modal
-      opened={open}
+      opened={opened}
       onClose={onClose}
       title="Assign permission"
       size="lg"
@@ -360,13 +382,13 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
       zIndex={10000}
     >
       {/* Проверка прав пользователя */}
-      {userBlockPermission !== 'owner' && !isPageCreator && (
+      {userBlockPermission !== 'owner' && !isPageCreator && !hasAdminRights && (
         <Stack gap="md" align="center" py="xl">
           <Text size="lg" fw={500} color="red">
             Недостаточно прав
           </Text>
           <Text size="sm" color="dimmed" ta="center">
-            Для управления правами доступа к блоку требуются права владельца (owner) или статус создателя страницы.
+            Для управления правами доступа к блоку требуются права владельца (owner), статус создателя страницы или права администратора.
           </Text>
           <Button onClick={onClose} variant="default">
             Закрыть
@@ -374,8 +396,17 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
         </Stack>
       )}
 
-      {/* Основной контент модалки - показывается только для владельцев или создателей */}
-      {(userBlockPermission === 'owner' || isPageCreator) && (
+      {/* Основной контент модалки - показывается для владельцев, создателей или администраторов */}
+      {(() => {
+        const shouldShowContent = userBlockPermission === 'owner' || isPageCreator || hasAdminRights;
+        console.log('[SearchMenu] Content visibility check:', {
+          userBlockPermission,
+          isPageCreator,
+          hasAdminRights,
+          shouldShowContent
+        });
+        return shouldShowContent;
+      })() && (
         <>
           {/* --- Новый блок: права доступа на страницу --- */}
           {pagePermissions && (
@@ -543,4 +574,4 @@ export const SearchMenu = ({ open, onClose, onSelect, editor, pageId, isPageCrea
       )}
     </Modal>
   );
-};
+}

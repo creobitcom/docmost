@@ -1,5 +1,6 @@
 import {
   BubbleMenu,
+  BubbleMenuProps,
   isNodeSelection,
   useEditor,
 } from "@tiptap/react";
@@ -15,85 +16,84 @@ import {
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import classes from "./bubble-menu.module.css";
-import { ActionIcon, Button, Tooltip, rem } from "@mantine/core";
+import { ActionIcon, rem, Tooltip } from "@mantine/core";
 import { ColorSelector } from "./color-selector";
 import { NodeSelector } from "./node-selector";
 import { TextAlignmentSelector } from "./text-alignment-selector";
-import { draftCommentIdAtom, showCommentPopupAtom } from "@/features/comment/atoms/comment-atom";
+import {
+  draftCommentIdAtom,
+  showCommentPopupAtom,
+} from "@/features/comment/atoms/comment-atom";
 import { useAtom } from "jotai";
 import { v7 as uuid7 } from "uuid";
 import { isCellSelection, isTextSelected } from "@docmost/editor-ext";
-import { LinkSelector } from "@/features/editor/components/bubble-menu/link-selector";
+import { LinkSelector } from "@/features/editor/components/bubble-menu/link-selector.tsx";
 import { useTranslation } from "react-i18next";
-import { ContextMenu } from "./context-menu";
 import { SearchMenu } from "./search-menu";
 import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
-import { getBlockPermissions } from "@/lib/api-client";
+import { getBlockPermissions, getUserSpaceRole } from "@/lib/api-client";
 
-type EditorBubbleMenuProps = {
+export interface BubbleMenuItem {
+  name: string;
+  isActive: () => boolean;
+  command: () => void;
+  icon: typeof IconBold;
+}
+
+type EditorBubbleMenuProps = Omit<BubbleMenuProps, "children" | "editor"> & {
   editor: ReturnType<typeof useEditor>;
-  pageId: string;
+  pageId?: string;
 };
 
-export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) => {
+export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
   const { t } = useTranslation();
   const [showCommentPopup, setShowCommentPopup] = useAtom(showCommentPopupAtom);
   const [, setDraftCommentId] = useAtom(draftCommentIdAtom);
   const [currentUser] = useAtom(currentUserAtom);
+  const showCommentPopupRef = useRef(showCommentPopup);
+
+  // Состояние для SearchMenu
+  const [searchModalOpened, setSearchModalOpened] = useState(false);
   const [userBlockPermission, setUserBlockPermission] = useState<string | null>(null);
   const [isPageCreator, setIsPageCreator] = useState(false);
+  const [hasAdminRights, setHasAdminRights] = useState(false);
 
-  const showCommentPopupRef = useRef(showCommentPopup);
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    showCommentPopupRef.current = showCommentPopup;
+  }, [showCommentPopup]);
 
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
-  const [searchModalOpened, setSearchModalOpened] = useState(false);
+  // Получаем ID текущего блока из выделенного текста
+  const getCurrentBlockId = (): string | null => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
 
-  const [isNodeSelectorOpen, setIsNodeSelectorOpen] = useState(false);
-  const [isTextAlignmentSelectorOpen, setIsTextAlignmentOpen] = useState(false);
-  const [isColorSelectorOpen, setIsColorSelectorOpen] = useState(false);
-  const [isLinkSelectorOpen, setIsLinkSelectorOpen] = useState(false);
-
-  // Функция для получения blockId из текущего выделения
-  const getCurrentBlockId = () => {
-    const { state } = editor;
-    const { selection } = state;
-    const fromPos = selection.from;
-    let foundNode = null;
-
-    state.doc.nodesBetween(fromPos, fromPos, (node) => {
-      if (node.attrs?.blockId) {
-        foundNode = node;
-        return false;
-      }
-      return true;
-    });
-
-    return foundNode?.attrs?.blockId;
+    const range = selection.getRangeAt(0);
+    const blockElement = range.commonAncestorContainer.parentElement?.closest('[data-block-id]');
+    return blockElement?.getAttribute('data-block-id') || null;
   };
 
-  // Проверяем права пользователя на текущий блок и статус создателя
-  useEffect(() => {
-    const checkUserPermissions = async () => {
-      const blockId = getCurrentBlockId();
-      if (!blockId || !currentUser?.user?.id) {
-        setUserBlockPermission(null);
-        return;
-      }
+      // Проверяем права пользователя на блок и статус создателя
+    useEffect(() => {
+      const checkUserPermissions = async () => {
+        const blockId = getCurrentBlockId();
+        const pageId = (props.pageId ?? props.editor.storage.pageId) as string | undefined;
+
+        if (!blockId || !currentUser?.user?.id || !pageId) {
+          console.log('[BubbleMenu] Missing required data:', { blockId, userId: currentUser?.user?.id, pageId });
+          setUserBlockPermission(null);
+          setIsPageCreator(false);
+          setHasAdminRights(false);
+          return;
+        }
 
       try {
         // Проверяем права на блок
-        const result = await getBlockPermissions({ pageId, blockId });
-        console.log('[BubbleMenu][Perm] Inputs:', { pageId, blockId, currentUserId: currentUser.user.id });
-        console.log('[BubbleMenu][Perm] Raw block permissions result:', result);
-        const currentUserPermission = result.find(item => item.id === currentUser.user.id);
-        console.log('[BubbleMenu][Perm] Matched user permission:', {
-          userId: currentUser.user.id,
-          found: !!currentUserPermission,
-          permission: currentUserPermission?.permission || null,
+        const result = await getBlockPermissions({
+          pageId,
+          blockId
         });
-        setUserBlockPermission(currentUserPermission?.permission || null);
+        const currentUserPermission = result.data?.find(item => item.userId === currentUser.user.id);
+        setUserBlockPermission(currentUserPermission?.role || null);
 
         // Проверяем, является ли пользователь создателем страницы
         const pageResponse = await fetch(`/api/pages/info`, {
@@ -106,21 +106,54 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
 
         if (pageResponse.ok) {
           const pageData = await pageResponse.json();
-          const creatorId = (pageData?.data?.creator_id ?? pageData?.creator_id) as string | undefined;
-          const isCreator = creatorId === currentUser.user.id;
-          console.log('[BubbleMenu][Perm] Creator compare:', { creatorId, currentUserId: currentUser.user.id, isCreator });
+          const pageInfo = pageData.data;
+
+          // Проверяем разные варианты имени поля creator
+          const creatorId = pageInfo?.creator_id || pageInfo?.creatorId || pageInfo?.creator?.id;
+          const isCreator = creatorId === currentUser?.user?.id;
           setIsPageCreator(isCreator);
 
-          const computedShowSearch = isCreator || (currentUserPermission?.permission === 'owner');
-          console.log('[BubbleMenu][Perm] Should show Search button:', {
-            isCreator,
-            userBlockPermission: currentUserPermission?.permission || null,
-            result: computedShowSearch,
+          // Проверяем права администратора
+          const userRole = currentUser?.user?.role;
+          const hasOwnerRole = userRole === 'owner';
+          const hasAdminRole = userRole === 'admin';
+
+          // Получаем роль пользователя в пространстве
+          let hasSpaceAdminRights = false;
+          if (pageInfo?.spaceId && currentUser?.user?.id) {
+            try {
+              const spaceMemberData = await getUserSpaceRole({
+                spaceId: pageInfo.spaceId,
+                userId: currentUser.user.id
+              });
+              const spaceMemberRole = spaceMemberData?.data?.role;
+              hasSpaceAdminRights = spaceMemberRole === 'admin' || spaceMemberRole === 'owner';
+            } catch (e) {
+              console.error("Failed to fetch space member role:", e);
+            }
+          }
+
+          // Если у пользователя есть права owner или admin (в users или spaceMembers), даем доступ
+          const finalHasAdminRights = hasOwnerRole || hasAdminRole || hasSpaceAdminRights;
+          setHasAdminRights(finalHasAdminRights);
+
+          console.log('[BubbleMenu] User permissions check:', {
+            userId: currentUser?.user?.id,
+            pageCreatorId: creatorId,
+            isPageCreator: isCreator,
+            userBlockPermission: currentUserPermission?.role,
+            userRole,
+            hasOwnerRole,
+            hasAdminRole,
+            hasSpaceAdminRights,
+            finalHasAdminRights,
+            shouldShowSearchButton: isCreator || currentUserPermission?.role === 'owner' || finalHasAdminRights
           });
         }
       } catch (err) {
         console.error("Failed to check user permissions:", err);
         setUserBlockPermission(null);
+        setIsPageCreator(false);
       }
     };
 
@@ -129,77 +162,101 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
       checkUserPermissions();
     };
 
-    editor.on('selectionUpdate', handleSelectionUpdate);
+    props.editor.on('selectionUpdate', handleSelectionUpdate);
 
     // Начальная проверка
     checkUserPermissions();
 
     return () => {
-      editor.off('selectionUpdate', handleSelectionUpdate);
+      props.editor.off('selectionUpdate', handleSelectionUpdate);
     };
-  }, [editor, pageId, currentUser?.user?.id]);
+  }, [props.editor, currentUser?.user?.id]);
 
-  useEffect(() => {
-    showCommentPopupRef.current = showCommentPopup;
-  }, [showCommentPopup]);
-
-  const items = [
+  const items: BubbleMenuItem[] = [
     {
       name: "Bold",
-      isActive: () => editor.isActive("bold"),
-      command: () => editor.chain().focus().toggleBold().run(),
+      isActive: () => props.editor.isActive("bold"),
+      command: () => props.editor.chain().focus().toggleBold().run(),
       icon: IconBold,
     },
     {
       name: "Italic",
-      isActive: () => editor.isActive("italic"),
-      command: () => editor.chain().focus().toggleItalic().run(),
+      isActive: () => props.editor.isActive("italic"),
+      command: () => props.editor.chain().focus().toggleItalic().run(),
       icon: IconItalic,
     },
     {
       name: "Underline",
-      isActive: () => editor.isActive("underline"),
-      command: () => editor.chain().focus().toggleUnderline().run(),
+      isActive: () => props.editor.isActive("underline"),
+      command: () => props.editor.chain().focus().toggleUnderline().run(),
       icon: IconUnderline,
     },
     {
       name: "Strike",
-      isActive: () => editor.isActive("strike"),
-      command: () => editor.chain().focus().toggleStrike().run(),
+      isActive: () => props.editor.isActive("strike"),
+      command: () => props.editor.chain().focus().toggleStrike().run(),
       icon: IconStrikethrough,
     },
     {
       name: "Code",
-      isActive: () => editor.isActive("code"),
-      command: () => editor.chain().focus().toggleCode().run(),
+      isActive: () => props.editor.isActive("code"),
+      command: () => props.editor.chain().focus().toggleCode().run(),
       icon: IconCode,
     },
   ];
 
+  const commentItem: BubbleMenuItem = {
+    name: "Comment",
+    isActive: () => props.editor.isActive("comment"),
+    command: () => {
+      const commentId = uuid7();
+
+      props.editor.chain().focus().setCommentDecoration().run();
+      setDraftCommentId(commentId);
+      setShowCommentPopup(true);
+    },
+    icon: IconMessage,
+  };
+
+  const bubbleMenuProps: EditorBubbleMenuProps = {
+    ...props,
+    shouldShow: ({ state, editor }) => {
+      const { selection } = state;
+      const { empty } = selection;
+
+      if (
+        !editor.isEditable ||
+        editor.isActive("image") ||
+        empty ||
+        isNodeSelection(selection) ||
+        isCellSelection(selection) ||
+        showCommentPopupRef?.current
+      ) {
+        return false;
+      }
+      return isTextSelected(editor);
+    },
+    tippyOptions: {
+      moveTransition: "transform 0.15s ease-out",
+      onHide: () => {
+        setIsNodeSelectorOpen(false);
+        setIsTextAlignmentOpen(false);
+        setIsColorSelectorOpen(false);
+        setIsLinkSelectorOpen(false);
+      },
+    },
+  };
+
+  const [isNodeSelectorOpen, setIsNodeSelectorOpen] = useState(false);
+  const [isTextAlignmentSelectorOpen, setIsTextAlignmentOpen] = useState(false);
+  const [isColorSelectorOpen, setIsColorSelectorOpen] = useState(false);
+  const [isLinkSelectorOpen, setIsLinkSelectorOpen] = useState(false);
 
   return (
-    <BubbleMenu
-      editor={editor}
-      shouldShow={({ editor, state }) => {
-        const { selection } = state;
-        const { empty } = selection;
-
-        if (
-          !editor.isEditable ||
-          editor.isActive("image") ||
-          empty ||
-          isNodeSelection(selection) ||
-          isCellSelection(selection) ||
-          showCommentPopupRef.current
-        ) {
-          return false;
-        }
-        return isTextSelected(editor);
-      }}
-    >
+    <BubbleMenu {...bubbleMenuProps}>
       <div className={classes.bubbleMenu}>
         <NodeSelector
-          editor={editor}
+          editor={props.editor}
           isOpen={isNodeSelectorOpen}
           setIsOpen={() => {
             setIsNodeSelectorOpen(!isNodeSelectorOpen);
@@ -210,7 +267,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
         />
 
         <TextAlignmentSelector
-          editor={editor}
+          editor={props.editor}
           isOpen={isTextAlignmentSelectorOpen}
           setIsOpen={() => {
             setIsTextAlignmentOpen(!isTextAlignmentSelectorOpen);
@@ -220,8 +277,27 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
           }}
         />
 
+        <ActionIcon.Group>
+          {items.map((item, index) => (
+            <Tooltip key={index} label={t(item.name)} withArrow>
+              <ActionIcon
+                key={index}
+                variant="default"
+                size="lg"
+                radius="0"
+                aria-label={t(item.name)}
+                className={clsx({ [classes.active]: item.isActive() })}
+                style={{ border: "none" }}
+                onClick={item.command}
+              >
+                <item.icon style={{ width: rem(16) }} stroke={2} />
+              </ActionIcon>
+            </Tooltip>
+          ))}
+        </ActionIcon.Group>
+
         <LinkSelector
-          editor={editor}
+          editor={props.editor}
           isOpen={isLinkSelectorOpen}
           setIsOpen={() => {
             setIsLinkSelectorOpen(!isLinkSelectorOpen);
@@ -232,7 +308,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
         />
 
         <ColorSelector
-          editor={editor}
+          editor={props.editor}
           isOpen={isColorSelectorOpen}
           setIsOpen={() => {
             setIsColorSelectorOpen(!isColorSelectorOpen);
@@ -242,26 +318,19 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
           }}
         />
 
-        <Tooltip label={t("Comment")} withArrow>
-          <ActionIcon
-            variant="default"
-            size="lg"
-            radius="0"
-            aria-label={t("Comment")}
-            style={{ border: "none" }}
-            onClick={() => {
-              const commentId = uuid7();
-              editor.chain().focus().setCommentDecoration().run();
-              setDraftCommentId(commentId);
-              setShowCommentPopup(true);
-            }}
-          >
-            <IconMessage size={16} stroke={2} />
-          </ActionIcon>
-        </Tooltip>
+        <ActionIcon
+          variant="default"
+          size="lg"
+          radius="0"
+          aria-label={t(commentItem.name)}
+          style={{ border: "none" }}
+          onClick={commentItem.command}
+        >
+          <IconMessage size={16} stroke={2} />
+        </ActionIcon>
 
-        {/* Показываем кнопку поиска только для владельцев или создателей страницы */}
-        {(userBlockPermission === 'owner' || isPageCreator) && (
+        {/* Показываем кнопку поиска для владельцев, создателей или администраторов */}
+        {(userBlockPermission === 'owner' || isPageCreator || hasAdminRights) && (
           <Tooltip label="Search Users" withArrow>
             <ActionIcon
               variant="default"
@@ -270,50 +339,25 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = ({ editor, pageId }) 
               aria-label="Search"
               style={{ border: "none" }}
               onClick={() => {
-                setIsSearchOpen(!isSearchOpen);
-                setIsColorSelectorOpen(false);
-                setIsLinkSelectorOpen(false);
-                setIsNodeSelectorOpen(false);
-                setIsTextAlignmentOpen(false);
+                console.log('[BubbleMenu] Search button clicked, opening modal');
+                setSearchModalOpened(true);
               }}
-              ref={searchButtonRef}
             >
               <IconSearch size={16} stroke={2} />
             </ActionIcon>
           </Tooltip>
         )}
-
-        {isSearchOpen && (
-          <div
-            style={{
-              position: "absolute",
-              top: "100%",
-              left: 0,
-              marginTop: "8px",
-              backgroundColor: "#fff",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              padding: "8px",
-              boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-              width: "250px",
-              zIndex: 10,
-            }}
-          >
-            <SearchMenu
-              open={searchModalOpened}
-              onClose={() => setSearchModalOpened(false)}
-              editor={editor}
-              pageId={pageId}
-              isPageCreator={isPageCreator}
-              onSelect={(user) => {
-                console.log("Выбран пользователь:", user);
-                setIsSearchOpen(false);
-              }}
-            />
-            <Button onClick={() => setSearchModalOpened(true)}>Assign Permission</Button>
-          </div>
-        )}
       </div>
+
+      {/* Модальное окно управления правами доступа */}
+      {(props.pageId ?? props.editor.storage.pageId) && (
+        <SearchMenu
+          opened={searchModalOpened}
+          onClose={() => setSearchModalOpened(false)}
+          pageId={(props.pageId ?? props.editor.storage.pageId) as string}
+          blockId={props.editor.storage.blockId}
+        />
+      )}
     </BubbleMenu>
   );
 };
