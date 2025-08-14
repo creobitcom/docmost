@@ -303,7 +303,7 @@ function PlaceholderBlock({ block }) {
   );
 }
 
-export default function PageEditor({ pageId }) {
+export default function PageEditor({ pageId, editable, content, syncPageOriginId }) {
   const [blocks, setBlocks] = useState([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -386,6 +386,7 @@ export default function PageEditor({ pageId }) {
         console.log('[PageEditor] Rendering block:', block.id, 'hasAccess:', block.hasAccess);
         return block.hasAccess ? (
           <BlockEditor
+            pageId={pageId}
             key={block.id}
             block={block}
             editable={block.userPermission === "edit" || block.userPermission === "owner"}
