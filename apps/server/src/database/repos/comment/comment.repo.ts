@@ -76,7 +76,7 @@ export class CommentRepo {
       eb
         .selectFrom('users')
         .select(['users.id', 'users.name', 'users.avatarUrl'])
-        .whereRef('users.id', '=', 'comments.creator_id'),
+        .whereRef('users.id', '=', 'comments.creatorId'),
     ).as('creator');
   }
 

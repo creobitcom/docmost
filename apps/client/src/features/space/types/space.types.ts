@@ -13,7 +13,7 @@ export interface ISpace {
   slug: string;
   hostname: string;
   visibility: string;
-  creator_id: string;
+  creatorId: string;
   createdAt: Date;
   updatedAt: Date;
   memberCount?: number;

@@ -72,11 +72,10 @@ export class ImportService {
         createdPage = await this.pageRepo.insertPage({
           slugId: generateSlugId(),
           title: pageTitle,
-          content: prosemirrorJson, // можно удалить, если не нужно
           textContent: jsonToText(prosemirrorJson),
           position: pagePosition.toString(),
           spaceId: spaceId,
-          creator_id: userId,
+          creatorId: userId,
           workspaceId: workspaceId,
           lastUpdatedById: userId,
         });

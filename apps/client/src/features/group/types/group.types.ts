@@ -4,7 +4,7 @@ export interface IGroup {
   name: string;
   description: string | null;
   isDefault: boolean;
-  creator_id: string | null;
+  creatorId: string | null;
   workspaceId: string;
   createdAt: Date;
   updatedAt: Date;

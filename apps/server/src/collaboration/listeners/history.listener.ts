@@ -28,10 +28,11 @@ export class HistoryListener {
 
     const lastHistory = await this.pageHistoryRepo.findPageLastHistory(page.id);
 
+    // Поскольку content больше не существует в pages,
+    // создаем историю только на основе времени
     if (
       !lastHistory ||
-      (!isDeepStrictEqual(lastHistory.content, page.content) &&
-        currentTime - new Date(lastHistory.createdAt).getTime() >= FIVE_MINUTES)
+      currentTime - new Date(lastHistory.createdAt).getTime() >= FIVE_MINUTES
     ) {
       try {
         await this.pageHistoryRepo.saveHistory(page);

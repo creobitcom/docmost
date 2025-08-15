@@ -27,7 +27,7 @@ export async function up(db: Kysely<any>): Promise<void> {
       col.defaultTo(false).notNull(),
     )
     .addColumn('is_enabled', 'boolean', (col) => col.defaultTo(false).notNull())
-    .addColumn('creator_id', 'uuid', (col) =>
+    .addColumn('creatorId', 'uuid', (col) =>
       col.references('users.id').onDelete('set null'),
     )
     .addColumn('workspace_id', 'uuid', (col) =>

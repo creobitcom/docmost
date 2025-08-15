@@ -20,7 +20,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('default_role', 'varchar', (col) =>
       col.defaultTo(SpaceRole.WRITER).notNull(),
     )
-    .addColumn('creator_id', 'uuid', (col) => col.references('users.id'))
+    .addColumn('creatorId', 'uuid', (col) => col.references('users.id'))
     .addColumn('workspace_id', 'uuid', (col) =>
       col.references('workspaces.id').onDelete('cascade').notNull(),
     )

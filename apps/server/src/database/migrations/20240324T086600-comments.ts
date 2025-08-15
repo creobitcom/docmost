@@ -9,7 +9,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('content', 'jsonb', (col) => col)
     .addColumn('selection', 'varchar', (col) => col)
     .addColumn('type', 'varchar', (col) => col)
-    .addColumn('creator_id', 'uuid', (col) => col.references('users.id'))
+    .addColumn('creatorId', 'uuid', (col) => col.references('users.id'))
     .addColumn('pageId', 'uuid', (col) =>
       col.references('pages.id').onDelete('cascade').notNull(),
     )

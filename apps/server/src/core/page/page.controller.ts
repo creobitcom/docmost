@@ -156,11 +156,22 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creator_id'))
+      .select(['creatorId'])
       .where('id', '=', pageId)
       .executeTakeFirst();
 
-    const isCreator = (page as any)?.creator_id === user.id;
+    // Проверяем, существует ли страница
+    if (!page) {
+      throw new NotFoundException('Page not found');
+    }
+
+    // Используем правильное имя поля из объекта
+    const creatorId = (page as any).creatorId;
+
+    const isCreator = creatorId ? creatorId === user.id : false;
+    console.log('user.id', user.id);
+    console.log('creatorId', creatorId);
+    console.log('isCreator:', isCreator);
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -217,11 +228,11 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creator_id'))
+      .select((eb) => eb.fn.coalesce(sql`creatorId`, sql`NULL`).as('creatorId'))
       .where('id', '=', pageId)
       .executeTakeFirst();
 
-    const isCreator = (page as any)?.creator_id === user.id;
+    const isCreator = (page as any)?.creatorId === user.id;
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -278,11 +289,11 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creator_id'))
+      .select((eb) => eb.fn.coalesce(sql`creatorId`, sql`NULL`).as('creatorId'))
       .where('id', '=', dto.pageId)
       .executeTakeFirst();
 
-    const isCreator = (page as any)?.creator_id === user.id;
+    const isCreator = (page as any)?.creatorId === user.id;
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -348,13 +359,13 @@ export class PageController {
       if (!originPage) {
         throw new NotFoundException('Origin page not found');
       }
-      page.content = originPage.content;
+      // Убираем присвоение content, так как это поле больше не существует
       return { ...page, membership, originPageId: originPage.id };
     }
 
-    // Добавляем alias для совместимости клиентского кода: creator_id
-    const creator_id = (page as any)?.creator_id ?? (page as any)?.creator_id ?? null;
-    return { ...page, creator_id, blocks, membership };
+    // Добавляем alias для совместимости клиентского кода: creatorId
+    const creatorId = (page as any)?.creatorId ?? (page as any)?.creatorId ?? null;
+    return { ...page, creatorId, blocks, membership };
   }
 
   @HttpCode(HttpStatus.OK)

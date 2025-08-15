@@ -31,7 +31,7 @@ export class SidebarPageResultDto {
   spaceId: string;
 
   @IsString()
-  creator_id: string;
+  creatorId: string;
 
   @IsBoolean()
   isSynced: boolean;

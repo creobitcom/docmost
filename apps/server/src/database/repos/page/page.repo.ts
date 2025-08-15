@@ -54,7 +54,7 @@ export class PageRepo {
     'coverPhoto',
     'position',
     'parentPageId',
-    'creator_id',
+    'creatorId',
     'lastUpdatedById',
     'spaceId',
     'workspaceId',
@@ -273,7 +273,7 @@ export class PageRepo {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
@@ -364,7 +364,7 @@ export class PageRepo {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .select((eb) => this.withHasChildren(eb))
@@ -514,7 +514,7 @@ export class PageRepo {
   async findPagesByIdsWithSpace(pageIds: string[], workspaceId: string) {
     return this.db
       .selectFrom('pages')
-      .select(['id', 'slugId', 'title', 'creator_id', 'spaceId', 'workspaceId'])
+      .select(['id', 'slugId', 'title', 'creatorId', 'spaceId', 'workspaceId'])
       .select((eb) => this.withSpace(eb))
       .where('id', 'in', pageIds)
       .where('workspaceId', '=', workspaceId)
@@ -573,7 +573,7 @@ export class PageRepo {
         'position',
         'parentPageId',
         'spaceId',
-        'creator_id',
+        'creatorId',
         'isSynced',
       ])
       .orderBy('position', 'asc')
@@ -598,7 +598,7 @@ export class PageRepo {
         'title',
         'icon',
         'parentPageId',
-        'creator_id',
+        'creatorId',
         'createdAt',
         'updatedAt',
         sql<number>`ts_rank(tsv, to_tsquery(${searchQuery}))`.as('rank'),
@@ -611,8 +611,8 @@ export class PageRepo {
         qb.where('spaceId', '=', searchParams.spaceId),
       )
       .where('tsv', '@@', sql<string>`to_tsquery(${searchQuery})`)
-      .$if(Boolean(searchParams.creator_id), (qb) =>
-        qb.where('creator_id', '=', searchParams.creator_id),
+      .$if(Boolean(searchParams.creatorId), (qb) =>
+        qb.where('creatorId', '=', searchParams.creatorId),
       )
       .orderBy('rank', 'desc')
       .limit(searchParams.limit | 20)
@@ -698,7 +698,7 @@ export class PageRepo {
       eb
         .selectFrom('users')
         .select(['users.id', 'users.name', 'users.avatarUrl'])
-        .whereRef('users.id', '=', 'pages.creator_id'),
+        .whereRef('users.id', '=', 'pages.creatorId'),
     ).as('creator');
   }
 

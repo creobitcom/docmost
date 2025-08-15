@@ -166,7 +166,7 @@ export class SpaceRepo {
     const space = await db
       .selectFrom('spaces')
       .selectAll()
-      .where('creator_id', '=', userId)
+      .where('creatorId', '=', userId)
       .where('visibility', '=', SpaceVisibility.PERSONAL)
       .executeTakeFirst();
 

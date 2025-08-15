@@ -3,7 +3,7 @@ export class SearchResponseDto {
   title: string;
   icon: string;
   parentPageId: string;
-  creator_id: string;
+  creatorId: string;
   rank: number;
   highlight: string;
   createdAt: Date;

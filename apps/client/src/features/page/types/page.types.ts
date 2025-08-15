@@ -28,7 +28,7 @@ export interface IPage {
   icon: string;
   coverPhoto: string;
   parentPageId: string;
-  creator_id: string;
+  creatorId: string;
   spaceId: string;
   workspaceId: string;
   isLocked: boolean;

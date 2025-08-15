@@ -12,7 +12,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('file_ext', 'varchar', (col) => col.notNull())
     .addColumn('mime_type', 'varchar', (col) => col)
     .addColumn('type', 'varchar', (col) => col)
-    .addColumn('creator_id', 'uuid', (col) =>
+    .addColumn('creatorId', 'uuid', (col) =>
       col.references('users.id').notNull(),
     )
     .addColumn('pageId', 'uuid', (col) => col)

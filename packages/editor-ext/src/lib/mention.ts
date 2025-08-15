@@ -32,7 +32,7 @@ export interface MentionNodeAttrs {
   /**
    * the id of the user who initiated the mention
    */
-  creator_id?: string;
+  creatorId?: string;
 }
 
 export type MentionOptions<
@@ -233,16 +233,16 @@ export const Mention = Node.create<MentionOptions>({
         },
       },
 
-      creator_id: {
+      creatorId: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-creator-id"),
         renderHTML: (attributes) => {
-          if (!attributes.creator_id) {
+          if (!attributes.creatorId) {
             return {};
           }
 
           return {
-            "data-creator-id": attributes.creator_id,
+            "data-creator-id": attributes.creatorId,
           };
         },
       },
