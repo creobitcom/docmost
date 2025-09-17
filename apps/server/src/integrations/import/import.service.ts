@@ -88,14 +88,31 @@ export class ImportService {
             for (let i = 0; i < blocks.length; i++) {
               const blockContent = blocks[i];
               if (!blockContent || typeof blockContent.type !== 'string') continue;
-              const ydoc = TiptapTransformer.toYdoc(blockContent, 'default');
+              
+              // Проверяем, не содержит ли блок несколько параграфов
+              let contentToUse = blockContent;
+              if (blockContent.type === 'doc' && Array.isArray(blockContent.content)) {
+                const paragraphs = blockContent.content.filter(node => 
+                  typeof node === 'object' && node !== null && node.type === 'paragraph'
+                );
+                if (paragraphs.length > 1) {
+                  // Берем только первый параграф
+                  contentToUse = {
+                    ...blockContent,
+                    content: [paragraphs[0]]
+                  };
+                  this.logger.debug(`Multiple paragraphs detected in imported block ${i}, using only first paragraph`);
+                }
+              }
+              
+              const ydoc = TiptapTransformer.toYdoc(contentToUse, 'default');
               const yjsSnapshot = Buffer.from(require('yjs').encodeStateAsUpdate(ydoc));
               await this.db
                 .insertInto('blocks')
                 .values({
                   pageId: createdPage.id,
-                  blockType: blockContent.type,
-                  content: blockContent,
+                  blockType: contentToUse.type,
+                  content: contentToUse,
                   position: i,
                   yjsSnapshot,
                   createdAt: new Date(),

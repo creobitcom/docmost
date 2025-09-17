@@ -16,13 +16,29 @@ export async function up(db: Kysely<any>): Promise<void> {
 
     const blocks = content.content;
     for (const block of blocks) {
+      // Проверяем, не содержит ли блок несколько параграфов
+      let blockContent = block;
+      if (block.type === 'doc' && Array.isArray(block.content)) {
+        const paragraphs = block.content.filter(node => 
+          typeof node === 'object' && node !== null && node.type === 'paragraph'
+        );
+        if (paragraphs.length > 1) {
+          // Берем только первый параграф
+          blockContent = {
+            ...block,
+            content: [paragraphs[0]]
+          };
+          console.log(`Multiple paragraphs detected in migration for page ${page.id}, using only first paragraph`);
+        }
+      }
+      
       await db
         .insertInto('blocks')
         .values({
           pageId: page.id,
-          blockType: block.type,
-          content: JSON.stringify(block),
-          stateHash: calculateBlockHash(block),
+          blockType: blockContent.type,
+          content: JSON.stringify(blockContent),
+          stateHash: calculateBlockHash(blockContent),
         })
         .execute();
     }

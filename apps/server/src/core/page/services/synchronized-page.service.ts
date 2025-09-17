@@ -8,6 +8,7 @@ import { executeTx } from '@docmost/db/utils';
 import { generateSlugId } from 'src/common/helpers';
 import { PageService } from './page.service';
 import { SynchronizedPageRepo } from '@docmost/db/repos/page/synchronized_page.repo';
+import { v7 as uuid7 } from 'uuid';
 
 @Injectable()
 export class SynchronizedPageService {
@@ -71,6 +72,19 @@ export class SynchronizedPageService {
         },
         trx,
       );
+
+      // Копируем блоки из origin страницы с новыми ID
+      const originBlocks = await this.pageRepo.findPageBlocks(originPage.id, trx);
+      for (const block of originBlocks) {
+        const newBlockId = uuid7(); // Генерируем новый уникальный ID
+        await this.pageRepo.createBlock(
+          block.content,
+          newBlockId, // Используем новый ID вместо block.id
+          refPage.id,
+          block.stateHash,
+          trx,
+        );
+      }
 
       return refPage;
     });

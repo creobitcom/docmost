@@ -37,18 +37,6 @@ export const TrailingNode = Extension.create<TrailingNodeExtensionOptions>({
           "data-callout-type": attributes.type,
         }),
       },
-    };
-  },
-
-  addAttributes() {
-    return {
-      type: {
-        default: "info",
-        parseHTML: (element) => element.getAttribute("data-callout-type"),
-        renderHTML: (attributes) => ({
-          "data-callout-type": attributes.type,
-        }),
-      },
       blockId: {
         default: null,
         parseHTML: (element) => element.getAttribute("blockId"),

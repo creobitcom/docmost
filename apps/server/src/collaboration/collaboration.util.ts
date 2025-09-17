@@ -94,7 +94,21 @@ export function jsonToText(tiptapJson: JSONContent) {
 }
 
 export function jsonToNode(tiptapJson: JSONContent) {
-  return Node.fromJSON(getSchema(tiptapExtensions), tiptapJson);
+  // Проверяем валидность входных данных
+  if (!tiptapJson || typeof tiptapJson !== 'object') {
+    throw new Error('Invalid JSON content: content is null or not an object');
+  }
+  
+  if (!tiptapJson.type || typeof tiptapJson.type !== 'string') {
+    throw new Error('Invalid JSON content: missing or invalid type field');
+  }
+  
+  try {
+    return Node.fromJSON(getSchema(tiptapExtensions), tiptapJson);
+  } catch (error) {
+    console.warn('Failed to convert JSON to Node:', error);
+    throw error;
+  }
 }
 
 export function getPageId(documentName: string) {

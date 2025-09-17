@@ -28,6 +28,8 @@ import slugify from '@sindresorhus/slugify';
 import { EnvironmentService } from '../environment/environment.service';
 import { AttachmentRepo } from '@docmost/db/repos/attachment/attachment.repo';
 import { SpaceRepo } from '@docmost/db/repos/space/space.repo';
+import { InjectKysely } from 'nestjs-kysely';
+import { KyselyDB } from '@docmost/db/types/kysely.types';
 
 @Injectable()
 export class ExportService {
@@ -39,6 +41,7 @@ export class ExportService {
     private readonly attachmentRepo: AttachmentRepo,
     private readonly storageService: StorageService,
     private readonly environmentService: EnvironmentService,
+    @InjectKysely() private readonly db: KyselyDB,
   ) {}
 
   async exportPage(format: string, page: Page, singlePage?: boolean) {
@@ -50,14 +53,27 @@ export class ExportService {
 
     let prosemirrorJson: any;
 
+    // Получаем контент из блоков вместо поля content
+    const blocks = await this.db
+      .selectFrom('blocks')
+      .select(['content'])
+      .where('pageId', '=', page.id)
+      .orderBy('position', 'asc')
+      .execute();
+
+    const content = {
+      type: 'doc',
+      content: blocks.map(block => block.content).filter(Boolean)
+    };
+
     if (singlePage) {
       prosemirrorJson = await this.turnPageMentionsToLinks(
-        getProsemirrorContent(page.content),
+        getProsemirrorContent(content),
         page.workspaceId,
       );
     } else {
       // mentions is already turned to links during the zip process
-      prosemirrorJson = getProsemirrorContent(page.content);
+      prosemirrorJson = getProsemirrorContent(content);
     }
 
     if (page.title) {
@@ -166,8 +182,21 @@ export class ExportService {
       for (const page of children) {
         const childPages = tree[page.id] || [];
 
+        // Получаем контент из блоков
+        const blocks = await this.db
+          .selectFrom('blocks')
+          .select(['content'])
+          .where('pageId', '=', page.id)
+          .orderBy('position', 'asc')
+          .execute();
+
+        const content = {
+          type: 'doc',
+          content: blocks.map(block => block.content).filter(Boolean)
+        };
+
         const prosemirrorJson = await this.turnPageMentionsToLinks(
-          getProsemirrorContent(page.content),
+          getProsemirrorContent(content),
           page.workspaceId,
         );
 
@@ -185,10 +214,7 @@ export class ExportService {
         }
 
         const pageTitle = getPageTitle(page.title);
-        const pageExportContent = await this.exportPage(format, {
-          ...page,
-          content: updatedJsonContent,
-        });
+        const pageExportContent = await this.exportPage(format, page);
 
         folder.file(
           `${pageTitle}${getExportExtension(format)}`,

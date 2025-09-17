@@ -11,24 +11,35 @@ export interface MentionNode {
 
 export function extractMentions(prosemirrorJson: any) {
   const mentionList: MentionNode[] = [];
-  const doc = jsonToNode(prosemirrorJson);
+  
+  // Проверяем валидность входных данных
+  if (!prosemirrorJson || typeof prosemirrorJson !== 'object') {
+    return mentionList;
+  }
 
-  doc.descendants((node: Node) => {
-    if (node.type.name === 'mention') {
-      if (
-        node.attrs.id &&
-        !mentionList.some((mention) => mention.id === node.attrs.id)
-      ) {
-        mentionList.push({
-          id: node.attrs.id,
-          label: node.attrs.label,
-          entityType: node.attrs.entityType,
-          entityId: node.attrs.entityId,
-          creatorId: node.attrs.creatorId,
-        });
+  try {
+    const doc = jsonToNode(prosemirrorJson);
+
+    doc.descendants((node: Node) => {
+      if (node.type.name === 'mention') {
+        if (
+          node.attrs.id &&
+          !mentionList.some((mention) => mention.id === node.attrs.id)
+        ) {
+          mentionList.push({
+            id: node.attrs.id,
+            label: node.attrs.label,
+            entityType: node.attrs.entityType,
+            entityId: node.attrs.entityId,
+            creatorId: node.attrs.creatorId,
+          });
+        }
       }
-    }
-  });
+    });
+  } catch (error) {
+    console.warn('Failed to extract mentions from prosemirror JSON:', error);
+  }
+  
   return mentionList;
 }
 

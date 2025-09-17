@@ -205,16 +205,30 @@ export function SearchMenu({ opened, onClose, pageId, blockId: externalBlockId }
     query: debounced,
   });
 
-  // Получаем ID текущего блока: сначала из editor.storage, иначе из выделения
+    // Получаем ID текущего блока: сначала из props, иначе из выделения
   const getBlockId = (): string | null => {
-    if (externalBlockId) return externalBlockId;
+    console.log('[SearchMenu] getBlockId called, externalBlockId:', externalBlockId);
+
+    if (externalBlockId) {
+      console.log('[SearchMenu] Using externalBlockId:', externalBlockId);
+      return externalBlockId;
+    }
+
+    // Fallback: пытаемся найти блок в DOM
     const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return null;
+    if (!selection || selection.rangeCount === 0) {
+      console.log('[SearchMenu] No selection found');
+      return null;
+    }
+
     const range = selection.getRangeAt(0);
     const blockElement = range.commonAncestorContainer instanceof Element
       ? (range.commonAncestorContainer as Element).closest('[data-block-id]')
       : (range.commonAncestorContainer.parentElement?.closest('[data-block-id]'));
-    return blockElement?.getAttribute('data-block-id') || null;
+
+    const foundBlockId = blockElement?.getAttribute('data-block-id') || null;
+    console.log('[SearchMenu] Found blockId from DOM:', foundBlockId);
+    return foundBlockId;
   };
 
   useEffect(() => {
@@ -256,7 +270,15 @@ export function SearchMenu({ opened, onClose, pageId, blockId: externalBlockId }
   const blockId = getBlockId();
 
   const handleSelectUserWithPermission = async (user: any) => {
+    console.log('[SearchMenu] handleSelectUserWithPermission called with:', {
+      user,
+      blockId,
+      pageId,
+      externalBlockId
+    });
+
     if (!blockId || !pageId) {
+      console.error('[SearchMenu] Missing required data:', { blockId, pageId, externalBlockId });
       notifications.show({
         message: "Block or page ID not found",
         color: "red",

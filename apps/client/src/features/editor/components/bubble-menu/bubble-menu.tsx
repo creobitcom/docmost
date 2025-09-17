@@ -43,6 +43,7 @@ export interface BubbleMenuItem {
 type EditorBubbleMenuProps = Omit<BubbleMenuProps, "children" | "editor"> & {
   editor: ReturnType<typeof useEditor>;
   pageId?: string;
+  blockId?: string;
 };
 
 export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
@@ -355,7 +356,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           opened={searchModalOpened}
           onClose={() => setSearchModalOpened(false)}
           pageId={(props.pageId ?? props.editor.storage.pageId) as string}
-          blockId={props.editor.storage.blockId}
+          blockId={props.blockId}
         />
       )}
     </BubbleMenu>

@@ -124,23 +124,25 @@ export class PageController {
     return this.blockPermissionService.getAccessiblePageBlocks(pageId, userId);
   }
 
-  @Get(':id/blocks')
-  async getAllPageBlocks(@Param('id') pageId: string, @AuthUser() user: User) {
-    console.log('[PageController] user:', user);
+ // В PageController.getAllPageBlocks()
+@Get(':id/blocks')
+async getAllPageBlocks(@Param('id') pageId: string, @AuthUser() user: User) {
+  const page = await this.pageRepo.findById(pageId);
 
-    const page = await this.pageRepo.findById(pageId);
-    if (!page) {
-      throw new NotFoundException('Page not found');
-    }
-
-    const pageAbility = await this.pageAbility.createForUser(user, pageId);
-    if (pageAbility.cannot(PageCaslAction.Read, PageCaslSubject.Page)) {
-      throw new ForbiddenException();
-    }
-
-    const result = await this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
+  if (page.isSynced) {
+    const syncPage = await this.syncPageService.findByReferenceId(pageId);
+    // Получаем блоки из origin страницы
+    const result = await this.blockPermissionService.getAccessiblePageBlocks(
+      syncPage.originPageId,
+      user.id
+    );
     return { data: result, success: true };
   }
+
+  // Обычная логика
+  const result = await this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
+  return { data: result, success: true };
+}
 
 
 
@@ -156,7 +158,7 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select(['creatorId'])
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
       .where('id', '=', pageId)
       .executeTakeFirst();
 
@@ -218,6 +220,10 @@ export class PageController {
     },
     @AuthUser() user: User,
   ) {
+    console.log('[PageController] assignPermissionToBlock called with:', {
+      dto,
+      userId: user.id
+    });
     const { pageId, blockId, userId, role = 'reader', permission = 'read' } = dto;
 
     // Запрещаем пользователю изменять свои собственные права
@@ -226,13 +232,19 @@ export class PageController {
     }
 
     // Проверяем, является ли пользователь создателем страницы
+    console.log('[PageController] Checking if user is page creator:', { pageId, userId: user.id });
     const page = await this.db
       .selectFrom('pages')
-      .select((eb) => eb.fn.coalesce(sql`creatorId`, sql`NULL`).as('creatorId'))
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
       .where('id', '=', pageId)
       .executeTakeFirst();
 
     const isCreator = (page as any)?.creatorId === user.id;
+    console.log('[PageController] Page creator check result:', { 
+      pageCreatorId: (page as any)?.creatorId, 
+      currentUserId: user.id, 
+      isCreator 
+    });
 
     // Если пользователь не создатель, проверяем его права на блок
     if (!isCreator) {
@@ -251,6 +263,7 @@ export class PageController {
     }
 
     // check: does block exist on current page
+    console.log('[PageController] Checking if block exists:', { pageId, blockId });
     const block = await this.db
       .selectFrom('blocks')
       .select(['id'])
@@ -258,7 +271,9 @@ export class PageController {
       .where('id', '=', blockId)
       .executeTakeFirst();
 
+    console.log('[PageController] Block query result:', block);
     if (!block) {
+      console.error('[PageController] Block not found:', { pageId, blockId });
       throw new NotFoundException('Block not found for given page and blockId');
     }
 
@@ -289,7 +304,7 @@ export class PageController {
     // Проверяем, является ли пользователь создателем страницы
     const page = await this.db
       .selectFrom('pages')
-      .select((eb) => eb.fn.coalesce(sql`creatorId`, sql`NULL`).as('creatorId'))
+      .select((eb) => eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'))
       .where('id', '=', dto.pageId)
       .executeTakeFirst();
 

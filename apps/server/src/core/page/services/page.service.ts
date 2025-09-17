@@ -136,7 +136,9 @@ export class PageService {
   ): Promise<Page> {
     const contributors = new Set<string>(page.contributorIds ?? []);
     contributors.add(userId);
-    await this.pageRepo.updatePageMetadata(
+
+    // Обновляем метаданные страницы через правильный метод
+    await this.pageRepo.updatePage(
       {
         title: updatePageDto.title,
         icon: updatePageDto.icon,
@@ -180,12 +182,11 @@ export class PageService {
     await executeTx(this.db, async (trx) => {
       // Update root page
       const nextPosition = await this.nextPagePosition(spaceId);
-      await this.pageRepo.updatePageMetadata(
+      await this.pageRepo.updatePage(
         {
           spaceId,
           parentPageId: parentPageId ?? null,
           position: nextPosition,
-          content: rootPage.content,
         },
         rootPage.id,
         trx,
@@ -228,15 +229,11 @@ export class PageService {
   ) {
     this.logger.debug('Updating page: ', updatePageData);
 
-    const pageUpdateResult = await this.pageRepo.updatePageMetadata(
+    const pageUpdateResult = await this.pageRepo.updatePage(
       updatePageData,
       pageId,
       trx,
     );
-
-    if (updatePageData.content) {
-      await this.updatePageBlocks(updatePageData, pageId, trx);
-    }
 
     return pageUpdateResult;
   }
@@ -246,75 +243,8 @@ export class PageService {
     pageId: string,
     trx?: KyselyTransaction,
   ): Promise<void> {
-    const blocks: {
-      attrs: { blockId: string };
-      type?: string;
-      content?: any[];
-    }[] = (updatePageData?.content as any)?.content;
-
-    if (!blocks || blocks.length === 0) {
-      return;
-    }
-
-    const existingBlocks = await this.pageRepo.getExistingPageBlocks(
-      pageId,
-      trx,
-    );
-
-    const existingBlocksMap = new Map(
-      existingBlocks.map((block) => [block.id, block]),
-    );
-
-    const incomingBlockIds = new Set(
-      blocks.map((block) => {
-        if (!Object.prototype.hasOwnProperty.call(block, 'attrs')) {
-          this.logger.error('Block missing blockId attribute: ', block);
-          return null;
-        }
-        if (!Object.prototype.hasOwnProperty.call(block.attrs, 'blockId')) {
-          this.logger.error('Block missing blockId attribute: ', block);
-          return null;
-        }
-        return block.attrs.blockId;
-      }),
-    );
-    this.logger.debug('Incoming blocks: ', incomingBlockIds);
-
-    const removedBlocks = existingBlocks.filter(
-      (existingBlock) => !incomingBlockIds.has(existingBlock.id),
-    );
-
-    this.logger.debug('Deleting blocks: ', removedBlocks);
-    for (const removedBlock of removedBlocks) {
-      await this.pageRepo.deleteBlock(removedBlock.id, trx);
-    }
-
-    for (const block of blocks) {
-      const blockId = block.attrs.blockId;
-      const existingBlock = existingBlocksMap.get(blockId);
-      const calculatedHash = calculateBlockHash(block);
-
-      if (!existingBlock) {
-        if (!block.content || (Array.isArray(block.content) && block.content.length === 0) || (typeof block.content === 'object' && Object.keys(block.content).length === 0)) {
-          this.logger.error('Попытка создать пустой блок через updatePageBlocks:', block, new Error().stack);
-          throw new Error('updatePageBlocks: попытка создать пустой блок!');
-        }
-        await this.pageRepo.createBlock(
-          block,
-          blockId,
-          pageId,
-          calculatedHash,
-          trx,
-        );
-      } else if (existingBlock.stateHash !== calculatedHash) {
-        await this.pageRepo.updateExistingBlock(
-          block,
-          blockId,
-          calculatedHash,
-          trx,
-        );
-      }
-    }
+    // Убираем эту функцию, так как content больше не существует в pages
+    // Блоки обрабатываются отдельно через saveBlocksForPage
   }
 
   async movePage(dto: MovePageDto, movedPage: Page) {
@@ -339,7 +269,7 @@ export class PageService {
       }
     }
 
-    await this.pageRepo.updatePageMetadata(
+    await this.pageRepo.updatePage(
       {
         position: dto.position,
         parentPageId: parentPageId,
@@ -418,13 +348,18 @@ export class PageService {
     });
   }
   async updatePage(id: string, dto: UpdatePageDto, userId: string) {
-    await this.db.updateTable('pages')
-      .set({ content: dto.content })
-      .where('id', '=', id)
-      .execute();
+    // Обновляем только метаданные страницы
+    await this.pageRepo.updatePage(
+      {
+        title: dto.title,
+        icon: dto.icon,
+        lastUpdatedById: userId,
+        updatedAt: new Date(),
+      },
+      id,
+    );
 
     // Сохранение блоков делается на клиенте через /pages/blocks/:pageId
-
   }
 
   async getAllBlocksOfPage(pageId: string, userId: string) {
@@ -443,16 +378,27 @@ export class PageService {
       .execute();
 
     const permissionMap = new Map(permissions.map(p => [p.blockId, p.permission]));
+    const processedBlockIds = new Set(); // Для отслеживания дубликатов
 
-    return allBlocks.map(block => {
-      const userPermission = permissionMap.get(block.id);
-      return {
-        ...block,
-        hasAccess: !!userPermission,
-        userPermission: userPermission ?? 'none',
-        content: userPermission ? block.content : null,
-      };
-    });
+    return allBlocks
+      .filter(block => {
+        // Убираем дубликаты по ID
+        if (processedBlockIds.has(block.id)) {
+          this.logger.warn(`Duplicate block ID found in database: ${block.id}, skipping`);
+          return false;
+        }
+        processedBlockIds.add(block.id);
+        return true;
+      })
+      .map(block => {
+        const userPermission = permissionMap.get(block.id);
+        return {
+          ...block,
+          hasAccess: !!userPermission,
+          userPermission: userPermission ?? 'none',
+          content: userPermission ? block.content : null,
+        };
+      });
   }
 
   async saveBlocksForPage(pageId: string, blocks: any[], userId: string) {
@@ -463,19 +409,77 @@ export class PageService {
       const incomingIds = new Set((blocks || []).map((b: any) => b.blockId).filter(Boolean));
       const toDelete = existingBlocks.filter((b) => !incomingIds.has(b.id));
 
+      // Удаляем блоки, которых нет в новом списке
       for (const removed of toDelete) {
         await this.pageRepo.deleteBlock(removed.id, trx);
       }
 
+      // Обрабатываем входящие блоки
+      const processedBlockIds = new Set(); // Для отслеживания дубликатов
+      
+      // Функция для проверки наличия текста в параграфе
+      const hasTextContent = (paragraph) => {
+        if (!paragraph || !paragraph.content) return false;
+        
+        // Проверяем, есть ли текстовые узлы с содержимым
+        for (const node of paragraph.content) {
+          if (node.type === 'text' && node.text && node.text.trim().length > 0) {
+            return true;
+          }
+          // Рекурсивно проверяем вложенные узлы
+          if (node.content && hasTextContent(node)) {
+            return true;
+          }
+        }
+        return false;
+      };
+      
       for (const incoming of blocks || []) {
         const blockId: string | undefined = incoming?.blockId;
         const blockType: string | undefined = incoming?.blockType;
         let blockNode: any = incoming?.content ?? {};
 
         if (!blockNode || typeof blockNode !== 'object') continue;
+        
+        // Проверяем на дубликаты
+        if (blockId && processedBlockIds.has(blockId)) {
+          this.logger.warn(`Duplicate block ID detected: ${blockId}, skipping`);
+          continue;
+        }
+        
         blockNode.attrs = blockNode.attrs || {};
-        if (blockId) blockNode.attrs.blockId = blockId;
+        if (blockId) {
+          blockNode.attrs.blockId = blockId;
+          processedBlockIds.add(blockId);
+        }
         if (!blockNode.type && blockType) blockNode.type = blockType;
+
+        // Убеждаемся, что position установлен
+        if (blockNode.attrs.position === undefined || blockNode.attrs.position === null) {
+          // Если position не установлен, используем позицию из существующего блока или 0
+          const existingBlock = blockId ? existingBlocksMap.get(blockId) : undefined;
+          blockNode.attrs.position = existingBlock?.position ?? 0;
+        }
+
+        // Проверяем, не содержит ли блок несколько параграфов
+        if (blockNode.type === 'doc' && Array.isArray(blockNode.content)) {
+          const paragraphs = blockNode.content.filter(node => 
+            typeof node === 'object' && node !== null && node.type === 'paragraph'
+          );
+          if (paragraphs.length > 1) {
+            // Берем только первый параграф
+            blockNode.content = [paragraphs[0]];
+            this.logger.debug(`Multiple paragraphs detected in block ${blockId}, using only first paragraph`);
+          } else if (paragraphs.length === 1) {
+            // Проверяем, что параграф не пустой
+            const paragraph = paragraphs[0];
+            if (!hasTextContent(paragraph)) {
+              // Если параграф пустой, пропускаем этот блок
+              this.logger.debug(`Empty paragraph detected in block ${blockId}, skipping`);
+              continue;
+            }
+          }
+        }
 
         const calculatedHash = calculateBlockHash(blockNode);
         const existed = blockId ? existingBlocksMap.get(blockId) : undefined;
@@ -525,15 +529,11 @@ export class PageService {
   ) {
     this.logger.debug('Updating page: ', updatePageData);
 
-    const pageUpdateResult = await this.pageRepo.updatePageMetadata(
+    const pageUpdateResult = await this.pageRepo.updatePage(
       updatePageData,
       pageId,
       trx,
     );
-
-    if (updatePageData.content) {
-      await this.updatePageBlocks(updatePageData, pageId, trx);
-    }
 
     return pageUpdateResult;
   }
@@ -582,10 +582,14 @@ export class PageService {
         trx,
       );
 
-      if (originPage.content) {
-        await this.pageRepo.insertContent(
+      // Копируем блоки вместо content
+      const originBlocks = await this.pageRepo.getExistingPageBlocks(originPageId, trx);
+      for (const block of originBlocks) {
+        await this.pageRepo.createBlock(
+          block.content,
+          block.id,
           copyPage.id,
-          originPage.content as PageContent,
+          block.stateHash,
           trx,
         );
       }

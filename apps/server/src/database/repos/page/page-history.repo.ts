@@ -44,12 +44,48 @@ export class PageHistoryRepo {
   }
 
   async saveHistory(page: Page, trx?: KyselyTransaction): Promise<void> {
+    // Получаем блоки страницы для сохранения в истории
+    const blocks = await this.db
+      .selectFrom('blocks')
+      .select(['content'])
+      .where('pageId', '=', page.id)
+      .orderBy('position', 'asc')
+      .execute();
+
+    // Создаем контент из блоков для совместимости с историей
+    const processedBlocks = blocks.map(block => {
+      let blockContent = block.content;
+      
+      // Проверяем, не содержит ли блок несколько параграфов
+      if (blockContent && typeof blockContent === 'object' && blockContent !== null && 
+          'type' in blockContent && blockContent.type === 'doc' && 
+          'content' in blockContent && Array.isArray(blockContent.content)) {
+        const paragraphs = blockContent.content.filter(node => 
+          typeof node === 'object' && node !== null && 'type' in node && node.type === 'paragraph'
+        );
+        if (paragraphs.length > 1) {
+          // Берем только первый параграф
+          blockContent = {
+            ...blockContent,
+            content: [paragraphs[0]]
+          };
+        }
+      }
+      
+      return blockContent;
+    }).filter(Boolean);
+    
+    const content = {
+      type: 'doc',
+      content: processedBlocks
+    };
+
     await this.insertPageHistory(
       {
         pageId: page.id,
         slugId: page.slugId,
         title: page.title,
-        content: page.content,
+        content: content, // Теперь используем контент из блоков
         icon: page.icon,
         coverPhoto: page.coverPhoto,
         lastUpdatedById: page.lastUpdatedById ?? page.creatorId,

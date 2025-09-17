@@ -39,6 +39,23 @@ export class PersistenceExtension implements Extension {
     @InjectQueue(QueueName.GENERAL_QUEUE) private generalQueue: Queue,
   ) {}
 
+  // Функция для проверки наличия текста в параграфе
+  private hasTextContent(paragraph) {
+    if (!paragraph || !paragraph.content) return false;
+    
+    // Проверяем, есть ли текстовые узлы с содержимым
+    for (const node of paragraph.content) {
+      if (node.type === 'text' && node.text && node.text.trim().length > 0) {
+        return true;
+      }
+      // Рекурсивно проверяем вложенные узлы
+      if (node.content && this.hasTextContent(node)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   async onLoadDocument({ documentName }) {
     if (documentName.startsWith('block.')) {
       const blockId = documentName.split('.')[1];
@@ -56,29 +73,68 @@ export class PersistenceExtension implements Extension {
 
       // 1. Если есть yjsSnapshot → восстановить ydoc из него
       if (block.yjsSnapshot) {
-        this.logger.debug(`ydoc loaded from db: ${blockId}`);
-        const doc = new Y.Doc();
-        const dbState = new Uint8Array(block.yjsSnapshot);
-        Y.applyUpdate(doc, dbState);
-        return doc;
+        try {
+          this.logger.debug(`ydoc loaded from db: ${blockId}`);
+          const doc = new Y.Doc();
+          const dbState = new Uint8Array(block.yjsSnapshot);
+          Y.applyUpdate(doc, dbState);
+          return doc;
+        } catch (error) {
+          this.logger.error(`Failed to load Y.js snapshot for block ${blockId}:`, error);
+          // Если не удалось загрузить snapshot, продолжаем с JSON
+        }
       }
 
       // 2. Если нет snapshot, но есть JSON content → сконвертировать
       if (block.content) {
-        this.logger.debug(`converting json to ydoc: ${blockId}`);
-        this.logger.debug('Sending block: ', block);
+        try {
+          this.logger.debug(`converting json to ydoc: ${blockId}`);
+          this.logger.debug('Sending block: ', block);
 
-        const ydoc = TiptapTransformer.toYdoc(
-          block.content,
-          'default',
-          tiptapExtensions,
-        );
+          // Проверяем, не содержит ли контент несколько параграфов
+          let contentToUse = block.content;
+          if (typeof block.content === 'object' && block.content !== null && 
+              'type' in block.content && block.content.type === 'doc' && 
+              'content' in block.content && Array.isArray(block.content.content)) {
+            const paragraphs = block.content.content.filter(node => 
+              typeof node === 'object' && node !== null && 'type' in node && node.type === 'paragraph'
+            );
+            if (paragraphs.length > 1) {
+              // Берем только первый параграф
+              contentToUse = {
+                type: 'doc',
+                content: [paragraphs[0]]
+              };
+              this.logger.debug(`Multiple paragraphs detected in block ${blockId}, using only first paragraph`);
+            } else if (paragraphs.length === 1) {
+              // Проверяем, что параграф не пустой
+              const paragraph = paragraphs[0];
+              if (!this.hasTextContent(paragraph)) {
+                // Если параграф пустой, не создаем контент
+                this.logger.debug(`Empty paragraph detected in block ${blockId}, creating empty doc`);
+                contentToUse = {
+                  type: 'doc',
+                  content: []
+                };
+              }
+            }
+          }
 
-        // Сразу прогоняем через encode/decode чтобы привести к единому виду
-        const encoded = Y.encodeStateAsUpdate(ydoc);
-        const doc = new Y.Doc();
-        Y.applyUpdate(doc, encoded);
-        return doc;
+          const ydoc = TiptapTransformer.toYdoc(
+            contentToUse,
+            'default',
+            tiptapExtensions,
+          );
+
+          // Сразу прогоняем через encode/decode чтобы привести к единому виду
+          const encoded = Y.encodeStateAsUpdate(ydoc);
+          const doc = new Y.Doc();
+          Y.applyUpdate(doc, encoded);
+          return doc;
+        } catch (error) {
+          this.logger.error(`Failed to convert JSON to Y.js for block ${blockId}:`, error);
+          // Если не удалось конвертировать, создаем новый документ
+        }
       }
 
       // 3. Если нет вообще ничего → новый документ
@@ -96,97 +152,194 @@ export class PersistenceExtension implements Extension {
 
     const blockId = documentName.split('.')[1];
 
-    const tiptapJson = TiptapTransformer.fromYdoc(document, 'default');
-    const yjsSnapshot = Buffer.from(Y.encodeStateAsUpdate(document));
-
-    Logger.debug('Block document: ', tiptapJson);
-
-    let textContent: string = null;
-
     try {
-      textContent = jsonToText(tiptapJson);
-    } catch (err) {
-      this.logger.warn('jsonToText: ' + err?.['message']);
-    }
+      const tiptapJson = TiptapTransformer.fromYdoc(document, 'default');
+      const yjsSnapshot = Buffer.from(Y.encodeStateAsUpdate(document));
 
-    let block: any = null;
+      Logger.debug('Block document: ', tiptapJson);
 
-    try {
-      await executeTx(this.db, async (trx) => {
-        // Загружаем блок для проверки
-        block = await trx
-          .selectFrom('blocks')
-          .selectAll()
-          .where('id', '=', blockId)
-          .forUpdate()
-          .executeTakeFirst();
-
-        if (!block) {
-          this.logger.error(`Block with id ${blockId} not found`);
-          return;
+      // Функция для проверки наличия текста в параграфе
+      const hasTextContent = (paragraph) => {
+        if (!paragraph || !paragraph.content) return false;
+        
+        // Проверяем, есть ли текстовые узлы с содержимым
+        for (const node of paragraph.content) {
+          if (node.type === 'text' && node.text && node.text.trim().length > 0) {
+            return true;
+          }
+          // Рекурсивно проверяем вложенные узлы
+          if (node.content && hasTextContent(node)) {
+            return true;
+          }
         }
+        return false;
+      };
 
-        if (isDeepStrictEqual(tiptapJson, block.content)) {
-          block = null;
-          return;
+      // Проверяем, не содержит ли контент несколько параграфов
+      let contentToStore = tiptapJson;
+      if (tiptapJson && typeof tiptapJson === 'object' && 
+          tiptapJson.type === 'doc' && Array.isArray(tiptapJson.content)) {
+        const paragraphs = tiptapJson.content.filter(node => 
+          typeof node === 'object' && node !== null && node.type === 'paragraph'
+        );
+        if (paragraphs.length > 1) {
+          // Берем только первый параграф
+          contentToStore = {
+            ...tiptapJson,
+            content: [paragraphs[0]]
+          };
+          this.logger.debug(`Multiple paragraphs detected in block ${blockId}, storing only first paragraph`);
+        } else if (paragraphs.length === 1) {
+          // Проверяем, что параграф не пустой
+          const paragraph = paragraphs[0];
+          if (!hasTextContent(paragraph)) {
+            // Если параграф пустой, не сохраняем его
+            this.logger.debug(`Empty paragraph detected in block ${blockId}, skipping save`);
+            return;
+          }
         }
-
-        // contributors
-        let contributorIds = undefined;
-        try {
-          const existingContributors = block.contributorIds || [];
-          const contributorSet = this.contributors.get(documentName) ?? new Set();
-          contributorSet.add(block.creatorId);
-          const newContributors = [...contributorSet];
-          contributorIds = Array.from(
-            new Set([...existingContributors, ...newContributors]),
-          );
-          this.contributors.delete(documentName);
-        } catch (err) {
-          this.logger.log('Contributors error:' + err?.['message']);
-        }
-
-        // Обновляем блок
-        await trx
-          .updateTable('blocks')
-          .set({
-            content: tiptapJson,
-            yjsSnapshot,
-            //textContent,
-            //lastUpdatedById: context.user.id,
-            //contributorIds: contributorIds,
-            //updatedAt: new Date(),
-          })
-          .where('id', '=', blockId)
-          .execute();
-
-        this.logger.debug(`Block updated: ${blockId}`);
-      });
-    } catch (err) {
-      this.logger.error(`Failed to update block ${blockId}`, err);
-    }
-
-    if (block) {
-      this.eventEmitter.emit('collab.block.updated', {
-        block: {
-          ...block,
-          content: tiptapJson,
-          lastUpdatedById: context.user.id,
-        },
-      });
-
-      // Mentions (по желанию, если блоки тоже могут содержать ссылки)
-      const mentions = extractMentions(tiptapJson);
-      const pageMentions = extractPageMentions(mentions);
-
-      if (pageMentions.length > 0) {
-        await this.generalQueue.add(QueueJob.BLOCK_BACKLINKS, {
-          blockId,
-          pageId: block.pageId,
-          workspaceId: block.workspaceId,
-          mentions: pageMentions,
-        });
       }
+
+      // Проверяем валидность всех узлов в контенте
+      if (contentToStore && typeof contentToStore === 'object') {
+        const blockIds = new Set();
+        
+        const validateNode = (node) => {
+          if (!node || typeof node !== 'object') return false;
+          if (!node.type || typeof node.type !== 'string') {
+            this.logger.warn(`Invalid node type in block ${blockId}:`, node);
+            return false;
+          }
+          
+          // Проверяем поддерживаемые типы узлов
+          const supportedTypes = ['doc', 'paragraph', 'heading', 'text', 'codeBlock'];
+          if (!supportedTypes.includes(node.type)) {
+            this.logger.warn(`Unsupported node type in block ${blockId}: ${node.type}`);
+            return false;
+          }
+          
+          // Проверяем на дублирующиеся blockId
+          if (node.attrs && node.attrs.blockId) {
+            const nodeBlockId = node.attrs.blockId;
+            if (typeof nodeBlockId !== 'string' || nodeBlockId.length === 0) {
+              this.logger.warn(`Invalid blockId in block ${blockId}:`, node.attrs.blockId);
+              return false;
+            }
+            if (blockIds.has(nodeBlockId)) {
+              this.logger.warn(`Duplicate blockId detected in block ${blockId}: ${nodeBlockId}`);
+              return false;
+            }
+            blockIds.add(nodeBlockId);
+          }
+          
+          if (node.content && Array.isArray(node.content)) {
+            return node.content.every(validateNode);
+          }
+          return true;
+        };
+
+        if (!validateNode(contentToStore)) {
+          this.logger.error(`Invalid content structure in block ${blockId}, skipping save`);
+          return;
+        }
+      }
+
+      let textContent: string = null;
+
+      try {
+        textContent = jsonToText(contentToStore);
+      } catch (err) {
+        this.logger.warn('jsonToText: ' + err?.['message']);
+      }
+
+      let block: any = null;
+
+      try {
+        await executeTx(this.db, async (trx) => {
+          // Загружаем блок для проверки
+          block = await trx
+            .selectFrom('blocks')
+            .selectAll()
+            .where('id', '=', blockId)
+            .forUpdate()
+            .executeTakeFirst();
+
+          if (!block) {
+            this.logger.error(`Block with id ${blockId} not found`);
+            return;
+          }
+
+          if (isDeepStrictEqual(contentToStore, block.content)) {
+            block = null;
+            return;
+          }
+
+          // contributors
+          let contributorIds = undefined;
+          try {
+            const existingContributors = block.contributorIds || [];
+            const contributorSet = this.contributors.get(documentName) ?? new Set();
+            contributorSet.add(block.creatorId);
+            const newContributors = [...contributorSet];
+            contributorIds = Array.from(
+              new Set([...existingContributors, ...newContributors]),
+            );
+            this.contributors.delete(documentName);
+          } catch (err) {
+            this.logger.log('Contributors error:' + err?.['message']);
+          }
+
+          // Обновляем блок
+          await trx
+            .updateTable('blocks')
+            .set({
+              content: contentToStore,
+              yjsSnapshot,
+              //textContent,
+              //lastUpdatedById: context.user.id,
+              //contributorIds: contributorIds,
+              //updatedAt: new Date(),
+            })
+            .where('id', '=', blockId)
+            .execute();
+
+          this.logger.debug(`Block updated: ${blockId}`);
+        });
+      } catch (err) {
+        this.logger.error(`Failed to update block ${blockId}`, err);
+      }
+
+      if (block) {
+        this.eventEmitter.emit('collab.block.updated', {
+          block: {
+            ...block,
+            content: contentToStore,
+            lastUpdatedById: context.user.id,
+          },
+        });
+
+        // Mentions (по желанию, если блоки тоже могут содержать ссылки)
+        // Проверяем валидность контента перед извлечением mentions
+        if (contentToStore && typeof contentToStore === 'object' && contentToStore.type) {
+          try {
+            const mentions = extractMentions(contentToStore);
+            const pageMentions = extractPageMentions(mentions);
+
+            if (pageMentions.length > 0) {
+              await this.generalQueue.add(QueueJob.BLOCK_BACKLINKS, {
+                blockId,
+                pageId: block.pageId,
+                workspaceId: block.workspaceId,
+                mentions: pageMentions,
+              });
+            }
+          } catch (err) {
+            this.logger.warn(`Failed to extract mentions from block ${blockId}:`, err);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to process Y.js document for block ${blockId}:`, error);
     }
   }
 

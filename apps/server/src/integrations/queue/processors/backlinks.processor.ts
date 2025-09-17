@@ -23,7 +23,7 @@ export class BacklinksProcessor extends WorkerHost implements OnModuleDestroy {
       const { pageId, mentions, workspaceId } = job.data;
 
       switch (job.name) {
-        case QueueJob.PAGE_BACKLINKS:
+        case QueueJob.BLOCK_BACKLINKS:
           {
             await executeTx(this.db, async (trx) => {
               const existingBacklinks = await trx
@@ -106,14 +106,14 @@ export class BacklinksProcessor extends WorkerHost implements OnModuleDestroy {
 
   @OnWorkerEvent('active')
   onActive(job: Job) {
-    if (job.name === QueueJob.PAGE_BACKLINKS) {
+    if (job.name === QueueJob.BLOCK_BACKLINKS) {
       this.logger.debug(`Processing ${job.name} job`);
     }
   }
 
   @OnWorkerEvent('failed')
   onError(job: Job) {
-    if (job.name === QueueJob.PAGE_BACKLINKS) {
+    if (job.name === QueueJob.BLOCK_BACKLINKS) {
       this.logger.error(
         `Error processing ${job.name} job. Reason: ${job.failedReason}`,
       );
@@ -122,7 +122,7 @@ export class BacklinksProcessor extends WorkerHost implements OnModuleDestroy {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job) {
-    if (job.name === QueueJob.PAGE_BACKLINKS) {
+    if (job.name === QueueJob.BLOCK_BACKLINKS) {
       this.logger.debug(`Completed ${job.name} job`);
     }
   }

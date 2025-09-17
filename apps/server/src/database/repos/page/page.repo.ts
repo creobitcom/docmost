@@ -43,9 +43,25 @@ interface FindPageOptions {
   trx?: KyselyTransaction;
 }
 
-@Injectable()
 export class PageRepo {
-  private readonly logger = new Logger('PageRepo');
+  private readonly logger = new Logger(PageRepo.name);
+
+  // Функция для проверки наличия текста в параграфе
+  private hasTextContent(paragraph) {
+    if (!paragraph || !paragraph.content) return false;
+    
+    // Проверяем, есть ли текстовые узлы с содержимым
+    for (const node of paragraph.content) {
+      if (node.type === 'text' && node.text && node.text.trim().length > 0) {
+        return true;
+      }
+      // Рекурсивно проверяем вложенные узлы
+      if (node.content && this.hasTextContent(node)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private readonly baseFields: Array<keyof Page> = [
     'id',
@@ -181,14 +197,50 @@ export class PageRepo {
     const db = dbOrTx(this.db, trx);
     this.logger.debug('Inserting block: ', block);
 
+    // Проверяем, не содержит ли блок несколько параграфов
+    let blockContent = block;
+    if (block && typeof block === 'object' && 
+        block.type === 'doc' && Array.isArray(block.content)) {
+      const paragraphs = block.content.filter(node => 
+        typeof node === 'object' && node !== null && node.type === 'paragraph'
+      );
+      if (paragraphs.length > 1) {
+        // Берем только первый параграф
+        blockContent = {
+          ...block,
+          content: [paragraphs[0]]
+        };
+        this.logger.debug(`Multiple paragraphs detected in block ${blockId}, using only first paragraph`);
+      } else if (paragraphs.length === 1) {
+        // Проверяем, что параграф не пустой
+        const paragraph = paragraphs[0];
+        if (!this.hasTextContent(paragraph)) {
+          // Если параграф пустой, пропускаем создание блока
+          this.logger.debug(`Empty paragraph detected in block ${blockId}, skipping creation`);
+          return;
+        }
+      }
+    }
+
+    // Получаем следующий position для страницы
+    const lastBlock = await db
+      .selectFrom('blocks')
+      .select(['position'])
+      .where('pageId', '=', pageId)
+      .orderBy('position', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+
+    const nextPosition = lastBlock ? lastBlock.position + 1 : 0;
+
     await db
       .insertInto('blocks')
       .values({
         id: blockId,
         pageId: pageId,
-        position: block?.attrs.position,
-        content: block,
-        blockType: block?.type,
+        position: blockContent?.attrs?.position ?? nextPosition,
+        content: blockContent,
+        blockType: blockContent?.type,
         createdAt: new Date(),
         updatedAt: new Date(),
         stateHash: calculatedHash,
@@ -205,14 +257,55 @@ export class PageRepo {
     const db = dbOrTx(this.db, trx);
     this.logger.debug('Updating block: ', block);
 
+    // Проверяем, не содержит ли блок несколько параграфов
+    let blockContent = block;
+    if (block && typeof block === 'object' && 
+        block.type === 'doc' && Array.isArray(block.content)) {
+      const paragraphs = block.content.filter(node => 
+        typeof node === 'object' && node !== null && node.type === 'paragraph'
+      );
+      if (paragraphs.length > 1) {
+        // Берем только первый параграф
+        blockContent = {
+          ...block,
+          content: [paragraphs[0]]
+        };
+        this.logger.debug(`Multiple paragraphs detected in block ${blockId}, using only first paragraph`);
+      } else if (paragraphs.length === 1) {
+        // Проверяем, что параграф не пустой
+        const paragraph = paragraphs[0];
+        if (!this.hasTextContent(paragraph)) {
+          // Если параграф пустой, пропускаем обновление блока
+          this.logger.debug(`Empty paragraph detected in block ${blockId}, skipping update`);
+          return;
+        }
+      }
+    }
+
+    // Получаем текущий блок для сохранения position
+    const existingBlock = await db
+      .selectFrom('blocks')
+      .select(['position'])
+      .where('id', '=', blockId)
+      .executeTakeFirst();
+
+    const updateData: any = {
+      content: blockContent,
+      updatedAt: new Date(),
+      stateHash: calculatedHash,
+    };
+
+    // Обновляем position только если он предоставлен и не null
+    if (blockContent?.attrs?.position !== undefined && blockContent?.attrs?.position !== null) {
+      updateData.position = blockContent.attrs.position;
+    } else if (existingBlock?.position !== undefined) {
+      // Если position не предоставлен, сохраняем существующий
+      updateData.position = existingBlock.position;
+    }
+
     await db
       .updateTable('blocks')
-      .set({
-        position: block?.attrs.position,
-        content: block,
-        updatedAt: new Date(),
-        stateHash: calculatedHash,
-      })
+      .set(updateData)
       .where('id', '=', blockId)
       .execute();
   }
@@ -233,8 +326,22 @@ export class PageRepo {
       .values(insertablePage)
       .returning(this.baseFields)
       .executeTakeFirst();
-
   }
+
+  async updatePage(
+    updatablePage: UpdatablePage,
+    pageId: string,
+    trx?: KyselyTransaction,
+  ): Promise<UpdateResult> {
+    const db = dbOrTx(this.db, trx);
+
+    return db
+      .updateTable('pages')
+      .set(updatablePage)
+      .where('id', '=', pageId)
+      .executeTakeFirst();
+  }
+
   async getLatestPageBySpaceId(spaceId: string): Promise<Page | null> {
     const page = await this.db
       .selectFrom('pages')
@@ -509,14 +616,31 @@ export class PageRepo {
 
     // Process blocks sequentially to maintain order and avoid race conditions
     for (const [position, block] of content.content.entries()) {
+      // Проверяем, не содержит ли блок несколько параграфов
+      let blockContent = block;
+      if (block && typeof block === 'object' && 
+          block.type === 'doc' && Array.isArray(block.content)) {
+        const paragraphs = block.content.filter(node => 
+          typeof node === 'object' && node !== null && node.type === 'paragraph'
+        );
+        if (paragraphs.length > 1) {
+          // Берем только первый параграф
+          blockContent = {
+            ...block,
+            content: [paragraphs[0]]
+          };
+          this.logger.debug(`Multiple paragraphs detected in content insertion for position ${position}, using only first paragraph`);
+        }
+      }
+      
       await db
         .insertInto('blocks')
         .values({
           pageId,
-          blockType: block.type,
-          content: block,
-          stateHash: calculateBlockHash(block),
-          position,
+          blockType: blockContent.type,
+          content: blockContent,
+          stateHash: calculateBlockHash(blockContent),
+          position: position, // Используем индекс массива как position
         })
         .execute();
     }
@@ -525,7 +649,14 @@ export class PageRepo {
   async findPagesByIdsWithSpace(pageIds: string[], workspaceId: string) {
     return this.db
       .selectFrom('pages')
-      .select(['id', 'slugId', 'title', 'creatorId', 'spaceId', 'workspaceId'])
+      .select((eb) => [
+        'id',
+        'slugId',
+        'title',
+        eb.fn.coalesce(sql`creator_id`, sql`NULL`).as('creatorId'),
+        'spaceId',
+        'workspaceId'
+      ])
       .select((eb) => this.withSpace(eb))
       .where('id', 'in', pageIds)
       .where('workspaceId', '=', workspaceId)
@@ -575,7 +706,7 @@ export class PageRepo {
 
     const query = db
       .selectFrom('pages')
-      .select([
+      .select((eb) => [
         'id',
         'slugId',
         'title',
@@ -602,7 +733,7 @@ export class PageRepo {
     const searchQuery = tsquery(query.trim() + '*');
     return this.db
       .selectFrom('pages')
-      .select([
+      .select((eb) => [
         'id',
         'slugId',
         'title',
