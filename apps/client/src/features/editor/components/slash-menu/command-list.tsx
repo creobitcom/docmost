@@ -38,7 +38,9 @@ const CommandList = ({
     (index: number) => {
       const item = flatItems[index];
       if (item) {
+        console.log('🎯 [CommandList] Selecting item:', item.title, 'at index:', index);
         command(item);
+        console.log('✅ [CommandList] Command executed for:', item.title);
       }
     },
     [command, flatItems],
@@ -49,6 +51,7 @@ const CommandList = ({
     const onKeyDown = (e: KeyboardEvent) => {
       if (navigationKeys.includes(e.key)) {
         e.preventDefault();
+        e.stopPropagation();
 
         if (e.key === "ArrowUp") {
           setSelectedIndex(
@@ -63,6 +66,7 @@ const CommandList = ({
         }
 
         if (e.key === "Enter") {
+          console.log('🎯 [CommandList] Enter pressed, selecting item at index:', selectedIndex);
           selectItem(selectedIndex);
           return true;
         }
@@ -86,22 +90,25 @@ const CommandList = ({
   }, [selectedIndex]);
 
   return flatItems.length > 0 ? (
-    <Paper id="slash-command" shadow="md" p="xs" withBorder>
+    <Paper id="slash-command" className="slash-menu" shadow="md" p="xs" withBorder>
       <ScrollArea viewportRef={viewportRef} h={350} w={270} scrollbarSize={8}>
         {Object.entries(items).map(([category, categoryItems]) => (
           <div key={category}>
             <Text c="dimmed" mb={4} fw={500} tt="capitalize">
               {category}
             </Text>
-            {categoryItems.map((item: SlashMenuItemType, index: number) => (
-              <UnstyledButton
-                data-item-index={index}
-                key={index}
-                onClick={() => selectItem(index)}
-                className={clsx(classes.menuBtn, {
-                  [classes.selectedItem]: index === selectedIndex,
-                })}
-              >
+            {categoryItems.map((item: SlashMenuItemType, categoryIndex: number) => {
+              // Находим глобальный индекс элемента в flatItems
+              const globalIndex = flatItems.findIndex(flatItem => flatItem === item);
+              return (
+                <UnstyledButton
+                  data-item-index={globalIndex}
+                  key={categoryIndex}
+                  onClick={() => selectItem(globalIndex)}
+                  className={clsx(classes.menuBtn, {
+                    [classes.selectedItem]: globalIndex === selectedIndex,
+                  })}
+                >
                 <Group>
                   <ActionIcon
                     variant="default"
@@ -121,7 +128,8 @@ const CommandList = ({
                   </div>
                 </Group>
               </UnstyledButton>
-            ))}
+              );
+            })}
           </div>
         ))}
       </ScrollArea>

@@ -402,15 +402,26 @@ export class PageService {
   }
 
   async saveBlocksForPage(pageId: string, blocks: any[], userId: string) {
+    console.log('🔄 [PageService] saveBlocksForPage called:', {
+      pageId,
+      userId,
+      blocksCount: blocks?.length || 0
+    });
+
     await this.db.transaction().execute(async (trx) => {
       const existingBlocks = await this.pageRepo.getExistingPageBlocks(pageId, trx);
+      console.log('📦 [PageService] Existing blocks:', existingBlocks.map(b => ({ id: b.id, position: b.position })));
+      
       const existingBlocksMap = new Map(existingBlocks.map((b) => [b.id, b]));
 
       const incomingIds = new Set((blocks || []).map((b: any) => b.blockId).filter(Boolean));
       const toDelete = existingBlocks.filter((b) => !incomingIds.has(b.id));
 
+      console.log('🗑️ [PageService] Blocks to delete:', toDelete.map(b => ({ id: b.id, position: b.position })));
+
       // Удаляем блоки, которых нет в новом списке
       for (const removed of toDelete) {
+        console.log('🗑️ [PageService] Deleting block:', removed.id);
         await this.pageRepo.deleteBlock(removed.id, trx);
       }
 
@@ -485,11 +496,17 @@ export class PageService {
         const existed = blockId ? existingBlocksMap.get(blockId) : undefined;
 
         if (!existed) {
+          console.log('➕ [PageService] Creating new block:', blockId);
           await this.pageRepo.createBlock(blockNode, blockId, pageId, calculatedHash, trx);
         } else if (existed.stateHash !== calculatedHash) {
+          console.log('🔄 [PageService] Updating existing block:', blockId);
           await this.pageRepo.updateExistingBlock(blockNode, blockId, calculatedHash, trx);
+        } else {
+          console.log('⏭️ [PageService] Block unchanged, skipping:', blockId);
         }
       }
+      
+      console.log('✅ [PageService] saveBlocksForPage completed successfully');
     });
   }
 

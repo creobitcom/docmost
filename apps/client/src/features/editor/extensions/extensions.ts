@@ -3,6 +3,11 @@ import { Placeholder } from "@tiptap/extension-placeholder";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
+import { BulletList } from "@tiptap/extension-bullet-list";
+import { ListItem } from "@tiptap/extension-list-item";
+import { OrderedList } from "@tiptap/extension-ordered-list";
+import { EnhancedTaskItem } from "./enhanced-task-item-extension.tsx";
+import { EnhancedListItem } from "./enhanced-list-item-extension.tsx";
 import { Underline } from "@tiptap/extension-underline";
 import { Superscript } from "@tiptap/extension-superscript";
 import SubScript from "@tiptap/extension-subscript";
@@ -46,7 +51,9 @@ import {
 import { IUser } from "@/features/user/types/user.types.ts";
 import MathInlineView from "@/features/editor/components/math/math-inline.tsx";
 import MathBlockView from "@/features/editor/components/math/math-block.tsx";
-import GlobalDragHandle from "tiptap-extension-global-drag-handle";
+// Убрали неиспользуемый GlobalDragHandle
+// import GlobalDragHandle from "tiptap-extension-global-drag-handle";
+import { RealElementDragHandle } from "./real-element-drag-handle";
 import { Youtube } from "@tiptap/extension-youtube";
 import ImageView from "@/features/editor/components/image/image-view.tsx";
 import CalloutView from "@/features/editor/components/callout/callout-view.tsx";
@@ -77,6 +84,8 @@ import { BlockId } from "@/features/editor/extensions/block-id";
 import { BlockPosition } from "@/features/editor/extensions/block-position";
 import { BlockTypes } from "@/features/editor/utils/block-types";
 import { SmartEnter } from "@/features/editor/extensions/smart-enter";
+import { SmartListHandler } from "@/features/editor/extensions/smart-list-handler";
+import { ComprehensiveKeyboardHandler } from "@/features/editor/extensions/comprehensive-keyboard-handler";
 import Document from "@tiptap/extension-document";
 
 
@@ -99,6 +108,9 @@ export const mainExtensions = [
   StarterKit.configure({
     document: false,
     history: false,
+    bulletList: false, // Отключаем, так как используем отдельные расширения
+    orderedList: false, // Отключаем, так как используем отдельные расширения
+    listItem: false, // Отключаем, так как используем отдельные расширения
     dropcursor: {
       width: 3,
       color: "#70CFF8",
@@ -126,10 +138,17 @@ export const mainExtensions = [
     showOnlyWhenEditable: true,
   }),
   TextAlign.configure({ types: ["heading", "paragraph"] }),
+  BulletList,
+  ListItem,
+  OrderedList,
   TaskList,
   TaskItem.configure({
     nested: true,
   }),
+  // EnhancedTaskItem.configure({
+  //   nested: true,
+  // }), // Временно отключено из-за дублирования имени 'taskItem'
+  // EnhancedListItem, // Временно отключено для тестирования списков
   Underline,
   LinkExtension.configure({
     openOnClick: false,
@@ -140,11 +159,16 @@ export const mainExtensions = [
     multicolor: true,
   }),
   Typography,
-  TrailingNode,
-  GlobalDragHandle,
+  // TrailingNode.configure({
+  //   notAfter: ['paragraph', 'taskList', 'bulletList', 'orderedList', 'taskItem', 'listItem'],
+  //   node: 'paragraph'
+  // }),
+  RealElementDragHandle,
   TextStyle,
   Color,
   SlashCommand,
+  SmartListHandler,
+  ComprehensiveKeyboardHandler,
   EmojiCommand,
   Comment.configure({
     HTMLAttributes: {

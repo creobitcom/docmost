@@ -70,15 +70,6 @@ const CommandGroups: SlashMenuGroupedItemsType = {
       },
     },
     {
-      title: "To-do list",
-      description: "Track tasks with a to-do list.",
-      searchTerms: ["todo", "task", "list", "check", "checkbox"],
-      icon: IconCheckbox,
-      command: ({ editor, range }: CommandProps) => {
-        editor.chain().focus().deleteRange(range).toggleTaskList().run();
-      },
-    },
-    {
       title: "Heading 1",
       description: "Big section heading.",
       searchTerms: ["title", "big", "large"],
@@ -121,6 +112,15 @@ const CommandGroups: SlashMenuGroupedItemsType = {
       },
     },
     {
+      title: "To-do list",
+      description: "Track tasks with a to-do list.",
+      searchTerms: ["todo", "task", "list", "check", "checkbox"],
+      icon: IconCheckbox,
+      command: ({ editor, range }: CommandProps) => {
+        editor.chain().focus().deleteRange(range).toggleTaskList().run();
+      },
+    },
+    {
       title: "Bullet list",
       description: "Create a simple bullet list.",
       searchTerms: ["unordered", "point", "list"],
@@ -135,7 +135,11 @@ const CommandGroups: SlashMenuGroupedItemsType = {
       searchTerms: ["numbered", "ordered", "list"],
       icon: IconListNumbers,
       command: ({ editor, range }: CommandProps) => {
+        console.log('🎯 [SlashMenu] Numbered list command executed');
+        console.log('🎯 [SlashMenu] Editor:', editor);
+        console.log('🎯 [SlashMenu] Range:', range);
         editor.chain().focus().deleteRange(range).toggleOrderedList().run();
+        console.log('✅ [SlashMenu] Numbered list command completed');
       },
     },
     {

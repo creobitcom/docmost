@@ -64,3 +64,45 @@
   pointer-events: none;
   user-select: text;
 }
+
+/* Скрываем все плейсхолдеры по умолчанию */
+.ProseMirror .is-editor-empty:first-child::before,
+.ProseMirror .is-empty::before,
+.ProseMirror-placeholder,
+[data-placeholder] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Показываем плейсхолдер только когда блок в фокусе и пустой */
+.ProseMirror:focus .is-editor-empty:first-child::before,
+.ProseMirror:focus .is-empty::before,
+.ProseMirror:focus .ProseMirror-placeholder,
+.ProseMirror:focus [data-placeholder] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Дополнительные селекторы для разных реализаций плейсхолдера */
+.ProseMirror:focus p:empty::before,
+.ProseMirror:focus p.is-empty::before,
+.ProseMirror:focus .ProseMirror p:empty::before,
+.ProseMirror:focus .ProseMirror p.is-empty::before {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Принудительное скрытие плейсхолдера при потере фокуса */
+.ProseMirror:not(:focus) .is-editor-empty:first-child::before,
+.ProseMirror:not(:focus) .is-empty::before,
+.ProseMirror:not(:focus) .ProseMirror-placeholder,
+.ProseMirror:not(:focus) [data-placeholder],
+.ProseMirror:not(:focus) p:empty::before,
+.ProseMirror:not(:focus) p.is-empty::before {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}

@@ -36,6 +36,15 @@ const SlashCommand = Command.configure({
   suggestion: {
     items: getSuggestionItems,
     render: renderItems,
+    onStart: (props) => {
+      console.log('🎯 [SlashCommand] Menu started:', props);
+    },
+    onUpdate: (props) => {
+      console.log('🔄 [SlashCommand] Menu updated:', props);
+    },
+    onExit: () => {
+      console.log('🏁 [SlashCommand] Menu exited');
+    },
   },
 });
 

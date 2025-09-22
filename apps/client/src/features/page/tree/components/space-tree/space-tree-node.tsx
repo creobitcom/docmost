@@ -1,7 +1,7 @@
 import { NodeApi, NodeRendererProps } from "react-arborist";
 import { useAtom } from "jotai";
 import { useUpdatePageMutation } from "@/features/page/queries/page-query.ts";
-import { useRef } from "react";
+import { useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import classes from "@/features/page/tree/styles/tree.module.css";
 import { IconFileDescription, IconLink } from "@tabler/icons-react";
@@ -91,10 +91,39 @@ export function Node({
     }
   }
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
+    console.log('[SpaceTree Node] handleClick called:', {
+      nodeId: node.data.id,
+      slugId: node.data.slugId,
+      name: node.data.name,
+      spaceSlug
+    });
+    
+    if (!spaceSlug) {
+      console.error('[SpaceTree Node] spaceSlug is undefined!');
+      return;
+    }
+    
     const pageUrl = buildPageUrl(spaceSlug, node.data.slugId, node.data.name);
-    navigate(pageUrl);
-  };
+    console.log('[SpaceTree Node] Navigating to:', pageUrl);
+    console.log('[SpaceTree Node] Current location:', window.location.pathname);
+    
+    // Дебаунс для предотвращения множественных кликов
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    
+    timerRef.current = setTimeout(() => {
+      // Попробуем принудительную навигацию
+      if (window.location.pathname !== pageUrl) {
+        console.log('[SpaceTree Node] Using window.location.href for navigation');
+        window.location.href = pageUrl;
+      } else {
+        console.log('[SpaceTree Node] Already on the same page, forcing reload');
+        window.location.reload();
+      }
+    }, 100);
+  }, [spaceSlug, node.data.slugId, node.data.name, node.data.id]);
 
   const handleUpdateNodeIcon = (nodeId: string, newIcon: string) => {
     const updatedTree = updateTreeNodeIcon(treeData, nodeId, newIcon);
@@ -155,7 +184,16 @@ export function Node({
         style={style}
         className={clsx(classes.node, node.state)}
         ref={dragHandle}
-        onClick={handleClick}
+        onClick={(e) => {
+          console.log('[SpaceTree Node] onClick event triggered:', {
+            nodeId: node.data.id,
+            event: e,
+            target: e.target,
+            currentTarget: e.currentTarget,
+            dragHandle: dragHandle
+          });
+          handleClick();
+        }}
         onMouseEnter={prefetchPage}
         onMouseLeave={cancelPagePrefetch}
       >
@@ -174,7 +212,20 @@ export function Node({
             removeEmojiAction={handleRemoveEmoji}
           />
         </div>
-        <span className={classes.text}>{node.data.name || t("untitled")}</span>
+        <span 
+          className={classes.text}
+          onClick={(e) => {
+            console.log('[SpaceTree Node] Text span clicked:', {
+              nodeId: node.data.id,
+              event: e
+            });
+            e.stopPropagation();
+            handleClick();
+          }}
+          style={{ cursor: 'pointer' }}
+        >
+          {node.data.name || t("untitled")}
+        </span>
         {node.data.isSynced && (
           <div className={classes.syncIndicator} title="Synced">
             <IconLink size={18} />

@@ -1,6 +1,9 @@
 ul[data-type="taskList"] {
     list-style: none;
-    padding: 0;
+    padding: 0 !important; /* Базовый отступ как у всех списков */
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+    margin-left: 0;
 
     p {
         margin: 0;
@@ -19,9 +22,12 @@ ul[data-type="taskList"] {
             flex: 1 1 auto;
         }
 
-        ul li,
-        ol li {
-            display: list-item;
+        /* Вложенные списки в task list должны сохранять flex-структуру для правильного центрирования */
+        /* Но только для элементов, которые находятся внутри task list */
+        ul[data-type="taskList"] ul li,
+        ul[data-type="taskList"] ol li {
+            display: flex;
+            align-items: flex-start;
         }
 
         ul[data-type="taskList"] > li {
@@ -34,5 +40,221 @@ ul[data-type="taskList"] li > label input[type="checkbox"] {
     width: 1em;
     height: 1em;
     cursor: pointer;
+}
+
+/* Стили для enhanced list items */
+.enhanced-list-item-task {
+    list-style: none !important;
+}
+
+.enhanced-list-item-normal {
+    /* Используем flex-позиционирование как в task list */
+    display: flex;
+    align-items: flex-start; /* Оригинальное выравнивание */
+    list-style: none;
+    position: relative;
+}
+
+/* Стили для контейнера маркеров */
+.list-marker {
+    flex: 0 0 auto;
+    width: 0.3em; /* Минимально возможный размер контейнера */
+    height: 0.3em; /* Минимально возможный размер контейнера */
+    margin-right: 0.5rem; /* Оригинальный отступ */
+    margin-top: 0.125rem; /* Оригинальный отступ сверху */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem; /* Большой размер шрифта */
+    line-height: 1;
+    user-select: none;
+    color: white !important; /* Белый цвет */
+    font-weight: bold !important; /* Жирный шрифт */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8) !important; /* Тень для видимости */
+    background: transparent !important; /* Прозрачный фон */
+    overflow: visible; /* Позволяем маркеру выходить за границы контейнера */
+}
+
+/* Сбрасываем стандартные маркеры для всех enhanced list items */
+.enhanced-list-item-normal {
+    list-style: none !important;
+}
+
+/* Маркеры для bullet list - система уровней как в Docmost */
+/* Поддерживаем маркеры bullet list в любом контейнере */
+.enhanced-list-item-bullet .list-marker::before {
+    content: '•'; /* Уровень 1: заполненный круг */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+/* Fallback для случаев, когда классы не применяются */
+.enhanced-list-item-normal .list-marker::before {
+    content: '•'; /* Базовый bullet маркер */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+.enhanced-list-item-bullet-level-2 .list-marker::before {
+    content: '◦'; /* Уровень 2: пустой круг */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+.enhanced-list-item-bullet-level-3 .list-marker::before {
+    content: '▪'; /* Уровень 3: заполненный квадрат */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+.enhanced-list-item-bullet-level-4 .list-marker::before {
+    content: '▫'; /* Уровень 4: пустой квадрат */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+.enhanced-list-item-bullet-level-5 .list-marker::before {
+    content: '•'; /* Уровень 5+: возвращаемся к заполненному кругу */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+/* Маркеры для ordered list - система уровней как в Docmost */
+/* Поддерживаем маркеры ordered list в любом контейнере */
+.enhanced-list-item-ordered .list-marker::before {
+    content: counter(list-item, decimal) '.'; /* Уровень 1: 1., 2., 3. */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+.enhanced-list-item-ordered-level-2 .list-marker::before {
+    content: counter(list-item, lower-alpha) '.'; /* Уровень 2: a., b., c. */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+.enhanced-list-item-ordered-level-3 .list-marker::before {
+    content: counter(list-item, lower-roman) '.'; /* Уровень 3: i., ii., iii. */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+.enhanced-list-item-ordered-level-4 .list-marker::before {
+    content: counter(list-item, upper-alpha) '.'; /* Уровень 4: A., B., C. */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+.enhanced-list-item-ordered-level-5 .list-marker::before {
+    content: counter(list-item, decimal) '.'; /* Уровень 5+: возвращаемся к 1., 2., 3. */
+    color: white; /* Только изменение цвета */
+    font-weight: bold; /* Только изменение веса шрифта */
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8); /* Только добавление тени */
+}
+
+/* Система счетчиков для многоуровневых ordered lists */
+ol {
+    counter-reset: list-item;
+}
+
+ol ol {
+    counter-reset: list-item;
+}
+
+ol ol ol {
+    counter-reset: list-item;
+}
+
+ol ol ol ol {
+    counter-reset: list-item;
+}
+
+ol .enhanced-list-item-normal {
+    counter-increment: list-item;
+}
+
+/* Сброс счетчиков для вложенных списков */
+ol ol .enhanced-list-item-normal {
+    counter-increment: list-item;
+}
+
+ol ol ol .enhanced-list-item-normal {
+    counter-increment: list-item;
+}
+
+ol ol ol ol .enhanced-list-item-normal {
+    counter-increment: list-item;
+}
+
+/* Отступы для всех списков - выравниваем по task list */
+/* Переопределяем стили из core.css для всех типов списков */
+.ProseMirror ul,
+.ProseMirror ol {
+    padding: 0 !important; /* Убираем дополнительный padding, чтобы отступ был как у параграфов */
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+    margin-left: 0;
+}
+
+/* Уровень 1 - базовый отступ (отступ от края страницы задается в core.css) */
+.enhanced-list-item-bullet,
+.enhanced-list-item-ordered,
+.enhanced-list-item-normal {
+    padding-left: 0; /* Не добавляем дополнительных отступов */
+}
+
+/* Уровень 2 - отступ 1.5rem */
+.enhanced-list-item-bullet-level-2,
+.enhanced-list-item-ordered-level-2 {
+    padding-left: 1.5rem;
+}
+
+/* Уровень 3 - отступ 3rem */
+.enhanced-list-item-bullet-level-3,
+.enhanced-list-item-ordered-level-3 {
+    padding-left: 3rem;
+}
+
+/* Уровень 4 - отступ 4.5rem */
+.enhanced-list-item-bullet-level-4,
+.enhanced-list-item-ordered-level-4 {
+    padding-left: 4.5rem;
+}
+
+/* Уровень 5+ - отступ 6rem */
+.enhanced-list-item-bullet-level-5,
+.enhanced-list-item-ordered-level-5 {
+    padding-left: 6rem;
+}
+
+/* Отступы для task list на разных уровнях - выравниваем с остальными списками */
+ul[data-type="taskList"] > li {
+    padding-left: 0; /* Уровень 1 - отступ от края страницы задается в core.css */
+}
+
+ul[data-type="taskList"] ul[data-type="taskList"] > li {
+    padding-left: 1.5rem; /* Уровень 2 */
+}
+
+ul[data-type="taskList"] ul[data-type="taskList"] ul[data-type="taskList"] > li {
+    padding-left: 3rem; /* Уровень 3 */
+}
+
+ul[data-type="taskList"] ul[data-type="taskList"] ul[data-type="taskList"] ul[data-type="taskList"] > li {
+    padding-left: 4.5rem; /* Уровень 4 */
+}
+
+ul[data-type="taskList"] ul[data-type="taskList"] ul[data-type="taskList"] ul[data-type="taskList"] ul[data-type="taskList"] > li {
+    padding-left: 6rem; /* Уровень 5+ */
 }
 

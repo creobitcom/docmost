@@ -172,15 +172,15 @@ export function SearchMenu({ opened, onClose, pageId, blockId: externalBlockId }
           const finalHasAdminRights = hasOwnerRole || hasAdminRole || hasSpaceAdminRights;
           setHasAdminRights(finalHasAdminRights);
 
-          console.log('[SearchMenu] Admin rights check:', {
-            userId: currentUser?.user?.id,
-            userRole,
-            hasOwnerRole,
-            hasAdminRole,
-            hasSpaceAdminRights,
-            finalHasAdminRights,
-            isPageCreator: creatorId === currentUser?.user?.id
-          });
+          // console.log('[SearchMenu] Admin rights check:', {
+          //   userId: currentUser?.user?.id,
+          //   userRole,
+          //   hasOwnerRole,
+          //   hasAdminRole,
+          //   hasSpaceAdminRights,
+          //   finalHasAdminRights,
+          //   isPageCreator: creatorId === currentUser?.user?.id
+          // });
 
           // Получаем информацию о странице для копирования ссылки
           setSpaceSlug(pageInfo?.spaceSlug);
@@ -207,10 +207,7 @@ export function SearchMenu({ opened, onClose, pageId, blockId: externalBlockId }
 
     // Получаем ID текущего блока: сначала из props, иначе из выделения
   const getBlockId = (): string | null => {
-    console.log('[SearchMenu] getBlockId called, externalBlockId:', externalBlockId);
-
     if (externalBlockId) {
-      console.log('[SearchMenu] Using externalBlockId:', externalBlockId);
       return externalBlockId;
     }
 
@@ -421,12 +418,6 @@ export function SearchMenu({ opened, onClose, pageId, blockId: externalBlockId }
       {/* Основной контент модалки - показывается для владельцев, создателей или администраторов */}
       {(() => {
         const shouldShowContent = userBlockPermission === 'owner' || isPageCreator || hasAdminRights;
-        console.log('[SearchMenu] Content visibility check:', {
-          userBlockPermission,
-          isPageCreator,
-          hasAdminRights,
-          shouldShowContent
-        });
         return shouldShowContent;
       })() && (
         <>

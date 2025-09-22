@@ -92,19 +92,37 @@ export class PageController {
     @Body() dto: UpdatePageBlocksDto,
     @AuthUser() user: User,
   ) {
-    console.log('updateBlocksForPage pageId:', pageId, 'body:', dto);
+    console.log('🔄 [PageController] updateBlocksForPage called:', {
+      pageId,
+      userId: user.id,
+      blocksCount: dto.blocks?.length || 0,
+      blocks: dto.blocks?.map(b => ({
+        blockId: b.blockId,
+        blockType: b.blockType,
+        pageId: b.pageId,
+        hasContent: !!b.content
+      }))
+    });
 
     const page = await this.pageRepo.findById(pageId);
     if (!page) {
+      console.error('❌ [PageController] Page not found:', pageId);
       throw new NotFoundException('Page not found');
     }
 
     const pageAbility = await this.pageAbility.createForUser(user, pageId);
     if (pageAbility.cannot(PageCaslAction.Edit, PageCaslSubject.Page)) {
+      console.error('❌ [PageController] User does not have edit permission:', {
+        pageId,
+        userId: user.id
+      });
       throw new ForbiddenException();
     }
 
+    console.log('✅ [PageController] Calling saveBlocksForPage...');
     await this.pageService.saveBlocksForPage(pageId, dto.blocks, user.id);
+    console.log('✅ [PageController] saveBlocksForPage completed successfully');
+    
     return { success: true };
   }
 
@@ -127,20 +145,45 @@ export class PageController {
  // В PageController.getAllPageBlocks()
 @Get(':id/blocks')
 async getAllPageBlocks(@Param('id') pageId: string, @AuthUser() user: User) {
+  console.log('🔍 [PageController] getAllPageBlocks called:', {
+    pageId,
+    userId: user.id
+  });
+
   const page = await this.pageRepo.findById(pageId);
+  if (!page) {
+    console.error('❌ [PageController] Page not found:', pageId);
+    throw new NotFoundException('Page not found');
+  }
+
+  console.log('📄 [PageController] Page found:', {
+    pageId: page.id,
+    isSynced: page.isSynced,
+    title: page.title
+  });
 
   if (page.isSynced) {
+    console.log('🔄 [PageController] Page is synced, getting blocks from origin page');
     const syncPage = await this.syncPageService.findByReferenceId(pageId);
     // Получаем блоки из origin страницы
     const result = await this.blockPermissionService.getAccessiblePageBlocks(
       syncPage.originPageId,
       user.id
     );
+    console.log('✅ [PageController] Synced blocks loaded:', {
+      blocksCount: result?.length || 0,
+      blocks: result?.map(b => ({ id: b.id, blockType: b.blockType, position: b.position }))
+    });
     return { data: result, success: true };
   }
 
   // Обычная логика
+  console.log('📦 [PageController] Getting blocks for regular page');
   const result = await this.blockPermissionService.getAccessiblePageBlocks(pageId, user.id);
+  console.log('✅ [PageController] Regular blocks loaded:', {
+    blocksCount: result?.length || 0,
+    blocks: result?.map(b => ({ id: b.id, blockType: b.blockType, position: b.position }))
+  });
   return { data: result, success: true };
 }
 

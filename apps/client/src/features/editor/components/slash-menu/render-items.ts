@@ -11,12 +11,14 @@ const renderItems = () => {
       editor: ReturnType<typeof useEditor>;
       clientRect: DOMRect;
     }) => {
+      console.log('🎯 [RenderItems] onStart called with props:', props);
       component = new ReactRenderer(CommandList, {
         props,
         editor: props.editor,
       });
 
       if (!props.clientRect) {
+        console.log('⚠️ [RenderItems] No clientRect provided');
         return;
       }
 

@@ -1,0 +1,151 @@
+/* Debug Drag Drop Styles */
+
+.debug-drag-handle {
+  position: absolute;
+  left: -30px;
+  top: 0px;
+  width: 20px;
+  height: 20px;
+  cursor: grab;
+  background: #ef4444;
+  border: 2px solid #ffffff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: white;
+  z-index: 9999;
+  user-select: none;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+  pointer-events: auto;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.debug-drag-handle:hover {
+  opacity: 1;
+  background: #dc2626;
+}
+
+.debug-drag-handle:active {
+  cursor: grabbing;
+  background: #b91c1c;
+}
+
+.debug-drag-handle.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+}
+
+/* Debug Drop Indicator */
+
+.debug-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  border-radius: 1px;
+  z-index: 10000;
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+  transition: all 0.2s ease;
+}
+
+.debug-drop-indicator-top {
+  top: 0;
+}
+
+.debug-drop-indicator-bottom {
+  bottom: 0;
+}
+
+.debug-drop-indicator-inside {
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(239, 68, 68, 0.3);
+  height: 4px;
+}
+
+/* Debug Drop Zone */
+
+.debug-drop-zone {
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px dashed #ef4444;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.debug-drop-zone-active {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #dc2626;
+}
+
+/* Debug Dragging States */
+
+.debug-element-dragging {
+  cursor: grabbing !important;
+}
+
+.debug-block-dragging {
+  cursor: grabbing !important;
+}
+
+/* Global Debug Drag States */
+
+body.debug-element-dragging {
+  cursor: grabbing !important;
+}
+
+body.debug-block-dragging {
+  cursor: grabbing !important;
+}
+
+/* Debug Log Styles */
+
+.debug-log {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #ffffff;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 10001;
+  max-width: 300px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.debug-log-entry {
+  margin-bottom: 5px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.debug-log-entry:last-child {
+  border-bottom: none;
+}
+
+.debug-log-timestamp {
+  color: #888;
+  font-size: 10px;
+}
+
+.debug-log-event {
+  color: #10b981;
+  font-weight: bold;
+}
+
+.debug-log-error {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.debug-log-warning {
+  color: #f59e0b;
+  font-weight: bold;
+}

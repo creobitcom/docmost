@@ -56,7 +56,8 @@ export function usePageQuery(
     queryKey: ["pages", pageInput.pageId],
     queryFn: () => getPageById(pageInput),
     enabled: !!pageInput.pageId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0, // Принудительно обновляем данные при каждом запросе
+    refetchOnMount: true, // Обновляем данные при монтировании компонента
   });
   useEffect(() => {
     if (query.data) {

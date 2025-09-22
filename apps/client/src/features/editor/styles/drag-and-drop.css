@@ -1,0 +1,206 @@
+/* Drag and Drop Styles */
+
+/* Ghost Elements */
+.lark-ghost {
+  opacity: 0.8;
+  transition: transform 0.1s ease-out;
+  /* Transform is controlled by JavaScript for positioning */
+}
+
+.lark-ghost-block {
+  /* Block-specific ghost styles */
+}
+
+.lark-ghost-list-item {
+  /* List item specific ghost styles */
+}
+
+.lark-ghost-table-row {
+  /* Table row specific ghost styles */
+}
+
+/* Drag Handles */
+.drag-handle-icon {
+  position: absolute;
+  left: -20px;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.drag-handle-icon:hover {
+  color: #374151;
+  background: rgba(255, 255, 255, 1);
+}
+
+.drag-handle-icon.visible {
+  opacity: 1;
+}
+
+.drag-handle-icon:active {
+  cursor: grabbing;
+}
+
+/* Block Wrapper */
+.block-wrapper {
+  position: relative;
+  margin: 8px 0;
+  padding: 4px 0;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.block-wrapper:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.block-wrapper.dragging {
+  opacity: 0.5;
+}
+
+.block-wrapper.hovered .drag-handle-icon {
+  opacity: 1;
+}
+
+/* Drop Zones */
+.drop-zone {
+  position: relative;
+  min-height: 20px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.drop-zone.element-drop-zone {
+  /* Element-specific drop zone styles */
+}
+
+/* Drop Indicators */
+.drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+}
+
+.drop-indicator-before {
+  top: -1px;
+}
+
+.drop-indicator-after {
+  bottom: -1px;
+}
+
+.drop-indicator.show {
+  opacity: 1;
+}
+
+/* Валидация drop зон */
+.drop-zone.valid {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px dashed rgba(34, 197, 94, 0.3);
+}
+
+.drop-zone.invalid {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px dashed rgba(239, 68, 68, 0.3);
+}
+
+.drop-zone.warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px dashed rgba(245, 158, 11, 0.3);
+}
+
+/* Элемент drag over эффекты */
+.element-drag-over {
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+/* Индикаторы вставки для элементов */
+.insert-indicator-element {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 1px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+}
+
+.insert-indicator-element.show {
+  opacity: 1;
+}
+
+/* Element Drag Handle View */
+.element-drag-handle-view {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.element-drag-handle-view:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.element-drag-handle-view.dragging {
+  opacity: 0.5;
+}
+
+.element-drag-handle-view.hovered .drag-handle-icon {
+  opacity: 1;
+}
+
+.element-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Global Insert Indicator */
+.insert-indicator {
+  position: absolute;
+  height: 4px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 2px;
+  z-index: 9999;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+/* Editor Drag Over */
+.editor-drag-over {
+  background: rgba(59, 130, 246, 0.05);
+  border: 2px dashed rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+/* Insert Inside Effect */
+.insert-inside {
+  background: rgba(34, 197, 94, 0.1);
+  border: 2px solid rgba(34, 197, 94, 0.3);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}

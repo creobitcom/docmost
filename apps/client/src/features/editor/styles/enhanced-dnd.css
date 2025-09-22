@@ -1,0 +1,381 @@
+/* Enhanced Drag and Drop Styles */
+
+/* Drop Indicators */
+.drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #3b82f6;
+  border-radius: 1px;
+  z-index: 99;
+  box-shadow: 0 0 4px rgba(59, 130, 246, 0.4);
+}
+
+.drop-indicator-before {
+  top: -2px;
+}
+
+.drop-indicator-after {
+  bottom: -2px;
+}
+
+.drop-indicator-inside {
+  top: 50%;
+  transform: translateY(-50%);
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+}
+
+/* Enhanced Block Handle */
+.enhanced-block-handle {
+  position: relative;
+  margin: 4px 0;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.enhanced-block-handle:hover {
+  background-color: rgba(59, 130, 246, 0.02);
+}
+
+.enhanced-block-handle.dragging {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+.enhanced-block-handle .drag-handle-icon {
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  background: #3b82f6;
+  border: 1px solid #1e40af;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: white;
+  cursor: grab;
+  z-index: 100;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.enhanced-block-handle:hover .drag-handle-icon {
+  opacity: 0.8;
+  pointer-events: auto;
+}
+
+.enhanced-block-handle .drag-handle-icon.visible {
+  opacity: 1;
+}
+
+.enhanced-block-handle .drag-handle-icon:active {
+  cursor: grabbing;
+}
+
+/* Block Content */
+.enhanced-block-handle .block-content {
+  position: relative;
+  min-height: 20px;
+  padding-left: 0;
+  width: 100%;
+}
+
+/* Enhanced Element Handle */
+.enhanced-element-handle {
+  position: relative;
+  margin: 2px 0;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.enhanced-element-handle:hover {
+  background-color: rgba(59, 130, 246, 0.02);
+}
+
+.enhanced-element-handle.dragging {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+.enhanced-element-handle .element-drag-handle-icon {
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  background: #3b82f6;
+  border: 1px solid #1e40af;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: white;
+  cursor: grab;
+  z-index: 100;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.enhanced-element-handle:hover .element-drag-handle-icon {
+  opacity: 0.8;
+  pointer-events: auto;
+}
+
+.enhanced-element-handle .element-drag-handle-icon.visible {
+  opacity: 1;
+}
+
+.enhanced-element-handle .element-drag-handle-icon:active {
+  cursor: grabbing;
+}
+
+/* Element Drop Indicators */
+.element-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #3b82f6;
+  border-radius: 1px;
+  z-index: 99;
+  box-shadow: 0 0 4px rgba(59, 130, 246, 0.4);
+}
+
+.element-drop-indicator-before {
+  top: -2px;
+}
+
+.element-drop-indicator-after {
+  bottom: -2px;
+}
+
+/* Drag Over States */
+.drag-over-element {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+.drag-over-block {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Block Drop Zone (между блоками) */
+.block-drop-zone {
+  position: relative;
+  margin: 1px 0;
+  border: 2px dashed transparent;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  min-height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.01); /* Очень легкая подсветка для видимости */
+}
+
+.block-drop-zone:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background-color: rgba(59, 130, 246, 0.02);
+}
+
+.block-drop-zone.drag-over {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  min-height: 60px;
+}
+
+.block-drop-zone.drag-over::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 1px;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+/* Between Blocks Drop Zone - новая дроп зона между блоками */
+.between-blocks-drop-zone {
+  position: relative;
+  margin: 2px 0;
+  border: 2px dashed transparent;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  min-height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  background-color: rgba(0, 0, 0, 0.005);
+  opacity: 0.7;
+}
+
+.between-blocks-drop-zone:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  background-color: rgba(139, 92, 246, 0.03);
+  opacity: 1;
+}
+
+.between-blocks-drop-zone.drag-over {
+  background-color: rgba(139, 92, 246, 0.15);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+  min-height: 60px;
+  opacity: 1;
+}
+
+.between-blocks-drop-zone .drop-zone-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.between-blocks-drop-zone .drop-zone-line {
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+  border-radius: 2px;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.5);
+  margin-bottom: 8px;
+}
+
+.between-blocks-drop-zone .drop-zone-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #8b5cf6;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+/* Ghost Element Styles */
+.lark-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.8;
+  transform: rotate(5deg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  background: white;
+  border: 2px solid #3b82f6;
+  max-width: 200px;
+  padding: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.lark-ghost::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+  border-radius: 6px;
+  z-index: -1;
+}
+
+/* Task Item Styles */
+.task-item-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 24px;
+}
+
+.task-item-content input[type="checkbox"] {
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.task-item-content .task-item-text {
+  flex: 1;
+  min-height: 20px;
+  outline: none;
+  border: none;
+  background: transparent;
+  line-height: 1.4;
+}
+
+/* List Item Styles */
+.list-item-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 24px;
+}
+
+.list-item-content .list-item-text {
+  flex: 1;
+  min-height: 20px;
+  outline: none;
+  border: none;
+  background: transparent;
+  line-height: 1.4;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .enhanced-block-handle .drag-handle-icon,
+  .enhanced-element-handle .element-drag-handle-icon {
+    left: -20px;
+    width: 16px;
+    height: 16px;
+    font-size: 9px;
+  }
+  
+  .between-blocks-drop-zone {
+    min-height: 6px;
+  }
+  
+  .between-blocks-drop-zone.drag-over {
+    min-height: 50px;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .lark-ghost {
+    background: #1f2937;
+    color: #f9fafb;
+    border-color: #60a5fa;
+  }
+  
+  .between-blocks-drop-zone .drop-zone-text {
+    background: rgba(31, 41, 55, 0.9);
+    color: #a78bfa;
+  }
+}

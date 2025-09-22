@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 import SetupWorkspace from "@/pages/auth/setup-workspace.tsx";
 import LoginPage from "@/pages/auth/login";
 import Home from "@/pages/dashboard/home";
@@ -27,6 +28,23 @@ import Security from "@/ee/security/pages/security.tsx";
 import License from "@/ee/licence/pages/license.tsx";
 import { useRedirectToCloudSelect } from "@/ee/hooks/use-redirect-to-cloud-select.tsx";
 import MyPagesHome from "./pages/my-pages/my-pages-home";
+
+// Оптимизированный компонент для рендеринга Page
+function PageWithKey({ isMyPages = false }: { isMyPages?: boolean }) {
+  const location = useLocation();
+  const { t } = useTranslation();
+  
+  // Убрали избыточный дебаунс и состояние isNavigating для оптимизации
+  // console.log('[PageWithKey] Rendering with key:', location.pathname, 'isMyPages:', isMyPages);
+  
+  return (
+    <ErrorBoundary
+      fallback={<>{t("Failed to load page. An error occurred.")}</>}
+    >
+      <Page key={location.pathname} isMyPages={isMyPages} />
+    </ErrorBoundary>
+  );
+}
 
 export default function App() {
   const { t } = useTranslation();
@@ -57,21 +75,15 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path={"/home"} element={<Home />} />
           <Route path={"/s/:spaceSlug"} element={<SpaceHome />} />
-          <Route
-            path={"/s/:spaceSlug/p/:pageSlug"}
-            element={
-              <ErrorBoundary
-                fallback={<>{t("Failed to load page. An error occurred.")}</>}
-              >
-                <Page />
-              </ErrorBoundary>
-            }
-          />
+            <Route
+              path={"/s/:spaceSlug/p/:pageSlug"}
+              element={<PageWithKey />}
+            />
 
           <Route path={"/my-pages"} element={<MyPagesHome />} />
           <Route
             path={"/my-pages/:pageSlug"}
-            element={<Page isMyPages={true} />}
+            element={<PageWithKey isMyPages={true} />}
           />
 
           <Route path={"/settings"}>

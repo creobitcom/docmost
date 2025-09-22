@@ -1,909 +1,584 @@
 import "@/features/editor/styles/index.css";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef } from "react";
-import { IndexeddbPersistence } from "y-indexeddb";
-import * as Y from "yjs";
-import {
-  HocuspocusProvider,
-  onAuthenticationFailedParameters,
-  WebSocketStatus,
-} from "@hocuspocus/provider";
-import { EditorContent, EditorProvider, useEditor } from "@tiptap/react";
-import {
-  collabExtensions,
-  creobitExtentions,
-  mainExtensions,
-} from "@/features/editor/extensions/extensions";
-import { useAtom } from "jotai";
-import { currentUserAtom } from "@/features/user/atoms/current-user-atom";
-import useCollaborationUrl from "@/features/editor/hooks/use-collaboration-url";
-import { useCollabToken } from "@/features/auth/queries/auth-query.tsx";
-import { TiptapTransformer } from "@hocuspocus/transformer";
-import { useDebouncedCallback } from '@mantine/hooks';
-import { EditorBubbleMenu } from "@/features/editor/components/bubble-menu/bubble-menu";
-import { yjsConnectionStatusAtom } from "./atoms/editor-atoms";
+import React, { useEffect } from "react";
+import { EnhancedBlockHandle } from "@/features/editor/components/drag-handle/enhanced-block-handle";
+import { EnhancedDndProviderV2 } from "@/features/editor/components/drag-handle/enhanced-dnd-provider-v2";
+import { useDragAndDrop } from "@/features/editor/hooks/use-drag-and-drop";
+import { BlockWrapper } from "@/features/editor/components/block-wrapper";
+// import { BlockWrapper as DragBlockWrapper } from "@/features/editor/components/drag-handle/block-wrapper"; // Убрали дублирование
+import { BlockDropZone } from "@/features/editor/components/drag-handle/block-drop-zone";
+import { useBlockManagement } from "@/features/editor/hooks/use-block-management";
+import { useEditorDiagnostics } from "@/features/editor/hooks/use-editor-diagnostics";
+import { useDndEvents } from "@/features/editor/hooks/use-dnd-events";
+import { saveBlocksToServer, startPeriodicSave, stopPeriodicSave, forceSaveBlocks } from "@/features/editor/utils/block-utils";
+import { cleanupBlocksContent } from "@/features/editor/utils/cleanup-empty-paragraphs";
+import { addElementToBlock, handleCrossBlockElementMove } from "@/features/editor/utils/cross-block-element-utils";
 
-function getTokenFromCollabQuery(collabQuery: any): string | undefined {
-  console.log('[getTokenFromCollabQuery] collabQuery:', collabQuery);
-  if (!collabQuery) return undefined;
-  if (typeof collabQuery.token === 'string') return collabQuery.token;
-  if (collabQuery.data && typeof collabQuery.data.token === 'string') return collabQuery.data.token;
-  return undefined;
-}
-
-
-
-async function saveBlocksToServer(pageId, blocks) {
-  console.log('[saveBlocksToServer] Saving blocks:', blocks);
-  const response = await fetch(`/api/pages/blocks/${pageId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ blocks }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[saveBlocksToServer] Error:', response.status, errorText);
-  } else {
-    console.log('[saveBlocksToServer] Success');
+// Объявляем глобальные переменные для TypeScript
+declare global {
+  interface Window {
+    __currentBlockId?: string;
+    __originalDragBlockId?: string;
   }
 }
 
-async function deleteBlock(pageId: string, blockId: string) {
-  const response = await fetch(`/api/pages/blocks/${pageId}/delete`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ blockId }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to delete block');
-  }
-
-  return response.json();
-}
-
-// Компонент-заглушка для блоков без доступа
-function PlaceholderBlock({ block }) {
-  return (
-    <div style={{ padding: '10px', border: '1px dashed #ccc', margin: '5px 0' }}>
-      <p>Блок недоступен для редактирования</p>
-    </div>
-  );
-}
-
-const BlockEditor = forwardRef(({
-    block,
-    editable,
-    onBlockCreated,
-    onBlockDeleted,
-    allBlocks,
-    saveBlocksToServer,
-    pageId,
-    syncPageOriginId,
-    onFocus,
-    onNavigateUp,
-    onNavigateDown,
-    onCreateBlockAfter,
-    onCreateBlockAtEnd,
-    onDeleteBlock
-  }: {
-    block: any,
-    editable: boolean,
-    onBlockCreated: (block: any) => void,
-    onBlockDeleted: (blockId: string) => void,
-    allBlocks: any[],
-    saveBlocksToServer: (pageId: string, blocks: any[]) => void,
-    pageId: string,
-    syncPageOriginId?: string | null,
-    onFocus?: () => void,
-    onNavigateUp?: () => void,
-    onNavigateDown?: () => void,
-    onCreateBlockAfter?: () => void,
-    onCreateBlockAtEnd?: () => void,
-    onDeleteBlock?: () => void
-  }, ref) => {
-  const [currentUser] = useAtom(currentUserAtom);
-  const ydoc = useMemo(() => new Y.Doc(), [block.id]);
-  const collaborationURL = useCollaborationUrl();
-  const documentName = syncPageOriginId
-  ? `page.${syncPageOriginId}`
-  : `page.${pageId}`;
-  const { data: collabQuery, isLoading: tokenLoading } = useCollabToken();
-  const [, setYjsConnectionStatus] = useAtom(yjsConnectionStatusAtom);
-  const token = getTokenFromCollabQuery(collabQuery);
-
-  console.log('[BlockEditor] Token loading:', tokenLoading, 'Token:', token ? 'present' : 'missing');
-
-  // Если токен загружается, показываем загрузку
-  if (tokenLoading) {
-    return <div>Загрузка редактора...</div>;
-  }
-
-  // Функция для проверки наличия текста в параграфе
-  const hasTextContent = (paragraph) => {
-    if (!paragraph || !paragraph.content) return false;
-
-    // Проверяем, есть ли текстовые узлы с содержимым
-    for (const node of paragraph.content) {
-      if (node.type === 'text' && node.text && node.text.trim().length > 0) {
-        return true;
-      }
-      // Рекурсивно проверяем вложенные узлы
-      if (node.content && hasTextContent(node)) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  // Парсим контент из JSON строки
-  let parsedContent;
-  try {
-    parsedContent = typeof block.content === 'string'
-      ? JSON.parse(block.content)
-      : block.content;
-  } catch (e) {
-    console.warn('Failed to parse block content:', block.content);
-    parsedContent = null;
-  }
-
-  console.log('[BlockEditor] block.content:', block.content);
-  console.log('[BlockEditor] parsedContent:', parsedContent);
-
-  // Гарантируем валидный контент - каждый блок содержит только один параграф
-  let contentToInit;
-
-  if (
-    parsedContent &&
-    typeof parsedContent === 'object' &&
-    typeof parsedContent.type === 'string'
-  ) {
-    if (parsedContent.type === 'doc') {
-      // Берем только первый параграф или создаем пустой только если контент действительно пустой
-      const paragraphs = parsedContent.content?.filter(node =>
-        node.type === 'paragraph'
-      ) || [];
-
-      if (paragraphs.length > 0) {
-        // Берем только первый параграф и добавляем метаданные
-        const firstParagraph = paragraphs[0];
-        // Проверяем, что параграф не пустой
-        if (hasTextContent(firstParagraph)) {
-          // Гарантируем, что создается только один параграф
-          contentToInit = {
-            type: 'doc',
-            content: [{
-              ...firstParagraph,
-              attrs: {
-                ...firstParagraph.attrs,
-                position: block.position,
-                blockId: block.id
-              }
-            }]
-          };
-
-          // Дополнительная проверка - убеждаемся, что в content только один элемент
-          if (contentToInit.content.length > 1) {
-            console.warn('[BlockEditor] Multiple content elements detected, keeping only first');
-            contentToInit.content = [contentToInit.content[0]];
-          }
-        } else {
-          // Если параграф пустой, не создаем контент вообще
-          contentToInit = null;
-        }
-      } else {
-        // Если нет параграфов, не создаем контент вообще
-        contentToInit = null;
-      }
-    } else if (parsedContent.type === 'paragraph') {
-      // Если это параграф, проверяем что он не пустой
-      if (hasTextContent(parsedContent)) {
-        contentToInit = {
-          type: 'doc',
-          content: [{
-            ...parsedContent,
-            attrs: {
-              ...parsedContent.attrs,
-              position: block.position,
-              blockId: block.id
-            }
-          }]
-        };
-      } else {
-        // Если параграф пустой, не создаем контент
-        contentToInit = null;
-      }
-    } else {
-      // Оборачиваем одиночный узел в doc только если он не пустой
-      if (hasTextContent(parsedContent)) {
-        contentToInit = {
-          type: 'doc',
-          content: [{
-            ...parsedContent,
-            attrs: {
-              ...parsedContent.attrs,
-              position: block.position,
-              blockId: block.id
-            }
-          }]
-        };
-      } else {
-        // Если узел пустой, не создаем контент
-        contentToInit = null;
-      }
-    }
-  } else {
-    // Если контент пустой или null - не создаем контент вообще
-    contentToInit = null;
-  }
-
-  console.log('[BlockEditor] contentToInit:', contentToInit);
-
-  const provider = useMemo(() => {
-    // Если нет токена, создаем провайдер без коллаборации
-    if (!token) {
-      return null;
-    }
-
-    return new HocuspocusProvider({
-      url: collaborationURL,
-      name: `block.${block.id}`,
-      document: ydoc,
-      token,
-    });
-  }, [block.id, collaborationURL, token]);
-
-  const handleEditorUpdate = useDebouncedCallback((editor) => {
-    const json = editor.getJSON();
-    console.log('[BlockEditor] Editor JSON:', json);
-
-    // Берем только первый параграф из редактора
-    const firstParagraph = json.content?.find(node =>
-      node.type === 'paragraph'
-    );
-
-    // Проверяем, что параграф не пустой - проверяем наличие текста
-    if (firstParagraph && hasTextContent(firstParagraph)) {
-      // Проверяем валидность контента перед отправкой
-      const isValidContent = (node) => {
-        if (!node || typeof node !== 'object') return false;
-        if (!node.type || typeof node.type !== 'string') return false;
-        if (node.content && Array.isArray(node.content)) {
-          return node.content.every(isValidContent);
-        }
-        return true;
-      };
-
-      if (!isValidContent(firstParagraph)) {
-        console.warn('[BlockEditor] Invalid content detected, skipping save');
-        return;
-      }
-
-      // Проверяем, что в параграфе нет дублирующихся blockId
-      const blockIds = new Set();
-      const checkForDuplicateBlockIds = (node) => {
-        if (node.attrs && node.attrs.blockId) {
-          if (blockIds.has(node.attrs.blockId)) {
-            return false; // Дублирующийся blockId
-          }
-          blockIds.add(node.attrs.blockId);
-        }
-        if (node.content && Array.isArray(node.content)) {
-          return node.content.every(checkForDuplicateBlockIds);
-        }
-        return true;
-      };
-
-      if (!checkForDuplicateBlockIds(firstParagraph)) {
-        console.warn('[BlockEditor] Duplicate blockId detected, skipping save');
-        return;
-      }
-
-      // Создаем обновленный список всех блоков страницы
-      const updatedBlocks = allBlocks.map(existingBlock => {
-        if (existingBlock.id === block.id) {
-          return {
-            blockId: existingBlock.id,
-            blockType: existingBlock.blockType,
-            pageId: existingBlock.pageId,
-            content: {
-              ...firstParagraph,
-              attrs: {
-                ...firstParagraph.attrs,
-                position: existingBlock.position, // Сохраняем существующий position
-                blockId: existingBlock.id // Добавляем blockId
-              }
-            }
-          };
-        }
-        // Для остальных блоков оставляем как есть
-        return {
-          blockId: existingBlock.id,
-          blockType: existingBlock.blockType,
-          pageId: existingBlock.pageId,
-          content: existingBlock.content
-        };
-      });
-
-      console.log('[BlockEditor] Saving all blocks:', updatedBlocks);
-      saveBlocksToServer(block.pageId, updatedBlocks);
-    } else {
-      console.log('[BlockEditor] Skipping save - paragraph is empty');
-    }
-  }, 2000);
-
-  const extensions = useMemo(() => {
-    const baseExtensions = [...mainExtensions, ...creobitExtentions];
-
-    // Добавляем коллаборационные расширения только если есть провайдер
-    if (provider) {
-      return [...baseExtensions, ...collabExtensions(provider, currentUser?.user)];
-    }
-
-    return baseExtensions;
-  }, [provider, currentUser?.user]);
-
-  console.log('[BlockEditor] Creating editor with editable:', editable, 'extensions count:', extensions.length);
-
-  const editor = useEditor({
-    extensions,
-    editable,
-    content: contentToInit || {
-      type: 'doc',
-      content: [{
-        type: 'paragraph',
-        attrs: {
-          textAlign: 'left',
-          position: block.position,
-          blockId: block.id
-        },
-        content: []
-      }]
-    },
-    editorProps: {
-      attributes: {
-        "data-block-id": block.id,
-      },
-      handleKeyDown: (view, event) => {
-        const { state } = view;
-        const { selection } = state;
-        const { $from } = selection;
-        const parentType = $from.parent.type.name;
-
-        // Навигация стрелками между блоками
-        if (event.key === 'ArrowUp' && $from.parentOffset === 0) {
-          // В начале параграфа - переходим к предыдущему блоку
-          if (onNavigateUp) {
-            event.preventDefault();
-            onNavigateUp();
-            return true;
-          }
-        }
-
-        if (event.key === 'ArrowDown' && $from.parentOffset === $from.parent.content.size) {
-          // В конце параграфа - переходим к следующему блоку
-          if (onNavigateDown) {
-            event.preventDefault();
-            onNavigateDown();
-            return true;
-          }
-        }
-
-                        // Удаление блока при Backspace в пустом параграфе
-                if (event.key === 'Backspace' && parentType === 'paragraph' && $from.parent.content.size === 0) {
-                  if (onDeleteBlock) {
-                    event.preventDefault();
-                    event.stopPropagation();
-
-                    // Используем requestAnimationFrame для синхронизации с DOM
-                    requestAnimationFrame(() => {
-                      try {
-                        onDeleteBlock();
-                      } catch (error) {
-                        console.warn('Error deleting block:', error);
-                      }
-                    });
-                    return true;
-                  }
-                }
-
-        // Enter в конце параграфа создаёт новый блок
-        if (
-          event.key === 'Enter' &&
-          parentType === 'paragraph' &&
-          $from.parentOffset === $from.parent.content.size
-        ) {
-          event.preventDefault();
-
-          // Проверяем, не создали ли мы уже этот блок
-          const newBlockId = window.crypto.randomUUID();
-          const existingBlock = allBlocks.find(b => b.id === newBlockId);
-          if (existingBlock) {
-            console.warn("Block with this ID already exists, skipping creation");
-            return true;
-          }
-
-          // Создаем новый блок на клиенте
-          const newBlock = {
-            id: newBlockId,
-            pageId: block.pageId,
-            blockType: 'paragraph',
-            position: block.position + 1,
-            content: {
-              type: 'paragraph',
-              attrs: {
-                textAlign: 'left',
-                position: block.position + 1,
-                blockId: newBlockId
-              },
-              content: []
-            },
-            hasAccess: true,
-            userPermission: 'owner'
-          };
-          console.log("Creating new block on client:", newBlock);
-
-          // Создаем обновленный список всех блоков с новым блоком
-          const updatedBlocks = [...allBlocks, {
-            blockId: newBlock.id,
-            blockType: newBlock.blockType,
-            pageId: newBlock.pageId,
-            content: {
-              ...newBlock.content,
-              attrs: {
-                ...newBlock.content.attrs,
-                position: newBlock.position
-              }
-            }
-          }];
-
-          // Отправляем полный список блоков на сервер
-          saveBlocksToServer(block.pageId, updatedBlocks);
-
-          onBlockCreated(newBlock);
-          return true;
-        }
-
-        // Для других типов блоков — стандартное поведение
-        return false;
-      },
-    },
-    onCreate({ editor }) {
-      console.log('[BlockEditor] Editor created successfully, editable:', editor.isEditable);
-
-      // Проверяем, что в редакторе только один параграф
-      try {
-        const doc = editor.getJSON();
-        if (doc.content && doc.content.length > 1) {
-          console.warn('[BlockEditor] Multiple paragraphs detected in editor after creation, keeping only first');
-          const firstParagraph = doc.content[0];
-          editor.commands.setContent({
-            type: 'doc',
-            content: [firstParagraph]
-          });
-        }
-
-        // Сохраняем ссылку на редактор и провайдер для ref
-        if (ref && typeof ref === 'object') {
-          ref.current = { editor, provider };
-        }
-
-        // Добавляем небольшую задержку для стабилизации Y.js
-        requestAnimationFrame(() => {
-          try {
-            if (ref && typeof ref === 'object' && ref.current) {
-              ref.current = { editor, provider };
-            }
-          } catch (error) {
-            console.warn('[BlockEditor] Error updating ref:', error);
-          }
-        });
-      } catch (error) {
-        console.warn('[BlockEditor] Error in onCreate:', error);
-      }
-    },
-    onUpdate({ editor }) {
-      if (editor.isEmpty) return;
-
-      try {
-        // Проверяем, что в редакторе только один параграф
-        const doc = editor.getJSON();
-        if (doc.content && doc.content.length > 1) {
-          console.warn('[BlockEditor] Multiple paragraphs detected in editor update, keeping only first');
-          const firstParagraph = doc.content[0];
-          editor.commands.setContent({
-            type: 'doc',
-            content: [firstParagraph]
-          });
-          return;
-        }
-
-        handleEditorUpdate(editor);
-      } catch (error) {
-        console.warn('[BlockEditor] Error in onUpdate:', error);
-      }
-    },
-    onFocus({ editor }) {
-      try {
-        if (onFocus) {
-          onFocus();
-        }
-      } catch (error) {
-        console.warn('[BlockEditor] Error in onFocus:', error);
-      }
-    },
-  });
-
-  useEffect(() => () => {
-    if (provider) {
-      try {
-        // Проверяем состояние провайдера перед уничтожением
-        if (provider.isConnected) {
-          provider.disconnect();
-        }
-
-        // Добавляем небольшую задержку перед уничтожением
-        setTimeout(() => {
-          try {
-            provider.destroy();
-            console.log('[BlockEditor] Provider destroyed on unmount');
-          } catch (error) {
-            console.warn('Error destroying provider:', error);
-          }
-        }, 10);
-      } catch (error) {
-        console.warn('Error destroying provider:', error);
-      }
-    }
-  }, [provider]);
-
-  // Добавляем обработчик для предотвращения DOM-конфликтов
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (provider) {
-        try {
-          if (provider.isConnected) {
-            provider.disconnect();
-          }
-          setTimeout(() => {
-            try {
-              provider.destroy();
-            } catch (error) {
-              console.warn('Error destroying provider on unload:', error);
-            }
-          }, 10);
-        } catch (error) {
-          console.warn('Error destroying provider on unload:', error);
-        }
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden && provider) {
-        try {
-          if (provider.isConnected) {
-            provider.disconnect();
-          }
-          setTimeout(() => {
-            try {
-              provider.destroy();
-            } catch (error) {
-              console.warn('Error destroying provider on visibility change:', error);
-            }
-          }, 10);
-        } catch (error) {
-          console.warn('Error destroying provider on visibility change:', error);
-        }
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [provider]);
-
-  useEffect(() => {
-    // Инициализируем Y.js документ только если есть провайдер
-    if (!provider) return;
-
-    const yXmlFragment = ydoc.getXmlFragment("content");
-
-    // Проверяем, есть ли уже контент в Y.js документе
-    if (yXmlFragment.length > 0) {
-      console.log('[BlockEditor] Y.js document already has content, skipping initialization');
-      return;
-    }
-
-    if (yXmlFragment.length === 0) {
-      // Если contentToInit равен null, не инициализируем Y.js документ
-      if (!contentToInit) {
-        console.log('[BlockEditor] contentToInit is null, skipping Y.js initialization');
-        return;
-      }
-
-      // Используем requestAnimationFrame для синхронизации с DOM
-      requestAnimationFrame(() => {
-        try {
-          // Проверяем, что contentToInit содержит только один параграф
-          if (contentToInit.type === 'doc' && contentToInit.content && Array.isArray(contentToInit.content)) {
-            const paragraphs = contentToInit.content.filter(node => node.type === 'paragraph');
-            if (paragraphs.length > 1) {
-              console.warn('[BlockEditor] Multiple paragraphs detected in contentToInit, using only first');
-              contentToInit = {
-                ...contentToInit,
-                content: [paragraphs[0]]
-              };
-            }
-          }
-
-          const tempYdoc = TiptapTransformer.toYdoc(contentToInit, "default", extensions as any);
-          const tempFragment = tempYdoc.getXmlFragment("content");
-          let nodes = [];
-          if (tempFragment && typeof tempFragment.toArray === "function") {
-            nodes = tempFragment.toArray();
-          } else if (Array.isArray(tempFragment)) {
-            nodes = tempFragment;
-          } else {
-            nodes = [];
-          }
-          // Расширенное логирование для диагностики
-          console.log('[BlockEditor][DIAG] block.content:', block.content);
-          console.log('[BlockEditor][DIAG] contentToInit:', contentToInit);
-          console.log('[BlockEditor][DIAG] tempFragment:', tempFragment);
-          console.log('[BlockEditor][DIAG] nodes:', nodes);
-
-          // Фильтруем только поддерживаемые узлы
-          const validNodes = nodes.filter(node => {
-            if (!(node instanceof Y.XmlElement || node instanceof Y.XmlText)) {
-              return false;
-            }
-            // Проверяем, что это поддерживаемый тип узла
-            if (node instanceof Y.XmlElement) {
-              const supportedTypes = ['paragraph', 'heading', 'text'];
-              return supportedTypes.includes(node.nodeName);
-            }
-            return true;
-          });
-
-          console.log('[BlockEditor][DIAG] validNodes:', validNodes);
-
-          // Проверяем, есть ли контент в блоке
-          if (validNodes.length === 0 && !hasTextContent(contentToInit)) {
-            // Вставляем пустой параграф только если контент действительно пустой
-            const yParagraph = new Y.XmlElement('paragraph');
-            yXmlFragment.insert(0, [yParagraph]);
-          } else if (validNodes.length > 0) {
-            // Вставляем только первый узел, чтобы избежать дублирования
-            // Проверяем, что узел имеет поддерживаемый тип
-            const firstNode = validNodes[0];
-            if (firstNode instanceof Y.XmlElement && firstNode.nodeName === 'paragraph') {
-              // Проверяем, что в узле нет дублирующихся blockId
-              const blockIds = new Set();
-              const checkForDuplicateBlockIds = (node) => {
-                if (node.getAttribute && node.getAttribute('blockId')) {
-                  const blockId = node.getAttribute('blockId');
-                  if (blockIds.has(blockId)) {
-                    return false; // Дублирующийся blockId
-                  }
-                  blockIds.add(blockId);
-                }
-                if (node.children && node.children.length > 0) {
-                  return node.children.every(checkForDuplicateBlockIds);
-                }
-                return true;
-              };
-
-              if (checkForDuplicateBlockIds(firstNode)) {
-                yXmlFragment.insert(0, [firstNode]);
-              } else {
-                console.warn('[BlockEditor] Duplicate blockId detected in Y.js node, creating empty paragraph');
-                const yParagraph = new Y.XmlElement('paragraph');
-                yXmlFragment.insert(0, [yParagraph]);
-              }
-            } else {
-              // Если тип не поддерживается, создаем пустой параграф
-              const yParagraph = new Y.XmlElement('paragraph');
-              yXmlFragment.insert(0, [yParagraph]);
-            }
-          }
-          // Если validNodes.length === 0, но есть текстовый контент, не создаем пустой параграф
-        } catch (error) {
-          console.error('[BlockEditor] Error during Y.js initialization:', error);
-          // В случае ошибки создаем пустой параграф
-          const yParagraph = new Y.XmlElement('paragraph');
-          yXmlFragment.insert(0, [yParagraph]);
-        }
-      });
-    }
-  }, [ydoc, contentToInit, provider, extensions]);
-
-  console.log('[BlockEditor] Rendering editor, editor exists:', !!editor, 'editable:', editor?.isEditable);
-
-  return (
-    <>
-      <div style={{ position: 'relative' }}>
-        <EditorContent editor={editor} />
-        {editor && <EditorBubbleMenu editor={editor} pageId={block.pageId} blockId={block.id} />}
-
-        {/* Кнопка удаления блока */}
-        {editable && onDeleteBlock && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-
-              // Добавляем подтверждение удаления
-              if (window.confirm('Вы уверены, что хотите удалить этот блок?')) {
-                if (onDeleteBlock) {
-                  // Используем requestAnimationFrame для синхронизации с DOM
-                  requestAnimationFrame(() => {
-                    try {
-                      onDeleteBlock();
-                    } catch (error) {
-                      console.warn('Error deleting block:', error);
-                    }
-                  });
-                }
-              }
-            }}
-            style={{
-              position: 'absolute',
-              top: '5px',
-              right: '5px',
-              background: '#ff4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '3px',
-              padding: '2px 6px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              opacity: 0.7,
-              zIndex: 1000
-            }}
-            onMouseEnter={(e) => {
-              (e.target as HTMLButtonElement).style.opacity = '1';
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.opacity = '0.7';
-            }}
-            title="Удалить блок"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-    </>
-  );
-});
+// Типы для DnD операций
+type CrossBlockMoveOperation = {
+  sourceBlockId: string;
+  targetBlockId: string;
+  elementData: any;
+  targetPosition: "before" | "after" | "inside";
+};
 
 
 
 export default function PageEditor({ pageId, editable, content, syncPageOriginId }) {
-  const [blocks, setBlocks] = useState([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [focusedBlockId, setFocusedBlockId] = useState(null);
-  const blockRefs = useRef(new Map());
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  // Используем хук для управления блоками
+  const blockManagement = useBlockManagement({ pageId, editable });
 
-  // Глобальная обработка ошибок для предотвращения DOM-конфликтов
+  const {
+    blocks,
+    setBlocks,
+    isInitialized,
+    focusedBlockId,
+    setFocusedBlockId,
+    isDeleting,
+    isReady,
+    setIsReady,
+    blocksRef,
+    blockRefs,
+    loadBlocks,
+    handleBlockCreated,
+    handleBlockDeleted,
+    focusBlock,
+    focusBlockWithRetry,
+    deleteBlockSafely,
+    findBlockElement,
+    navigateUp,
+    navigateDown,
+    navigateToFirst,
+    navigateToLast,
+    getNextBlock,
+    getPreviousBlock,
+    getFirstBlock,
+    getLastBlock,
+    createBlockBetween,
+    createBlockAtEnd,
+  } = blockManagement;
+
+  // Используем хук для диагностики редакторов - логи отключены
+  const editorDiagnostics = useEditorDiagnostics({
+    blocks,
+    blockRefs: blockRefs.current,
+    isReady,
+    enableLogging: false
+  });
+
+  // Настраиваем глобальные функции отладки
   useEffect(() => {
-    const originalErrorHandler = window.onerror;
+    editorDiagnostics.setupGlobalDebugFunctions(blocksRef, blockRefs.current);
+    
+  }, [editorDiagnostics, blocksRef, blockRefs]);
 
-    window.onerror = (message, source, lineno, colno, error) => {
-      if (message && typeof message === 'string' && (
-        message.includes('removeChild') ||
-        message.includes('Node') ||
-        message.includes('DOM')
-      )) {
-        console.warn('DOM error caught and suppressed:', message);
-        return true; // Предотвращаем показ ошибки
-      }
-      if (originalErrorHandler) {
-        return originalErrorHandler(message, source, lineno, colno, error);
+  // Обработчики событий для DnD системы
+  useEffect(() => {
+    console.log('[PageEditor] Setting up DnD event listeners');
+    
+    // Обработчик создания нового элемента в cross-block операции
+    const handleCrossBlockCreateElement = (event: CustomEvent) => {
+      console.log('[PageEditor] Cross-block create element event received:', event.detail);
+      
+      const { sourceBlockId, targetBlockId, elementData, targetPosition } = event.detail;
+      
+      // Создаем операцию для добавления элемента в целевой блок
+      const operation: CrossBlockMoveOperation = {
+        sourceBlockId,
+        targetBlockId,
+        elementData,
+        targetPosition
+      };
+      
+      // Добавляем элемент в целевой блок (без удаления из исходного, так как это синтетический элемент)
+      console.log('[PageEditor] Current blocksRef.current:', blocksRef.current.map(b => ({ id: b.id, blockType: b.blockType })));
+      const targetBlock = blocksRef.current.find(b => b.id === targetBlockId);
+      console.log('[PageEditor] Found target block:', targetBlock ? { id: targetBlock.id, blockType: targetBlock.blockType } : null);
+      if (targetBlock) {
+        const updatedTargetBlock = addElementToBlock(targetBlock, elementData, targetPosition);
+        const updatedBlocks = blocksRef.current.map(block => 
+          block.id === targetBlockId ? updatedTargetBlock : block
+        );
+        console.log('[PageEditor] Updated blocks after adding element:', updatedBlocks.map(b => ({ id: b.id, blockType: b.blockType })));
+        
+        // Обновляем состояние
+        blocksRef.current = updatedBlocks;
+        setBlocks(() => {
+          console.log('[PageEditor] setBlocks called with updatedBlocks:', updatedBlocks.length, 'blocks');
+          return JSON.parse(JSON.stringify(updatedBlocks));
+        });
+        
+        // Дополнительное обновление через requestAnimationFrame для гарантии рендера
+        requestAnimationFrame(() => {
+          console.log('[PageEditor] 🔄 RequestAnimationFrame update after cross-block create element');
+          setBlocks(prevBlocks => {
+            console.log('[PageEditor] RequestAnimationFrame: prevBlocks length:', prevBlocks.length);
+            if (prevBlocks.length === 0 && blocksRef.current.length > 0) {
+              console.log('[PageEditor] RequestAnimationFrame: Force updating from blocksRef.current');
+              return JSON.parse(JSON.stringify(blocksRef.current));
+            }
+            return prevBlocks;
+          });
+          
+          // Убрали setRenderKey чтобы избежать перерендера
+          
+          // Принудительно обновляем все ProseMirror редакторы
+          setTimeout(() => {
+            console.log('[PageEditor] 🔄 Force updating ProseMirror editors');
+            const editors = document.querySelectorAll('.ProseMirror');
+            console.log('[PageEditor] Found editors to update:', editors.length);
+            
+            editors.forEach((editor, index) => {
+              console.log('[PageEditor] Updating editor', index, editor);
+              
+              // Пытаемся найти blockId для этого редактора
+              const blockId = editor.getAttribute('data-block-id');
+              if (blockId) {
+                console.log('[PageEditor] Found block ID for editor:', blockId);
+                
+                // Находим обновленный блок
+                const updatedBlock = blocksRef.current.find(b => b.id === blockId);
+                if (updatedBlock) {
+                  console.log('[PageEditor] Found updated block for editor:', blockId);
+                  
+                  try {
+                    // Пытаемся получить ProseMirror view
+                    const view = (editor as any).__view || 
+                                (editor as any).pmView || 
+                                (editor as any).getAttribute('data-pm-view') ||
+                                (editor as any).__tiptapEditor?.view;
+                    
+                    if (view) {
+                      console.log('[PageEditor] Found ProseMirror view, dispatching transaction');
+                      
+                      // Создаем транзакцию для принудительного обновления
+                      const tr = view.state.tr.setMeta('forceUpdate', true);
+                      const newState = view.state.apply(tr);
+                      view.dispatch(newState);
+                      
+                      // Также триггерим события
+                      editor.dispatchEvent(new Event('input', { bubbles: true }));
+                      editor.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else {
+                      console.log('[PageEditor] No ProseMirror view found, using React re-render only');
+                      
+                      // Fallback: только события без DOM манипуляций
+                      editor.dispatchEvent(new Event('input', { bubbles: true }));
+                      editor.dispatchEvent(new Event('change', { bubbles: true }));
+                      editor.dispatchEvent(new Event('blur', { bubbles: true }));
+                      editor.dispatchEvent(new Event('focus', { bubbles: true }));
+                    }
+                  } catch (error) {
+                    console.warn('[PageEditor] Error updating ProseMirror view:', error);
+                  }
+                }
+              }
+            });
+          }, 100);
+        });
+      } else {
+        console.warn('[PageEditor] Target block not found:', targetBlockId);
       }
     };
 
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (event.reason && typeof event.reason === 'string' && (
-        event.reason.includes('removeChild') ||
-        event.reason.includes('Node') ||
-        event.reason.includes('DOM')
-      )) {
-        console.warn('DOM promise rejection caught and suppressed:', event.reason);
-        event.preventDefault();
-        return;
+    // Обработчик удаления текста из блока
+    const handleRemoveTextFromBlock = (event: CustomEvent) => {
+      console.log('[PageEditor] Remove text from block event received:', event.detail);
+      
+      const { blockId, textToRemove } = event.detail;
+      
+      const sourceBlock = blocksRef.current.find(b => b.id === blockId);
+      if (sourceBlock) {
+        console.log('[PageEditor] Found source block for text removal:', sourceBlock.id);
+        
+        // Рекурсивная функция для удаления текста из контента
+        const removeTextFromContent = (content: any): any => {
+          if (!content) return content;
+          
+          if (Array.isArray(content)) {
+            return content
+              .map(item => removeTextFromContent(item))
+              .filter(item => {
+                // Удаляем пустые параграфы, task items и task lists
+                if (item && typeof item === 'object') {
+                  if (item.type === 'paragraph' && (!item.content || item.content.length === 0)) {
+                    return false;
+                  }
+                  if (item.type === 'taskItem' && (!item.content || item.content.length === 0)) {
+                    return false;
+                  }
+                  if (item.type === 'taskList' && (!item.content || item.content.length === 0)) {
+                    return false;
+                  }
+                }
+                return true;
+              });
+          }
+          
+          if (typeof content === 'object' && content !== null) {
+            if (content.text && content.text.includes(textToRemove)) {
+              // Удаляем текст из текстового узла
+              const newText = content.text.replace(textToRemove, '').trim();
+              if (newText === '') {
+                return null; // Удаляем пустой текстовый узел
+              }
+              return { ...content, text: newText };
+            }
+            
+            if (content.content) {
+              const newContent = removeTextFromContent(content.content);
+              if (newContent === null || (Array.isArray(newContent) && newContent.length === 0)) {
+                return null; // Удаляем узел с пустым контентом
+              }
+              return { ...content, content: newContent };
+            }
+          }
+          
+          return content;
+        };
+        
+        // Удаляем текст из блока
+        const updatedContent = removeTextFromContent(sourceBlock.content);
+        const updatedBlocks = blocksRef.current.map(block => 
+          block.id === blockId 
+            ? { ...block, content: updatedContent }
+            : block
+        );
+        
+        console.log('[PageEditor] Updated blocks after text removal:', updatedBlocks.map(b => ({ id: b.id, blockType: b.blockType })));
+        
+        // Обновляем состояние
+        blocksRef.current = updatedBlocks;
+        setBlocks(() => {
+          console.log('[PageEditor] setBlocks called for text removal with updatedBlocks:', updatedBlocks.length, 'blocks');
+          return JSON.parse(JSON.stringify(updatedBlocks));
+        });
+        
+        // Дополнительное обновление через requestAnimationFrame для гарантии рендера
+        requestAnimationFrame(() => {
+          console.log('[PageEditor] 🔄 RequestAnimationFrame update after text removal');
+          setBlocks(prevBlocks => {
+            console.log('[PageEditor] RequestAnimationFrame: prevBlocks length:', prevBlocks.length);
+            if (prevBlocks.length === 0 && blocksRef.current.length > 0) {
+              console.log('[PageEditor] RequestAnimationFrame: Force updating from blocksRef.current');
+              return JSON.parse(JSON.stringify(blocksRef.current));
+            }
+            return prevBlocks;
+          });
+          
+          // Убрали setRenderKey чтобы избежать перерендера
+          
+          // Принудительно обновляем все ProseMirror редакторы
+          setTimeout(() => {
+            console.log('[PageEditor] 🔄 Force updating ProseMirror editors after text removal');
+            const editors = document.querySelectorAll('.ProseMirror');
+            console.log('[PageEditor] Found editors to update:', editors.length);
+            
+            editors.forEach((editor, index) => {
+              console.log('[PageEditor] Updating editor', index, editor);
+              
+              // Пытаемся найти blockId для этого редактора
+              const blockId = editor.getAttribute('data-block-id');
+              if (blockId) {
+                console.log('[PageEditor] Found block ID for editor:', blockId);
+                
+                // Находим обновленный блок
+                const updatedBlock = blocksRef.current.find(b => b.id === blockId);
+                if (updatedBlock) {
+                  console.log('[PageEditor] Found updated block for editor:', blockId);
+                  
+                  try {
+                    // Пытаемся получить ProseMirror view
+                    const view = (editor as any).__view || 
+                                (editor as any).pmView || 
+                                (editor as any).getAttribute('data-pm-view') ||
+                                (editor as any).__tiptapEditor?.view;
+                    
+                    if (view) {
+                      console.log('[PageEditor] Found ProseMirror view, dispatching transaction');
+                      
+                      // Создаем транзакцию для принудительного обновления
+                      const tr = view.state.tr.setMeta('forceUpdate', true);
+                      const newState = view.state.apply(tr);
+                      view.dispatch(newState);
+                      
+                      // Также триггерим события
+                      editor.dispatchEvent(new Event('input', { bubbles: true }));
+                      editor.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else {
+                      console.log('[PageEditor] No ProseMirror view found, using React re-render only');
+                      
+                      // Fallback: только события без DOM манипуляций
+                      editor.dispatchEvent(new Event('input', { bubbles: true }));
+                      editor.dispatchEvent(new Event('change', { bubbles: true }));
+                      editor.dispatchEvent(new Event('blur', { bubbles: true }));
+                      editor.dispatchEvent(new Event('focus', { bubbles: true }));
+                    }
+                  } catch (error) {
+                    console.warn('[PageEditor] Error updating ProseMirror view:', error);
+                  }
+                }
+              }
+            });
+          }, 100);
+        });
+      } else {
+        console.warn('[PageEditor] Source block not found for text removal:', blockId);
       }
     };
 
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    // Убрали дублирующий обработчик cross-block перемещения элементов
+    // Обработка теперь происходит только в use-dnd-events.ts
 
+    // Добавляем обработчики событий
+    document.addEventListener('cross-block-create-element', handleCrossBlockCreateElement as EventListener);
+    document.addEventListener('remove-text-from-block', handleRemoveTextFromBlock as EventListener);
+    // Убрали дублирующий обработчик cross-block-element-move
+
+    // Cleanup
     return () => {
-      window.onerror = originalErrorHandler;
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      document.removeEventListener('cross-block-create-element', handleCrossBlockCreateElement as EventListener);
+      document.removeEventListener('remove-text-from-block', handleRemoveTextFromBlock as EventListener);
+      // Убрали cleanup для дублирующего обработчика cross-block-element-move
     };
   }, []);
 
-  // Проверка готовности всех компонентов
+  // Запускаем периодическое сохранение каждые 3 секунды
   useEffect(() => {
-    const checkReadiness = () => {
-      if (blocks.length === 0) {
-        setIsReady(true);
-        return;
-      }
+    if (isInitialized && blocks.length > 0) {
+      console.log('🔄 [PageEditor] Starting periodic save for pageId:', pageId);
+      
+      // Функция для получения текущих блоков в формате для сервера
+      const getBlocksForSave = () => {
+        console.log('🔄 [getBlocksForSave] Getting current blocks from editors...', {
+          blocksCount: blocks.length,
+          blockRefsCount: blockRefs.current.size
+        });
+        
+        return blocks.map((block, index) => {
+          // Получаем актуальное содержимое из редактора
+          const blockRef = blockRefs.current.get(block.id);
+          let currentContent = block.content;
+          
+          console.log('🔍 [getBlocksForSave] Processing block:', {
+            index,
+            blockId: block.id,
+            hasBlockRef: !!blockRef,
+            hasEditor: !!blockRef?.editor,
+            originalContent: JSON.stringify(block.content).substring(0, 100) + '...'
+          });
+          
+          if (blockRef?.editor) {
+            try {
+              const editorContent = blockRef.editor.getJSON();
+              currentContent = editorContent;
+              console.log('📝 [getBlocksForSave] Got content from editor for block:', {
+                blockId: block.id,
+                editorContent: JSON.stringify(editorContent).substring(0, 100) + '...',
+                contentChanged: JSON.stringify(block.content) !== JSON.stringify(editorContent)
+              });
+            } catch (error) {
+              console.warn('⚠️ [getBlocksForSave] Error getting content from editor:', error);
+          }
+        } else {
+            console.log('⚠️ [getBlocksForSave] No editor found for block:', block.id);
+          }
+          
+          const result = {
+            blockId: block.id,
+            blockType: block.blockType,
+            pageId: block.pageId,
+            content: currentContent
+          };
+          
+          console.log('📦 [getBlocksForSave] Final block data:', {
+            blockId: result.blockId,
+            blockType: result.blockType,
+            contentPreview: JSON.stringify(result.content).substring(0, 100) + '...'
+          });
+          
+          return result;
+        });
+      };
 
-      const allReady = blocks.every(block => {
-        const ref = blockRefs.current.get(block.id);
-        return ref?.editor && ref?.provider;
+      startPeriodicSave(pageId, getBlocksForSave);
+
+      // Добавляем глобальные функции для тестирования
+      (window as any).forceSavePage = async () => {
+        console.log('🔄 [PageEditor] Force save triggered from console');
+        return await forceSaveBlocks(pageId, getBlocksForSave);
+      };
+
+      (window as any).debugBlocks = () => {
+        console.log('🔍 [PageEditor] Debug blocks data:');
+        const currentBlocks = getBlocksForSave();
+        console.log('Current blocks:', currentBlocks);
+        
+        // Показываем содержимое каждого блока
+        currentBlocks.forEach((block, index) => {
+          console.log(`Block ${index}:`, {
+            blockId: block.blockId,
+            blockType: block.blockType,
+            content: block.content
+          });
+        });
+        
+        return currentBlocks;
+      };
+
+      // Очистка при размонтировании
+    return () => {
+        console.log('⏹️ [PageEditor] Stopping periodic save for pageId:', pageId);
+        stopPeriodicSave(pageId);
+        delete (window as any).forceSavePage;
+        delete (window as any).debugBlocks;
+      };
+    }
+  }, [isInitialized, blocks, pageId]);
+
+    // Функция для создания нового блока из элемента
+  const handleCreateBlockFromElement = (sourceBlockId: string, elementId: string, position: 'before' | 'after', targetBlockId: string) => {
+    // Находим исходный блок
+    const sourceBlock = blocks.find(b => b.id === sourceBlockId);
+    if (!sourceBlock) {
+      return;
+    }
+
+    // Определяем тип блока на основе исходного блока
+    const sourceBlockType = sourceBlock.blockType || 'paragraph';
+    const isListBlock = sourceBlockType.includes('list') || sourceBlockType.includes('task');
+    
+    // Создаем новый блок
+          const newBlock = {
+      id: window.crypto.randomUUID(),
+      pageId: pageId,
+      blockType: isListBlock ? sourceBlockType : 'paragraph',
+      position: position === 'before' ? sourceBlock.position : sourceBlock.position + 1,
+      content: isListBlock ? {
+              type: 'doc',
+              content: [
+                {
+            type: sourceBlockType,
+                  attrs: {
+              position: position === 'before' ? sourceBlock.position : sourceBlock.position + 1,
+              blockId: window.crypto.randomUUID()
+            },
+            content: [] // Пустой список, элемент будет добавлен автоматически
+          }
+        ]
+      } : {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  attrs: {
+                    textAlign: 'left',
+              position: position === 'before' ? sourceBlock.position : sourceBlock.position + 1,
+              blockId: window.crypto.randomUUID()
+                  },
+            content: [] // Пустой контент, элемент будет добавлен автоматически
+                }
+              ]
+            },
+            hasAccess: true,
+            userPermission: 'owner'
+          };
+
+    // Обновляем массив блоков
+    const updatedBlocks = [...blocks];
+    
+    // Вставляем новый блок в правильную позицию
+    const insertIndex = position === 'before' ? sourceBlock.position : sourceBlock.position + 1;
+    updatedBlocks.splice(insertIndex, 0, newBlock);
+
+           // Обновляем позиции всех блоков
+    updatedBlocks.forEach((block, index) => {
+      block.position = index;
+      if (block.content && block.content.attrs) {
+        block.content.attrs.position = index;
+      }
+    });
+
+    // Очищаем пустые параграфы
+    // const cleanedBlocks = cleanupBlocksContent(updatedBlocks);
+    const cleanedBlocks = updatedBlocks;
+
+    // Обновляем состояние
+    setBlocks(cleanedBlocks);
+
+    // Сохраняем на сервер
+    const serverData = cleanedBlocks.map(block => ({
+      blockId: block.id,
+      blockType: block.blockType,
+      pageId: block.pageId,
+      content: block.content
+    }));
+
+    saveBlocksToServer(pageId, serverData);
+
+    // Инициируем автоматический драг элемента в новый блок
+        setTimeout(() => {
+      
+      // Создаем событие для автоматического перемещения элемента
+      const autoDragEvent = new CustomEvent('auto-drag-element-to-block', {
+        detail: {
+          sourceBlockId,
+          elementId,
+          targetBlockId: newBlock.id,
+          pageId
+        }
       });
-      setIsReady(allReady);
-    };
-
-    checkReadiness();
-  }, [blocks]);
-
-  // Функция для получения следующего блока
-  const getNextBlock = (currentBlockId) => {
-    const currentIndex = blocks.findIndex(block => block.id === currentBlockId);
-    if (currentIndex >= 0 && currentIndex < blocks.length - 1) {
-      return blocks[currentIndex + 1];
-    }
-    return null;
+      
+      document.dispatchEvent(autoDragEvent);
+    }, 100);
   };
 
-  // Функция для получения предыдущего блока
-  const getPreviousBlock = (currentBlockId) => {
-    const currentIndex = blocks.findIndex(block => block.id === currentBlockId);
-    if (currentIndex > 0) {
-      return blocks[currentIndex - 1];
-    }
-    return null;
-  };
-
-    // Безопасное удаление блока с правильной последовательностью
-  const deleteBlockSafely = async (blockId) => {
-    try {
-      // 1. Проверяем состояние
-      if (isDeleting) {
-        console.warn('Block deletion already in progress, skipping');
+    // Drag and Drop логика
+  const { state: dragState, handlers: dragHandlers } = useDragAndDrop({
+    onBlockMove: (sourceId, targetId, position) => {
+      // Проверяем, что это не drag элемента
+      if (sourceId.startsWith('element:')) {
         return;
       }
 
-      // 2. Проверяем готовность системы
-      if (!isReady) {
-        console.warn('System not ready for block deletion, waiting...');
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Проверяем, что это drag блока
+      if (!sourceId.startsWith('block:')) {
+        // Добавляем префикс block: если его нет
+        sourceId = `block:${sourceId}`;
       }
 
-      setIsDeleting(true);
+      // Извлекаем ID блока из формата "block:blockId"
+      const blockId = sourceId.replace('block:', '');
 
-      // 3. Получаем ссылку на блок и проверяем его существование
-      const blockRef = blockRefs.current.get(blockId);
-      const blockToDelete = blocks.find(b => b.id === blockId);
+      // Находим блоки
+      const sourceBlock = blocks.find(b => b.id === blockId);
+      const targetBlock = blocks.find(b => b.id === targetId);
 
-      if (!blockToDelete) {
-        console.warn('Block not found for deletion:', blockId);
+      if (!sourceBlock || !targetBlock) {
         return;
       }
 
-      // 4. Проверяем, что это не последний блок
-      if (blocks.length === 1) {
-        console.warn('Cannot delete the last block');
-        return;
-      }
+      // Создаем новый массив блоков
+      const newBlocks = blocks.filter(b => b.id !== blockId);
 
-      // 4. Подготавливаем данные для сервера
-      const updatedBlocks = blocks.filter(b => b.id !== blockId);
-      const serverData = updatedBlocks.map((block, index) => ({
-        blockId: block.id,
-        blockType: block.blockType,
-        pageId: block.pageId,
+      // Находим позицию вставки
+      const targetIndex = newBlocks.findIndex(b => b.id === targetId);
+      const insertIndex = position === 'after' ? targetIndex + 1 : targetIndex;
+
+      // Вставляем блок в новую позицию
+      newBlocks.splice(insertIndex, 0, sourceBlock);
+
+      // Обновляем позиции всех блоков
+      const updatedBlocks = newBlocks.map((block, index) => ({
+        ...block,
+        position: index,
         content: {
           ...block.content,
           attrs: {
@@ -913,366 +588,472 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
         }
       }));
 
-      // 5. Отправляем на сервер ПЕРЕД обновлением состояния
-      await saveBlocksToServer(pageId, serverData);
+      // Обновляем состояние
+      setBlocks(updatedBlocks);
 
-      // 6. Уничтожаем Y.js провайдер СИНХРОННО
-      if (blockRef?.provider) {
-        try {
-          console.log('[deleteBlockSafely] Destroying provider for block:', blockId);
+      // Отправляем на сервер
+      const serverData = updatedBlocks.map(block => ({
+        blockId: block.id,
+        blockType: block.blockType,
+        pageId: block.pageId,
+        content: block.content
+      }));
 
-          // Проверяем состояние провайдера перед уничтожением
-          if (blockRef.provider.isConnected) {
-            blockRef.provider.disconnect();
-          }
+      saveBlocksToServer(pageId, serverData);
+    },
+    onElementMove: (sourceId, targetId, position) => {
+      // Убираем префикс element: из sourceId если есть
+      const elementId = sourceId.replace('element:', '');
 
-          // Добавляем небольшую задержку перед уничтожением
-          await new Promise(resolve => setTimeout(resolve, 10));
+      // 🔧 ИСПРАВЛЕНИЕ: Находим исходный блок по sourceId (а не targetId!)
+      const sourceBlock = blocks.find(b => b.id === sourceId);
 
-          blockRef.provider.destroy();
-        } catch (error) {
-          console.warn('Error destroying provider:', error);
-        }
-      }
-
-      // 7. Удаляем ссылки на блок
-      blockRefs.current.delete(blockId);
-
-            // 8. Обновляем состояние React с задержкой для синхронизации с DOM
-      setTimeout(() => {
-        try {
-          setBlocks(updatedBlocks);
-
-          // 9. Фокусируемся на следующем блоке
-          const targetBlock = getNextBlock(blockId) || getPreviousBlock(blockId);
-          if (targetBlock) {
-            setTimeout(() => {
-              try {
-                focusBlock(targetBlock.id, 'end');
-              } catch (error) {
-                console.warn('Failed to focus target block after deletion:', error);
-              }
-            }, 50);
-          }
-        } catch (error) {
-          console.warn('Error updating blocks state after deletion:', error);
-        }
-      }, 10);
-
-    } catch (error) {
-      console.error('Failed to delete block:', error);
-    } finally {
-      setTimeout(() => setIsDeleting(false), 100);
-    }
-  };
-
-    // Функция для фокусировки на блоке
-  const focusBlock = (blockId, position = 'end') => {
-    try {
-      const blockRef = blockRefs.current.get(blockId);
-      if (!blockRef?.editor) {
-        console.warn('Block ref not found for focus:', blockId);
+      if (!sourceBlock) {
         return;
       }
 
-      const editor = blockRef.editor;
+      // Получаем ссылку на редактор исходного блока
+      const sourceBlockRef = blockRefs.current.get(sourceId);
 
-      // Проверяем, что редактор готов
-      if (!editor.isEditable || !editor.view || !editor.view.dom) {
-        console.warn('Editor not ready for focus:', blockId);
+      if (!sourceBlockRef?.editor) {
         return;
       }
 
-      // Проверяем, что DOM-элемент все еще существует
-      if (!editor.view.dom.parentNode) {
-        console.warn('Editor DOM element no longer exists:', blockId);
-        return;
-      }
+      // 🔧 ИСПРАВЛЕНИЕ: Получаем содержимое из исходного блока
+      const editorContent = sourceBlockRef.editor.getJSON();
 
-      setFocusedBlockId(blockId);
-
-      // Используем requestAnimationFrame для синхронизации с DOM
-      requestAnimationFrame(() => {
-        try {
-          if (position === 'end') {
-            editor.commands.focus('end');
-          } else {
-            editor.commands.focus('start');
-          }
-        } catch (error) {
-          console.warn('Error focusing editor:', error);
-        }
-      });
-    } catch (error) {
-      console.warn('Error in focusBlock:', error);
-    }
-  };
-
-  // Функция для создания блока между существующими
-  const createBlockBetween = (afterBlockId, beforeBlockId) => {
-    const afterBlock = blocks.find(block => block.id === afterBlockId);
-    const beforeBlock = blocks.find(block => block.id === beforeBlockId);
-
-    if (!afterBlock || !beforeBlock) return;
-
-    const newBlock = {
-      id: window.crypto.randomUUID(),
-      pageId: pageId,
-      blockType: 'paragraph',
-      position: afterBlock.position + 1,
-      content: {
-        type: 'doc',
-        content: [
-          {
-            type: 'paragraph',
-            attrs: { position: afterBlock.position + 1 }
-          }
-        ]
-      }
-    };
-
-    const updatedBlocks = [...blocks];
-    const insertIndex = updatedBlocks.findIndex(block => block.id === beforeBlockId);
-    updatedBlocks.splice(insertIndex, 0, newBlock);
-
-    // Обновляем позиции
-    updatedBlocks.forEach((block, index) => {
-      block.position = index;
-      if (block.content && block.content.attrs) {
-        block.content.attrs.position = index;
-      }
-    });
-
-    setBlocks(updatedBlocks);
-    return newBlock;
-  };
-
-  // Функция для создания блока в конце
-  const createBlockAtEnd = () => {
-    const newBlock = {
-      id: window.crypto.randomUUID(),
-      pageId: pageId,
-      blockType: 'paragraph',
-      position: blocks.length,
-      content: {
-        type: 'doc',
-        content: [
-          {
-            type: 'paragraph',
-            attrs: { position: blocks.length }
-          }
-        ]
-      }
-    };
-
-    setBlocks(prev => [...prev, newBlock]);
-    return newBlock;
-  };
-
-  // Обработчик создания блока
-  const handleBlockCreated = (newBlock) => {
-    // Обновляем позиции всех блоков
-    const updatedBlocks = blocks.map((block, index) => ({
-      ...block,
-      position: index,
-      content: {
-        ...block.content,
-        attrs: {
-          ...block.content.attrs,
-          position: index
-        }
-      }
-    }));
-
-    setBlocks(updatedBlocks);
-
-    // Фокусируемся на новом блоке
-    requestAnimationFrame(() => {
-      try {
-        focusBlock(newBlock.id, 'start');
-      } catch (error) {
-        console.warn('Failed to focus new block:', error);
-      }
-    });
-  };
-
-  // Обработчик удаления блока
-  const handleBlockDeleted = (blockId) => {
-    deleteBlockSafely(blockId);
-  };
-
-  async function fetchBlocks() {
-    const res = await fetch(`/api/pages/${pageId}/blocks`, { credentials: "include" });
-    const result = await res.json();
-    // Универсальная обработка вложенности
-    let blocks = Array.isArray(result?.data?.data)
-      ? result.data.data
-      : Array.isArray(result?.data)
-      ? result.data
-      : Array.isArray(result)
-      ? result
-      : [];
-    console.log("blocks data from API", blocks);
-    setBlocks(blocks);
-
-    // Если блоков нет и это первая инициализация - создаем первый блок только на клиенте
-    if (blocks.length === 0 && !isInitialized) {
-      console.log("No blocks found, creating initial block on client only");
-
-      // Дополнительная проверка - убеждаемся, что блоков действительно нет
-      try {
-        const doubleCheckRes = await fetch(`/api/pages/${pageId}/blocks`, { credentials: "include" });
-        const doubleCheckResult = await doubleCheckRes.json();
-        const doubleCheckBlocks = Array.isArray(doubleCheckResult?.data?.data)
-          ? doubleCheckResult.data.data
-          : Array.isArray(doubleCheckResult?.data)
-          ? doubleCheckResult.data
-          : Array.isArray(doubleCheckResult)
-          ? doubleCheckResult
-          : [];
-
-        if (doubleCheckBlocks.length > 0) {
-          console.log("Blocks found on double check, using server data");
-          setBlocks(doubleCheckBlocks);
-          setIsInitialized(true);
-          return;
-        }
-      } catch (error) {
-        console.warn("Double check failed, proceeding with initial block creation:", error);
-      }
-
-      const initialBlock = {
-        id: window.crypto.randomUUID(),
-        pageId: pageId,
-        blockType: 'paragraph',
-        position: 0,
-        content: {
-          type: 'paragraph',
-          attrs: {
-            textAlign: 'left',
-            position: 0,
-            blockId: window.crypto.randomUUID() // Добавляем blockId
-          },
-          content: []
-        },
-        hasAccess: true,
-        userPermission: 'owner'
+      // Обновляем исходный блок с новым содержимым
+      const updatedBlock = {
+        ...sourceBlock,
+        content: editorContent
       };
-      console.log("Initial block created on client:", initialBlock);
 
-      // Отправляем первый блок на сервер через тот же эндпоинт
-      saveBlocksToServer(pageId, [{
-        blockId: initialBlock.id,
-        blockType: initialBlock.blockType,
-        pageId: initialBlock.pageId,
-        content: {
-          ...initialBlock.content,
-          attrs: {
-            ...initialBlock.content.attrs,
-            position: initialBlock.position
-          }
-        }
-      }]);
+      // Обновляем массив блоков
+      const updatedBlocks = blocks.map(block =>
+        block.id === sourceId ? updatedBlock : block
+      );
 
-      setBlocks([initialBlock]);
-    }
-    setIsInitialized(true);
-  }
+      // Обновляем состояние
+      setBlocks(updatedBlocks);
 
+      // Отправляем на сервер
+      const serverData = updatedBlocks.map(block => ({
+        blockId: block.id,
+        blockType: block.blockType,
+        pageId: block.pageId,
+        content: block.content
+      }));
+
+      saveBlocksToServer(pageId, serverData);
+    },
+    onBlockCreate: (sourceId, targetId) => {
+      // Убираем префикс element: из sourceId
+      const elementId = sourceId.replace('element:', '');
+
+      // Находим целевой блок
+      const targetBlock = blocks.find(b => b.id === targetId);
+      if (!targetBlock) {
+        return;
+      }
+
+      // Получаем ссылку на редактор блока
+      const blockRef = blockRefs.current.get(targetId);
+      if (!blockRef?.editor) {
+        return;
+      }
+
+      // Получаем текущее содержимое блока из редактора
+      const editorContent = blockRef.editor.getJSON();
+
+      // Обновляем блок с новым содержимым
+      const updatedBlock = {
+        ...targetBlock,
+        content: editorContent
+      };
+
+      // Обновляем массив блоков
+      const updatedBlocks = blocks.map(block =>
+        block.id === targetId ? updatedBlock : block
+      );
+
+      // Обновляем состояние
+      setBlocks(updatedBlocks);
+
+      // Отправляем на сервер
+      const serverData = updatedBlocks.map(block => ({
+        blockId: block.id,
+        blockType: block.blockType,
+        pageId: block.pageId,
+        content: block.content
+      }));
+
+      saveBlocksToServer(pageId, serverData);
+    },
+  });
+
+  // Используем хук для обработки DnD событий
+  useDndEvents({
+    blocks,
+    blocksRef,
+    blockRefs: blockRefs.current,
+    isReady,
+    setBlocks,
+    saveBlocksToServer,
+    pageId
+  });
+
+  // Убрали renderKey чтобы избежать перерендера страницы при создании/удалении блоков
+
+
+  // Проверка готовности всех компонентов - логи отключены
   useEffect(() => {
-    fetchBlocks();
-  }, [pageId]);
+    const checkReadiness = () => {
+      // console.log('[PageEditor] 🔍 Checking editor readiness...', {
+      //   blocksCount: blocks.length,
+      //   blockRefsSize: blockRefs.current.size,
+      //   diagnostics: editorDiagnostics.diagnostics
+      // });
 
-  console.log('[PageEditor] Rendering blocks:', blocks);
+      if (blocks.length === 0) {
+        // console.log('[PageEditor] No blocks, setting ready to true');
+        setIsReady(true);
+        return;
+      }
 
-  return (
-    <div>
-      {isDeleting ? (
-        <div style={{ padding: '10px', textAlign: 'center', color: '#666' }}>
-          Удаление блока...
-        </div>
-      ) : (
-        blocks.map((block) => {
-          console.log('[PageEditor] Rendering block:', block.id, 'hasAccess:', block.hasAccess, 'userPermission:', block.userPermission, 'editable:', editable);
+      // Проверяем готовность без детальной диагностики
+      const allReady = blockRefs.current.size === blocks.length && 
+        Array.from(blockRefs.current.values()).every(ref => ref?.current?.editor);
+
+      // console.log('[PageEditor] 🎯 Final readiness check:', {
+      //   allReady,
+      //   blocksCount: blocks.length,
+      //   blockRefsSize: blockRefs.current.size
+      // });
+
+      if (!allReady && editorDiagnostics.recommendations.length > 0) {
+        // console.warn('[PageEditor] ⚠️ Editors not ready. Recommendations:', editorDiagnostics.recommendations);
+      }
+
+      setIsReady(allReady);
+    };
+
+    checkReadiness();
+  }, [blocks, editorDiagnostics, blockRefs, setIsReady]);
+
+  // Периодическая диагностика отключена
+  // useEffect(() => {
+  //   if (blocks.length > 0 && blockRefs.current.size > 0) {
+  //     const interval = setInterval(() => {
+  //       if (!isReady) {
+  //         console.log('[PageEditor] 🔄 Periodic diagnostics (editors not ready yet)...');
+  //         editorDiagnostics.logBlockEditorsState(blockRefs.current);
+  //       }
+  //     }, 2000); // Каждые 2 секунды
+
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [blocks.length, blockRefs.current.size, isReady, editorDiagnostics]);
+
+  // Загружаем блоки при инициализации
+  useEffect(() => {
+    loadBlocks();
+  }, [loadBlocks]);
+
+  // Логи рендеринга отключены
+  // console.log('[PageEditor] Rendering blocks:', blocks);
+  // console.log('[PageEditor] Current blockRefs state:', {
+  //   size: blockRefs.current.size,
+  //   keys: Array.from(blockRefs.current.keys()),
+  //   entries: Array.from(blockRefs.current.entries()).map(([id, ref]) => ({
+  //     id,
+  //     hasRef: !!ref,
+  //     hasCurrent: !!ref?.current,
+  //     hasEditor: !!ref?.current?.editor,
+  //     hasProvider: !!ref?.current?.provider
+  //   }))
+  // });
+
+             // console.log('[PageEditor] 🎬 STARTING BLOCKS RENDER:', {
+             //   blocksCount: blocks.length,
+             //   blockIds: blocks.map(b => b.id),
+             //   blockRefsCount: blockRefs.current.size,
+             //   blockRefsKeys: Array.from(blockRefs.current.keys()),
+             //   isReady
+             // });
+
+             // Глобальные тестовые функции для отладки
+             useEffect(() => {
+               (window as any).testBlockDropZones = () => {
+                 console.log('🧪 [Test] Testing block drop zones...');
+                 const dropZones = document.querySelectorAll('[data-drop-zone="true"]');
+                 console.log('🧪 [Test] Found drop zones:', dropZones.length);
+                 dropZones.forEach((zone, index) => {
+                   const blockId = zone.getAttribute('data-block-id');
+                   const position = zone.getAttribute('data-position');
+                   console.log(`🧪 [Test] Drop zone ${index + 1}:`, { blockId, position });
+                 });
+                 return dropZones;
+               };
+
+               (window as any).showDropZones = () => {
+                 console.log('🧪 [Test] Showing all drop zones...');
+                 const dropZones = document.querySelectorAll('[data-drop-zone="true"]');
+                 dropZones.forEach((zone) => {
+                   (zone as HTMLElement).style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                   (zone as HTMLElement).style.border = '2px dashed #3b82f6';
+                   (zone as HTMLElement).style.height = '30px';
+                 });
+                 console.log('🧪 [Test] Drop zones highlighted');
+               };
+
+               (window as any).simulateElementDrag = (elementId: string) => {
+                 console.log('🧪 [Test] Simulating element drag:', elementId);
+                 const element = document.querySelector(`[data-element-id="${elementId}"]`);
+                 if (element) {
+                   const dragEvent = new DragEvent('dragstart', {
+                     bubbles: true,
+                     cancelable: true,
+                     dataTransfer: new DataTransfer()
+                   });
+                   element.dispatchEvent(dragEvent);
+                   console.log('🧪 [Test] Drag event dispatched');
+                 } else {
+                   console.warn('🧪 [Test] Element not found:', elementId);
+                 }
+               };
+
+               (window as any).testDropZonePositioning = () => {
+                 console.log('🧪 [Test] Testing drop zone positioning...');
+                 const dropZones = document.querySelectorAll('[data-drop-zone="true"]');
+                 dropZones.forEach((zone, index) => {
+                   const rect = zone.getBoundingClientRect();
+                   const blockId = zone.getAttribute('data-block-id');
+                   const position = zone.getAttribute('data-position');
+                   console.log(`🧪 [Test] Drop zone ${index + 1}:`, {
+                     blockId,
+                     position,
+                     top: rect.top,
+                     left: rect.left,
+                     width: rect.width,
+                     height: rect.height
+                   });
+                 });
+               };
+
+               (window as any).testListMarkers = () => {
+                 console.log('🧪 [Test] Testing list markers...');
+                 const markers = document.querySelectorAll('.list-marker');
+                 console.log('🧪 [Test] Found markers:', markers.length);
+                 markers.forEach((marker, index) => {
+                   const rect = marker.getBoundingClientRect();
+                   const styles = window.getComputedStyle(marker);
+                   const alignmentOffset = rect.top - marker.parentElement?.getBoundingClientRect().top || 0;
+                   const isAligned = Math.abs(alignmentOffset) < 5; // 5px tolerance
+                   
+                   console.log(`🧪 [Test] Marker ${index + 1}:`, {
+                     width: styles.width,
+                     height: styles.height,
+                     fontSize: styles.fontSize,
+                     color: styles.color,
+                     fontWeight: styles.fontWeight,
+                     textShadow: styles.textShadow,
+                     backgroundColor: styles.backgroundColor,
+                     alignItems: styles.alignItems,
+                     justifyContent: styles.justifyContent,
+                     alignSelf: styles.alignSelf,
+                     marginTop: styles.marginTop,
+                     alignmentOffset,
+                     isAligned
+                   });
+                 });
+                 return markers;
+               };
+
+               console.log('🧪 [Test] Global test functions added to window object');
+             }, []);
+
+             return (
+       <EnhancedDndProviderV2>
+         <div>
+        {blocks.map((block, index) => {
+
           const blockEditable = block.userPermission === "edit" || block.userPermission === "owner";
-          console.log('[PageEditor] Block editable check:', {
-            blockId: block.id,
-            userPermission: block.userPermission,
-            blockEditable,
-            globalEditable: editable
-          });
+          // Логи проверки редактируемости отключены
+          // console.log('[PageEditor] 📝 Block editable check:', {
+          //   blockId: block.id,
+          //   userPermission: block.userPermission,
+          //   blockEditable,
+          //   globalEditable: editable,
+          //   willRender: block.hasAccess
+          // });
 
-          return block.hasAccess ? (
-            <BlockEditor
-              pageId={pageId}
-              key={block.id}
-              block={block}
-              editable={blockEditable}
-              onBlockCreated={handleBlockCreated}
-              onBlockDeleted={handleBlockDeleted}
-              allBlocks={blocks}
-              saveBlocksToServer={saveBlocksToServer}
-              onFocus={() => setFocusedBlockId(block.id)}
-              onNavigateUp={() => {
-                const prevBlock = getPreviousBlock(block.id);
-                if (prevBlock) focusBlock(prevBlock.id, 'end');
-              }}
-              onNavigateDown={() => {
-                const nextBlock = getNextBlock(block.id);
-                if (nextBlock) focusBlock(nextBlock.id, 'start');
-              }}
-              onCreateBlockAfter={() => {
-                const newBlock = createBlockBetween(block.id, getNextBlock(block.id)?.id);
-                if (newBlock) {
-                  handleBlockCreated(newBlock);
-                  const updatedBlocks = [...blocks, newBlock].map((block, index) => ({
-                    blockId: block.id,
-                    blockType: block.blockType,
-                    pageId: block.pageId,
-                    content: {
-                      ...block.content,
-                      attrs: {
-                        ...block.content.attrs,
-                        position: index
+                    return (
+                      <React.Fragment key={block.id}>
+                        {/* Дроп-зона перед первым блоком */}
+                        {index === 0 && (() => {
+                          return (
+                            <BlockDropZone
+                              blockId={block.id}
+                              position="before"
+                            />
+                          );
+                        })()}
+                        
+                        {block.hasAccess ? (
+                            <EnhancedBlockHandle
+                  blockId={block.id}
+                  onDragStart={dragHandlers.handleBlockDragStart}
+                  onDragEnd={dragHandlers.handleBlockDragEnd}
+                  onBlockDrop={dragHandlers.handleBlockDrop}
+                  onElementDrop={dragHandlers.handleElementDrop}
+                >
+                <BlockWrapper
+                block={block}
+                editable={blockEditable}
+                onBlockCreated={handleBlockCreated}
+                onBlockDeleted={handleBlockDeleted}
+                allBlocks={blocks}
+                saveBlocksToServer={saveBlocksToServer}
+                pageId={pageId}
+                syncPageOriginId={syncPageOriginId}
+                onFocus={() => setFocusedBlockId(block.id)}
+                onNavigateUp={() => navigateUp(block.id)}
+                onNavigateDown={() => navigateDown(block.id)}
+                onCreateBlockAfter={() => {
+                  // Создаем новый блок
+                  const newBlock = createBlockBetween(block.id, null);
+
+                  if (newBlock) {
+                    // Находим позицию для вставки - сразу после текущего блока
+                    const currentBlockIndex = blocks.findIndex(b => b.id === block.id);
+                    
+                    // Создаем новый массив с иммутабельными обновлениями
+                    const updatedBlocks = blocks.map((existingBlock, index) => {
+                      if (index > currentBlockIndex) {
+                        // Обновляем позиции блоков после вставки
+                        return {
+                          ...existingBlock,
+                          position: index + 1,
+                      content: {
+                        ...existingBlock.content,
+                        attrs: {
+                          ...(existingBlock.content.attrs || {}),
+                          position: index + 1
+                        }
                       }
-                    }
-                  }));
-                  saveBlocksToServer(pageId, updatedBlocks);
-                }
-              }}
-              onCreateBlockAtEnd={() => {
-                const newBlock = createBlockAtEnd();
-                if (newBlock) {
-                  handleBlockCreated(newBlock);
-                  const updatedBlocks = [...blocks, newBlock].map((block, index) => ({
-                    blockId: block.id,
-                    blockType: block.blockType,
-                    pageId: block.pageId,
-                    content: {
-                      ...block.content,
-                      attrs: {
-                        ...block.content.attrs,
-                        position: index
+                        };
                       }
-                    }
-                  }));
-                  saveBlocksToServer(pageId, updatedBlocks);
-                }
-              }}
-              onDeleteBlock={() => handleBlockDeleted(block.id)}
-              ref={(ref) => {
-                if (ref) {
-                  blockRefs.current.set(block.id, ref);
-                } else {
-                  blockRefs.current.delete(block.id);
-                }
-              }}
-            />
-          ) : (
-            <PlaceholderBlock key={block.id} block={block} />
+                      return existingBlock;
+                    });
+
+                    // Вставляем новый блок в правильную позицию
+                    updatedBlocks.splice(currentBlockIndex + 1, 0, {
+                      ...newBlock,
+                      position: currentBlockIndex + 1,
+                      content: {
+                        ...newBlock.content,
+                        attrs: {
+                          ...((newBlock.content as any).attrs || {}),
+                          position: currentBlockIndex + 1
+                        }
+                      }
+                    });
+
+                    // Обновляем состояние
+                    setBlocks(updatedBlocks);
+
+                    // Сохраняем на сервер
+                    const serverData = updatedBlocks.map(block => ({
+                      blockId: block.id,
+                      blockType: block.blockType,
+                      pageId: block.pageId,
+                      content: block.content
+                    }));
+
+                    // Асинхронное сохранение для оптимизации
+                    setTimeout(() => {
+                      saveBlocksToServer(pageId, serverData);
+                    }, 0);
+
+                    // Фокусируемся на новом блоке немедленно (убрали setTimeout для оптимизации)
+                    focusBlockWithRetry(newBlock.id, 'start');
+                  }
+                }}
+                onCreateBlockAtEnd={() => {
+                  const newBlock = createBlockAtEnd();
+                  if (newBlock) {
+                    // Создаем новый массив с иммутабельными обновлениями
+                    const updatedBlocks = blocks.map((existingBlock, index) => ({
+                      ...existingBlock,
+                      position: index,
+                      content: {
+                        ...existingBlock.content,
+                        attrs: {
+                          ...(existingBlock.content.attrs || {}),
+                          position: index
+                        }
+                      }
+                    }));
+
+                    // Добавляем новый блок в конец
+                    const finalBlocks = [...updatedBlocks, {
+                      ...newBlock,
+                      position: blocks.length,
+                      content: {
+                        ...newBlock.content,
+                        attrs: {
+                          ...((newBlock.content as any).attrs || {}),
+                          position: blocks.length
+                        }
+                      }
+                    }];
+
+                    // Обновляем состояние
+                    setBlocks(finalBlocks);
+
+                    // Сохраняем на сервер
+                    const serverData = finalBlocks.map(block => ({
+                      blockId: block.id,
+                      blockType: block.blockType,
+                      pageId: block.pageId,
+                      content: block.content
+                    }));
+
+                    // Асинхронное сохранение для оптимизации
+                    setTimeout(() => {
+                      saveBlocksToServer(pageId, serverData);
+                    }, 0);
+
+                    // Фокусируемся на новом блоке
+                    handleBlockCreated(newBlock);
+                  }
+                }}
+                onDeleteBlock={() => handleBlockDeleted(block.id)}
+                setBlockRef={(ref) => {
+                  // Логи отключены для упрощения отладки
+                  if (ref) {
+                    blockRefs.current.set(block.id, ref);
+                  } else {
+                    blockRefs.current.delete(block.id);
+                  }
+                }}
+              />
+            </EnhancedBlockHandle>
+                        ) : null}
+            
+            {/* Дроп-зона после каждого блока */}
+            {(() => {
+              return (
+                <BlockDropZone
+                  blockId={block.id}
+                  position="after"
+                />
+              );
+            })()}
+          </React.Fragment>
           );
-        })
-      )}
-    </div>
-  );
-}
+        })}
+      </div>
+      </EnhancedDndProviderV2>
+    );
+  }

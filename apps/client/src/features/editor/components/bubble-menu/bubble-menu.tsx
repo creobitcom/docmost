@@ -65,6 +65,11 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
 
   // Получаем ID текущего блока из выделенного текста
   const getCurrentBlockId = (): string | null => {
+    // Приоритет: используем props.blockId если он есть
+    if (props.blockId) {
+      return props.blockId;
+    }
+    
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return null;
 
@@ -80,7 +85,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
         const pageId = (props.pageId ?? props.editor.storage.pageId) as string | undefined;
 
         if (!blockId || !currentUser?.user?.id || !pageId) {
-          console.log('[BubbleMenu] Missing required data:', { blockId, userId: currentUser?.user?.id, pageId });
+          // console.log('[BubbleMenu] Missing required data:', { blockId, userId: currentUser?.user?.id, pageId });
           setUserBlockPermission(null);
           setIsPageCreator(false);
           setHasAdminRights(false);
