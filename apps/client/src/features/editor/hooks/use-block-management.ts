@@ -1,22 +1,16 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { 
-  saveBlocksToServer, 
-  fetchBlocks, 
-  getNextBlock, 
-  getPreviousBlock, 
-  getFirstBlock, 
-  getLastBlock, 
+import {
+  saveBlocksToServer,
+  fetchBlocks,
+  getNextBlock,
+  getPreviousBlock,
+  getFirstBlock,
+  getLastBlock,
   getBestTargetBlockForDeletion,
   createBlockBetween,
   createBlockAtEnd
 } from '../utils/block-utils';
-import { 
-  createRequiredFirstBlock,
-  isRequiredFirstBlock,
-  canDeleteBlock,
-  validateAndFixBlocks,
-  createMigrationScript
-} from '../utils/required-first-block';
+// Удалена старая логика обязательного первого блока
 
 interface UseBlockManagementOptions {
   pageId: string;
@@ -29,7 +23,7 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  
+
   const blocksRef = useRef(blocks);
   const blockRefs = useRef(new Map<string, any>());
 
@@ -194,8 +188,8 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
         return;
       }
 
-      // 4. Проверяем, можно ли удалить этот блок
-      if (!canDeleteBlock(blockToDelete, blocks)) {
+      // 4. Проверяем, можно ли удалить этот блок (нельзя удалить последний блок)
+      if (blocks.length === 1) {
         console.warn('Cannot delete the last block on the page');
         setIsDeleting(false);
         return;
@@ -313,16 +307,35 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
   // Функция для загрузки блоков
   const loadBlocks = useCallback(async () => {
     const blocksData = await fetchBlocks(pageId);
-    
+
     // Если блоков нет - создаем один пустой блок
     if (blocksData.length === 0 && !isInitialized) {
       console.log("No blocks found, creating initial empty block");
 
       // Создаем пустой блок
-      const initialBlock = createRequiredFirstBlock(pageId, {
-        placeholder: 'Начните писать...'
-      });
-      
+      const initialBlock = {
+        id: window.crypto.randomUUID(),
+        pageId: pageId,
+        blockType: 'paragraph',
+        position: 0,
+        content: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              attrs: {
+                textAlign: 'left',
+                position: 0,
+                blockId: window.crypto.randomUUID()
+              },
+              content: []
+            }
+          ]
+        },
+        hasAccess: true,
+        userPermission: 'owner'
+      };
+
       console.log("Initial block created:", initialBlock);
 
       // Отправляем блок на сервер
@@ -386,7 +399,7 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
     setIsReady,
     blocksRef,
     blockRefs,
-    
+
     // Функции
     loadBlocks,
     handleBlockCreated,
@@ -395,13 +408,13 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
     focusBlockWithRetry,
     deleteBlockSafely,
     findBlockElement,
-    
+
     // Навигация
     navigateUp,
     navigateDown,
     navigateToFirst,
     navigateToLast,
-    
+
     // Утилиты
     getNextBlock: (currentBlockId: string) => getNextBlock(blocks, currentBlockId),
     getPreviousBlock: (currentBlockId: string) => getPreviousBlock(blocks, currentBlockId),

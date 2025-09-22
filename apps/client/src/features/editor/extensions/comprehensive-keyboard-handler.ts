@@ -9,12 +9,14 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
   const isAtEnd = $from.pos === $from.end();
   
   // Более точное определение пустого элемента списка
-  const isEmpty = listItemNode.content.size <= 2;
-  
-  // Дополнительная проверка: если элемент списка содержит только пустой параграф
+  // Элемент считается пустым только если он содержит только пустой параграф
   const hasOnlyEmptyParagraph = listItemNode.content.size === 2 && 
     listItemNode.content.firstChild?.type.name === 'paragraph' &&
     listItemNode.content.firstChild?.content.size === 0;
+  
+  // Элемент считается пустым только если он действительно не содержит текста
+  // Проверяем как пустые параграфы, так и элементы без содержимого
+  const isEmpty = hasOnlyEmptyParagraph || listItemNode.content.size === 0;
 
   console.log('[ComprehensiveKeyboardHandler] List item info:', {
     isAtEnd,
@@ -26,7 +28,7 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
   });
 
   // Выход из списка при Enter в пустом элементе
-  if ((isEmpty || hasOnlyEmptyParagraph) && isAtEnd) {
+  if (isEmpty && isAtEnd) {
     console.log('[ComprehensiveKeyboardHandler] Empty list item at end - exiting list');
     
     const tr = state.tr;
@@ -34,20 +36,36 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
     const listPos = $from.before($from.depth - 1);
     const listNode = state.doc.nodeAt(listPos);
     
+    console.log('[ComprehensiveKeyboardHandler] List info:', {
+      listItemPos,
+      listPos,
+      listNodeType: listNode?.type.name,
+      listChildCount: listNode?.childCount,
+      listNodeSize: listNode?.nodeSize
+    });
+    
+    // Удаляем весь список только если это единственный элемент в блоке списка
     if (listNode && listNode.childCount === 1) {
-      // Если это последний элемент в списке, удаляем весь список
-      console.log('[ComprehensiveKeyboardHandler] Deleting entire list (last item)');
+      // Если это единственный элемент в списке, удаляем весь блок списка
+      console.log('[ComprehensiveKeyboardHandler] Deleting entire list block (only item)');
       tr.delete(listPos, listPos + listNode.nodeSize);
+      
+      // Применяем изменения в документе
+      editor.view.dispatch(tr);
+      
+      // Создаем новый блок после удаления списка
+      if (options.onCreateBlockAfter) {
+        console.log('[ComprehensiveKeyboardHandler] Creating new block after list deletion');
+        options.onCreateBlockAfter();
+      }
     } else {
-      // Удаляем только элемент списка
-      console.log('[ComprehensiveKeyboardHandler] Deleting single list item');
+      // Удаляем только элемент списка (если в списке несколько элементов)
+      console.log('[ComprehensiveKeyboardHandler] Deleting single list item (multiple items in list)');
       tr.delete(listItemPos, listItemPos + listItemNode.nodeSize);
+      
+      // Применяем изменения в документе
+      editor.view.dispatch(tr);
     }
-    
-    // Применяем изменения в документе
-    editor.view.dispatch(tr);
-    
-    // НЕ создаем новый блок автоматически - пользователь может сам решить, нужен ли ему новый блок
     
     return true;
   } 
@@ -64,7 +82,10 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
     }
     
     try {
-      const paragraph = state.schema.nodes.paragraph.create();
+      // Создаем пустой параграф для нового элемента списка
+      const paragraph = state.schema.nodes.paragraph.create(null, []);
+      
+      // Создаем новый элемент списка с пустым параграфом
       const newListItem = listItemNode.type.create(null, paragraph);
       
       // Проверяем, что позиция для вставки корректна
@@ -74,9 +95,10 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
         return false;
       }
       
+      // Вставляем новый элемент списка
       tr.insert(insertPos, newListItem);
       
-      // Проверяем, что можем установить селекцию
+      // Устанавливаем селекцию в новый элемент списка
       const newPos = insertPos + 1;
       if (newPos <= tr.doc.content.size) {
         tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
@@ -102,7 +124,10 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
     }
     
     try {
-      const paragraph = state.schema.nodes.paragraph.create();
+      // Создаем пустой параграф для нового элемента списка
+      const paragraph = state.schema.nodes.paragraph.create(null, []);
+      
+      // Создаем новый элемент списка с пустым параграфом
       const newListItem = listItemNode.type.create(null, paragraph);
       
       // Проверяем, что можем разделить в текущей позиции
@@ -111,6 +136,7 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
         return false;
       }
       
+      // Разделяем элемент списка
       tr.split($from.pos);
       
       // Проверяем позицию для вставки после разделения
@@ -118,7 +144,7 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
       if (insertPos <= tr.doc.content.size) {
         tr.insert(insertPos, newListItem);
         
-        // Проверяем, что можем установить селекцию
+        // Устанавливаем селекцию в новый элемент списка
         const newPos = insertPos + 1;
         if (newPos <= tr.doc.content.size) {
           tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
@@ -145,14 +171,14 @@ function handleBackspaceInList(editor: any, $from: any, listItemType: string, op
       const listNode = state.doc.nodeAt(listPos);
       
       if (listNode && listNode.childCount === 1) {
-        console.log('[ComprehensiveKeyboardHandler] Last item in list - deleting entire list block');
+        console.log('[ComprehensiveKeyboardHandler] Only item in list - deleting entire list block');
         
-        // Если это последний элемент в списке, удаляем весь блок списка
+        // Если это единственный элемент в списке, удаляем весь блок списка
         const tr = state.tr;
         tr.delete(listPos, listPos + listNode.nodeSize);
         editor.view.dispatch(tr);
         
-        // НЕ создаем новый блок автоматически - пользователь может сам решить, нужен ли ему новый блок
+        // НЕ создаем новый блок при удалении через Backspace - это обычное удаление
         
         return true;
       } else {

@@ -24,7 +24,7 @@ import {
 import { SmartListHandler } from "@/features/editor/extensions/smart-list-handler";
 import { slashMenuPluginKey } from "@/features/editor/extensions/slash-command";
 import { getTokenFromCollabQuery, saveBlocksToServer, hasTextContent } from "../utils/block-utils";
-import { canDeleteBlock } from "../utils/required-first-block";
+// Удалена старая логика обязательного первого блока
 
 // Объявляем глобальные переменные для TypeScript
 declare global {
@@ -240,13 +240,28 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
   const handleEditorUpdate = useDebouncedCallback((editor) => {
     const json = editor.getJSON();
 
-    // Берем только первый параграф из редактора
-    const firstParagraph = json.content?.find(node =>
-      node.type === 'paragraph'
-    );
+    // Проверяем тип блока для правильной обработки
+    const blockType = block.blockType || 'paragraph';
+    const isListBlock = blockType.includes('List') || blockType.includes('list') || blockType.includes('task');
 
-    // Проверяем, что параграф не пустой - проверяем наличие текста
-    if (firstParagraph && hasTextContent(firstParagraph)) {
+    let contentToSave = null;
+
+    if (isListBlock) {
+      // Для списков берем весь контент как есть
+      contentToSave = json;
+    } else {
+      // Для обычных блоков берем только первый параграф
+      const firstParagraph = json.content?.find(node =>
+        node.type === 'paragraph'
+      );
+
+      if (firstParagraph && hasTextContent(firstParagraph)) {
+        contentToSave = firstParagraph;
+      }
+    }
+
+    // Проверяем, что контент не пустой
+    if (contentToSave) {
       // Проверяем валидность контента перед отправкой
       const isValidContent = (node) => {
         if (!node || typeof node !== 'object') return false;
@@ -257,12 +272,12 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
         return true;
       };
 
-      if (!isValidContent(firstParagraph)) {
+      if (!isValidContent(contentToSave)) {
         console.warn('[BlockEditor] Invalid content detected, skipping save');
         return;
       }
 
-      // Проверяем, что в параграфе нет дублирующихся blockId
+      // Проверяем, что в контенте нет дублирующихся blockId
       const blockIds = new Set();
       const checkForDuplicateBlockIds = (node) => {
         if (node.attrs && node.attrs.blockId) {
@@ -277,7 +292,7 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
         return true;
       };
 
-      if (!checkForDuplicateBlockIds(firstParagraph)) {
+      if (!checkForDuplicateBlockIds(contentToSave)) {
         console.warn('[BlockEditor] Duplicate blockId detected, skipping save');
         return;
       }
@@ -290,9 +305,9 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
             blockType: existingBlock.blockType,
             pageId: existingBlock.pageId,
             content: {
-              ...firstParagraph,
+              ...contentToSave,
               attrs: {
-                ...firstParagraph.attrs,
+                ...contentToSave.attrs,
                 position: existingBlock.position, // Сохраняем существующий position
                 blockId: existingBlock.id // Добавляем blockId
               }
@@ -331,7 +346,7 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
           onNavigateDown: onNavigateDown,
           onNavigateToFirst: onNavigateToFirst,
           onNavigateToLast: onNavigateToLast,
-          canDeleteBlock: canDeleteBlock,
+          canDeleteBlock: (block: any, allBlocks: any[]) => allBlocks.length > 1,
           allBlocks: allBlocks,
           currentBlock: block
         });
@@ -392,49 +407,60 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
       console.log('🎯 [BlockEditor] Editor created for block:', block.id);
       console.log('🎯 [BlockEditor] Extensions loaded:', extensions.map(ext => ext.name));
 
-      // Проверяем, что в редакторе только один параграф
-      try {
-        const doc = editor.getJSON();
-        if (doc.content && doc.content.length > 1) {
-          const paragraphs = doc.content.filter(node => node.type === 'paragraph');
-          if (paragraphs.length > 1) {
-            console.warn('[BlockEditor] Multiple paragraphs detected in editor after creation, keeping only first');
-            const firstParagraph = paragraphs[0];
-            const otherContent = doc.content.filter(node => node.type !== 'paragraph');
-            editor.commands.setContent({
-              type: 'doc',
-              content: [firstParagraph, ...otherContent]
-            });
+      // Проверяем тип блока для правильной обработки
+      const blockType = block.blockType || 'paragraph';
+      const isListBlock = blockType.includes('List') || blockType.includes('list') || blockType.includes('task');
+
+      if (!isListBlock) {
+        // Для обычных блоков проверяем, что в редакторе только один параграф
+        try {
+          const doc = editor.getJSON();
+          if (doc.content && doc.content.length > 1) {
+            const paragraphs = doc.content.filter(node => node.type === 'paragraph');
+            if (paragraphs.length > 1) {
+              console.warn('[BlockEditor] Multiple paragraphs detected in editor after creation, keeping only first');
+              const firstParagraph = paragraphs[0];
+              const otherContent = doc.content.filter(node => node.type !== 'paragraph');
+              editor.commands.setContent({
+                type: 'doc',
+                content: [firstParagraph, ...otherContent]
+              });
+            }
           }
+        } catch (error) {
+          console.warn('[BlockEditor] Error in onCreate:', error);
         }
+      }
 
-        // Принудительно вызываем ref callback после создания редактора
-        if (ref && typeof ref === 'function') {
-          ref({ editor, provider });
-        }
-
-      } catch (error) {
-        console.warn('[BlockEditor] Error in onCreate:', error);
+      // Принудительно вызываем ref callback после создания редактора
+      if (ref && typeof ref === 'function') {
+        ref({ editor, provider });
       }
     },
     onUpdate({ editor }) {
       if (editor.isEmpty) return;
 
       try {
-        // Проверяем, что в редакторе только один параграф (только для параграфов, не для других типов блоков)
-        const doc = editor.getJSON();
-        if (doc.content && doc.content.length > 1) {
-          const paragraphs = doc.content.filter(node => node.type === 'paragraph');
-          if (paragraphs.length > 1) {
-            console.warn('[BlockEditor] Multiple paragraphs detected in editor update, keeping only first');
-            const firstParagraph = paragraphs[0];
-            const otherContent = doc.content.filter(node => node.type !== 'paragraph');
-            editor.commands.setContent({
-              type: 'doc',
-              content: [firstParagraph, ...otherContent]
-            });
+        // Проверяем тип блока для правильной обработки
+        const blockType = block.blockType || 'paragraph';
+        const isListBlock = blockType.includes('List') || blockType.includes('list') || blockType.includes('task');
+
+        if (!isListBlock) {
+          // Для обычных блоков проверяем, что в редакторе только один параграф
+          const doc = editor.getJSON();
+          if (doc.content && doc.content.length > 1) {
+            const paragraphs = doc.content.filter(node => node.type === 'paragraph');
+            if (paragraphs.length > 1) {
+              console.warn('[BlockEditor] Multiple paragraphs detected in editor update, keeping only first');
+              const firstParagraph = paragraphs[0];
+              const otherContent = doc.content.filter(node => node.type !== 'paragraph');
+              editor.commands.setContent({
+                type: 'doc',
+                content: [firstParagraph, ...otherContent]
+              });
+            }
+            return;
           }
-          return;
         }
 
         handleEditorUpdate(editor);
@@ -582,15 +608,21 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
       // Используем requestAnimationFrame для синхронизации с DOM
       requestAnimationFrame(() => {
         try {
-          // Проверяем, что contentToInit содержит только один параграф
-          if (contentToInit.type === 'doc' && contentToInit.content && Array.isArray(contentToInit.content)) {
-            const paragraphs = contentToInit.content.filter(node => node.type === 'paragraph');
-            if (paragraphs.length > 1) {
-              console.warn('[BlockEditor] Multiple paragraphs detected in contentToInit, using only first');
-              contentToInit = {
-                ...contentToInit,
-                content: [paragraphs[0]]
-              };
+          // Проверяем тип блока для правильной обработки
+          const blockType = block.blockType || 'paragraph';
+          const isListBlock = blockType.includes('List') || blockType.includes('list') || blockType.includes('task');
+
+          if (!isListBlock) {
+            // Для обычных блоков проверяем, что contentToInit содержит только один параграф
+            if (contentToInit.type === 'doc' && contentToInit.content && Array.isArray(contentToInit.content)) {
+              const paragraphs = contentToInit.content.filter(node => node.type === 'paragraph');
+              if (paragraphs.length > 1) {
+                console.warn('[BlockEditor] Multiple paragraphs detected in contentToInit, using only first');
+                contentToInit = {
+                  ...contentToInit,
+                  content: [paragraphs[0]]
+                };
+              }
             }
           }
 

@@ -212,7 +212,11 @@ export class PersistenceExtension implements Extension {
           }
           
           // Проверяем поддерживаемые типы узлов
-          const supportedTypes = ['doc', 'paragraph', 'heading', 'text', 'codeBlock'];
+          const supportedTypes = [
+            'doc', 'paragraph', 'heading', 'text', 'codeBlock',
+            'bulletList', 'orderedList', 'taskList', 'listItem', 'taskItem',
+            'blockquote', 'codeBlock', 'horizontalRule', 'hardBreak'
+          ];
           if (!supportedTypes.includes(node.type)) {
             this.logger.warn(`Unsupported node type in block ${blockId}: ${node.type}`);
             return false;
