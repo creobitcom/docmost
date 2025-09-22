@@ -86,7 +86,6 @@ function updateDragOverCache(e: DragEvent, targetElementId?: string, targetBlock
  */
 export function clearDragOverCache(): void {
   lastDragOverState = null;
-  console.log('🧹 [UnifiedDragHandlers] Drag over cache cleared');
 }
 
 /**
@@ -226,48 +225,30 @@ export function handleUnifiedDragStart(e: DragEvent): UnifiedDragData | null {
  * Универсальный обработчик drag over
  */
 export async function handleUnifiedDragOver(e: DragEvent): Promise<boolean> {
-  // Убрали избыточное логирование для оптимизации
-  // console.log('🔄 [UnifiedDragHandlers] ===== UNIFIED DRAG OVER =====');
-  // console.log('🔄 [UnifiedDragHandlers] Event type:', e.type);
-  // console.log('🔄 [UnifiedDragHandlers] Event target:', e.target);
-  // console.log('🔄 [UnifiedDragHandlers] Event currentTarget:', e.currentTarget);
-  // console.log('🔄 [UnifiedDragHandlers] Event clientX:', e.clientX);
-  // console.log('🔄 [UnifiedDragHandlers] Event clientY:', e.clientY);
-  // console.log('🔄 [UnifiedDragHandlers] DataTransfer types:', e.dataTransfer?.types);
-  // console.log('🔄 [UnifiedDragHandlers] DataTransfer dropEffect:', e.dataTransfer?.dropEffect);
-
   try {
     // Получаем данные из безопасного менеджера состояния
-    // console.log('🔄 [UnifiedDragHandlers] Getting drag state from DragStateManager...');
     let dragData = DragStateManager.get();
-    // console.log('🔄 [UnifiedDragHandlers] Current drag state:', dragData);
 
     // Fallback: пытаемся получить данные из DataTransfer
     if (!dragData && e.dataTransfer) {
-      console.log('🔄 [UnifiedDragHandlers] No drag state found, trying DataTransfer fallback...');
       try {
         const jsonData = e.dataTransfer.getData('application/json');
-        console.log('🔄 [UnifiedDragHandlers] DataTransfer jsonData:', jsonData);
         if (jsonData) {
           const parsed = JSON.parse(jsonData);
-          console.log('🔄 [UnifiedDragHandlers] Parsed DataTransfer data:', parsed);
           if (parsed && parsed.type && parsed.version === '2.0') {
             dragData = parsed as UnifiedDragData;
-            console.log('✅ [UnifiedDragHandlers] Using DataTransfer data:', dragData);
           }
         }
       } catch (error) {
-        console.warn('⚠️ [UnifiedDragHandlers] Could not parse DataTransfer data:', error);
+        // Silent fallback
       }
     }
 
     // 🔧 ИСПРАВЛЕНИЕ: Дополнительный fallback через dndCoordinator
     if (!dragData) {
-      console.log('🔄 [UnifiedDragHandlers] No drag state found, trying dndCoordinator fallback...');
       try {
         const { dndCoordinator } = await import('../dnd/DndCoordinator');
         const coordinatorState = dndCoordinator.getCurrentPayload();
-        console.log('🔄 [UnifiedDragHandlers] dndCoordinator state:', coordinatorState);
         
         if (coordinatorState && coordinatorState.type === 'element') {
           // Преобразуем данные из dndCoordinator в формат UnifiedDragData
@@ -279,32 +260,21 @@ export async function handleUnifiedDragOver(e: DragEvent): Promise<boolean> {
             sourceHandle: 'element',
             timestamp: Date.now()
           };
-          console.log('✅ [UnifiedDragHandlers] Using dndCoordinator data:', dragData);
           
           // Сохраняем в DragStateManager для будущих вызовов
           DragStateManager.set(dragData);
-          console.log('✅ [UnifiedDragHandlers] Data synced to DragStateManager');
         }
       } catch (error) {
-        console.warn('⚠️ [UnifiedDragHandlers] Could not get dndCoordinator data:', error);
+        // Silent fallback
       }
     }
 
     if (!dragData || !DragStateManager.hasValid()) {
-      console.log('⚠️ [UnifiedDragHandlers] No valid drag data found');
-      console.log('🔄 [UnifiedDragHandlers] DragStateManager.hasValid():', DragStateManager.hasValid());
-      console.log('❌ [UnifiedDragHandlers] ===== UNIFIED DRAG OVER FAILED =====');
       return false;
     }
 
-    console.log('✅ [UnifiedDragHandlers] Drag over with data:', dragData);
-    console.log('🔄 [UnifiedDragHandlers] Drag data type:', dragData.type);
-    console.log('🔄 [UnifiedDragHandlers] Drag data version:', dragData.version);
-
     // Сценарий 1: перетаскиваем элемент
     if (dragData.type === 'element') {
-      console.log('🔄 [UnifiedDragHandlers] Processing element drag over...');
-
       // 🔧 ИСПРАВЛЕНИЕ: Улучшенный поиск элементов
       const targetElement = findTargetElement(e.target as HTMLElement);
       const targetBlock = (e.target as HTMLElement).closest('[data-block-id]');
@@ -312,82 +282,53 @@ export async function handleUnifiedDragOver(e: DragEvent): Promise<boolean> {
       const targetElementId = targetElement?.getAttribute('data-element-id');
       const targetBlockId = targetBlock?.getAttribute('data-block-id');
 
-      console.log('🔄 [UnifiedDragHandlers] Target element found:', !!targetElement);
-      console.log('🔄 [UnifiedDragHandlers] Target block found:', !!targetBlock);
-      console.log('🔄 [UnifiedDragHandlers] Target element ID:', targetElementId);
-      console.log('🔄 [UnifiedDragHandlers] Target block ID:', targetBlockId);
-
       // 🔧 ИСПРАВЛЕНИЕ: Проверяем на дубликаты dragover
       if (isDuplicateDragOver(e, targetElementId, targetBlockId)) {
-        console.log('🔄 [UnifiedDragHandlers] Duplicate dragover detected, skipping...');
         return true; // Возвращаем true, чтобы не прерывать drag
       }
 
       if (targetElement || targetBlock) {
-        console.log('✅ [UnifiedDragHandlers] Valid drop target found for element');
         e.preventDefault();
         e.dataTransfer!.dropEffect = 'move';
-        console.log('✅ [UnifiedDragHandlers] Event prevented and dropEffect set to move');
 
         // Подсвечиваем drop-зону элемента
         if (targetElement) {
           targetElement.classList.add('drag-over-element');
-          console.log('✅ [UnifiedDragHandlers] Added drag-over-element class to target element');
         } else if (targetBlock) {
           targetBlock.classList.add('drag-over-block');
-          console.log('✅ [UnifiedDragHandlers] Added drag-over-block class to target block');
         }
 
         // 🔧 ИСПРАВЛЕНИЕ: Обновляем кэш
         updateDragOverCache(e, targetElementId, targetBlockId);
 
-        console.log('✅ [UnifiedDragHandlers] ===== ELEMENT DRAG OVER SUCCESS =====');
         return true;
-      } else {
-        console.log('⚠️ [UnifiedDragHandlers] No valid drop target found for element');
       }
     }
 
     // Сценарий 2: перетаскиваем блок
     if (dragData.type === 'block') {
-      console.log('🔄 [UnifiedDragHandlers] Processing block drag over...');
       const targetBlock = (e.target as HTMLElement).closest('[data-block-id]');
-
       const targetBlockId = targetBlock?.getAttribute('data-block-id');
-
-      console.log('🔄 [UnifiedDragHandlers] Target block found:', !!targetBlock);
-      console.log('🔄 [UnifiedDragHandlers] Target block ID:', targetBlockId);
-      console.log('🔄 [UnifiedDragHandlers] Source block ID:', dragData.blockId);
-      console.log('🔄 [UnifiedDragHandlers] Is different block:', targetBlockId !== dragData.blockId);
 
       // 🔧 ИСПРАВЛЕНИЕ: Проверяем на дубликаты dragover
       if (isDuplicateDragOver(e, undefined, targetBlockId)) {
-        console.log('🔄 [UnifiedDragHandlers] Duplicate dragover detected, skipping...');
         return true; // Возвращаем true, чтобы не прерывать drag
       }
 
       if (targetBlock && targetBlockId !== dragData.blockId) {
-        console.log('✅ [UnifiedDragHandlers] Valid drop target found for block');
         e.preventDefault();
         e.dataTransfer!.dropEffect = 'move';
-        console.log('✅ [UnifiedDragHandlers] Event prevented and dropEffect set to move');
 
         // Подсвечиваем drop-зону блока
         targetBlock.classList.add('drag-over-block');
-        console.log('✅ [UnifiedDragHandlers] Added drag-over-block class to target block');
 
         // 🔧 ИСПРАВЛЕНИЕ: Обновляем кэш
         updateDragOverCache(e, undefined, targetBlockId);
 
-        console.log('✅ [UnifiedDragHandlers] ===== BLOCK DRAG OVER SUCCESS =====');
         return true;
-      } else {
-        console.log('⚠️ [UnifiedDragHandlers] No valid drop target found for block');
       }
     }
 
-    console.log('⚠️ [UnifiedDragHandlers] No valid drag over scenario matched');
-    console.log('❌ [UnifiedDragHandlers] ===== UNIFIED DRAG OVER FAILED =====');
     return false;
   } catch (error) {
     console.error('❌ [UnifiedDragHandlers] Error in handleUnifiedDragOver:', error);

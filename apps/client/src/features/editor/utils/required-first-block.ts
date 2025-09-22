@@ -50,16 +50,14 @@ export function createRequiredFirstBlock(pageId: string, config?: Partial<Requir
               level: 1,
               textAlign: 'left',
               position: 0,
-              blockId: blockId,
-              isRequired: true // Флаг обязательного блока
+              blockId: blockId
             },
             content: finalConfig.title ? [{ type: 'text', text: finalConfig.title }] : []
           }
         ]
       },
       hasAccess: true,
-      userPermission: 'owner',
-      isRequired: true // Флаг обязательного блока
+      userPermission: 'owner'
     };
   } else {
     return {
@@ -75,25 +73,24 @@ export function createRequiredFirstBlock(pageId: string, config?: Partial<Requir
             attrs: {
               textAlign: 'left',
               position: 0,
-              blockId: blockId,
-              isRequired: true // Флаг обязательного блока
+              blockId: blockId
             },
             content: []
           }
         ]
       },
       hasAccess: true,
-      userPermission: 'owner',
-      isRequired: true // Флаг обязательного блока
+      userPermission: 'owner'
     };
   }
 }
 
 /**
  * Проверяет, является ли блок обязательным первым блоком
+ * @deprecated Больше не используется - проверяем только количество блоков
  */
 export function isRequiredFirstBlock(block: any): boolean {
-  return block?.isRequired === true;
+  return false; // Всегда false, так как используем простую логику подсчета блоков
 }
 
 /**

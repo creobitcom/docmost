@@ -85,7 +85,6 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
         const pageId = (props.pageId ?? props.editor.storage.pageId) as string | undefined;
 
         if (!blockId || !currentUser?.user?.id || !pageId) {
-          // console.log('[BubbleMenu] Missing required data:', { blockId, userId: currentUser?.user?.id, pageId });
           setUserBlockPermission(null);
           setIsPageCreator(false);
           setHasAdminRights(false);
@@ -143,18 +142,7 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
           const finalHasAdminRights = hasOwnerRole || hasAdminRole || hasSpaceAdminRights;
           setHasAdminRights(finalHasAdminRights);
 
-          console.log('[BubbleMenu] User permissions check:', {
-            userId: currentUser?.user?.id,
-            pageCreatorId: creatorId,
-            isPageCreator: isCreator,
-            userBlockPermission: currentUserPermission?.role,
-            userRole,
-            hasOwnerRole,
-            hasAdminRole,
-            hasSpaceAdminRights,
-            finalHasAdminRights,
-            shouldShowSearchButton: isCreator || currentUserPermission?.role === 'owner' || finalHasAdminRights
-          });
+          // Убираем избыточное логирование для оптимизации
         }
       } catch (err) {
         console.error("Failed to check user permissions:", err);
@@ -345,7 +333,6 @@ export const EditorBubbleMenu: FC<EditorBubbleMenuProps> = (props) => {
               aria-label="Search"
               style={{ border: "none" }}
               onClick={() => {
-                console.log('[BubbleMenu] Search button clicked, opening modal');
                 setSearchModalOpened(true);
               }}
             >

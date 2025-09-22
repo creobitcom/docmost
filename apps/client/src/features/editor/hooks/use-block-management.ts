@@ -314,83 +314,34 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
   const loadBlocks = useCallback(async () => {
     const blocksData = await fetchBlocks(pageId);
     
-    // Валидируем и исправляем структуру блоков (обязательный первый блок создается только если блоков нет)
-    const validatedBlocks = validateAndFixBlocks(blocksData, pageId, {
-      placeholder: 'Начните писать...'
-    });
-    
-    setBlocks(validatedBlocks);
+    // Если блоков нет - создаем один пустой блок
+    if (blocksData.length === 0 && !isInitialized) {
+      console.log("No blocks found, creating initial empty block");
 
-    // Если блоков нет и это первая инициализация - создаем обязательный первый блок
-    if (validatedBlocks.length === 0 && !isInitialized) {
-      console.log("No blocks found, creating required first block");
-
-      // Дополнительная проверка - убеждаемся, что блоков действительно нет
-      try {
-        const doubleCheckBlocks = await fetchBlocks(pageId);
-
-        if (doubleCheckBlocks.length > 0) {
-          console.log("Blocks found on double check, using server data");
-          const validatedDoubleCheckBlocks = validateAndFixBlocks(doubleCheckBlocks, pageId, {
-            placeholder: 'Начните писать...'
-          });
-          setBlocks(validatedDoubleCheckBlocks);
-          setIsInitialized(true);
-          return;
-        }
-      } catch (error) {
-        console.warn("Double check failed, proceeding with required first block creation:", error);
-      }
-
-      // Создаем обязательный первый блок
-      const requiredFirstBlock = createRequiredFirstBlock(pageId, {
+      // Создаем пустой блок
+      const initialBlock = createRequiredFirstBlock(pageId, {
         placeholder: 'Начните писать...'
       });
       
-      console.log("Required first block created:", requiredFirstBlock);
+      console.log("Initial block created:", initialBlock);
 
-      // Отправляем обязательный первый блок на сервер
+      // Отправляем блок на сервер
       saveBlocksToServer(pageId, [{
-        blockId: requiredFirstBlock.id,
-        blockType: requiredFirstBlock.blockType,
-        pageId: requiredFirstBlock.pageId,
-        content: {
-          ...requiredFirstBlock.content,
-          content: [
-            {
-              ...requiredFirstBlock.content.content[0],
-              attrs: {
-                ...requiredFirstBlock.content.content[0].attrs,
-                position: requiredFirstBlock.position
-              }
-            }
-          ]
-        }
+        blockId: initialBlock.id,
+        blockType: initialBlock.blockType,
+        pageId: initialBlock.pageId,
+        content: initialBlock.content,
+        hasAccess: initialBlock.hasAccess,
+        userPermission: initialBlock.userPermission
       }]);
 
-      setBlocks([requiredFirstBlock]);
-    } else if (blocksData.length > 0 && !isInitialized) {
-      // Если блоки есть, но обязательного первого блока нет - создаем миграцию
-      const migration = createMigrationScript(pageId, blocksData, {
-        placeholder: 'Начните писать...'
-      });
-      
-      if (migration.migration.type === 'add_required_first_block') {
-        console.log("Migration: Adding required first block to existing page");
-        
-        // Отправляем мигрированные блоки на сервер
-        const serverData = migration.blocks.map(block => ({
-          blockId: block.id,
-          blockType: block.blockType,
-          pageId: block.pageId,
-          content: block.content
-        }));
-        
-        saveBlocksToServer(pageId, serverData);
-        setBlocks(migration.blocks);
-      }
+      setBlocks([initialBlock]);
+    } else {
+      // Блоки есть - просто устанавливаем их
+      console.log("Blocks found, setting blocks:", blocksData.length);
+      setBlocks(blocksData);
     }
-    
+
     setIsInitialized(true);
   }, [pageId, isInitialized]);
 

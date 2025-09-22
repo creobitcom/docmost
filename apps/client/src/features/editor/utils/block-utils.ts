@@ -31,8 +31,24 @@ export async function saveBlocksToServer(pageId: string, blocks: any[]) {
       blockId: b.blockId,
       blockType: b.blockType,
       pageId: b.pageId,
-      hasContent: !!b.content
+      hasContent: !!b.content,
+      isRequired: b.isRequired,
+      hasAccess: b.hasAccess,
+      userPermission: b.userPermission,
+      allKeys: Object.keys(b)
     })));
+    
+    // Детальное логирование для отладки
+    console.log('🔍 [saveBlocksToServer] DETAILED BLOCK DATA:');
+    blocks.forEach((block, index) => {
+      console.log(`Block ${index}:`, {
+        blockId: block.blockId,
+        isRequired: block.isRequired,
+        hasAccess: block.hasAccess,
+        userPermission: block.userPermission,
+        allProperties: block
+      });
+    });
     
     try {
       const response = await fetch(`/api/pages/blocks/${pageId}`, {
@@ -339,7 +355,8 @@ export function createBlockBetween(pageId: string, blocks: any[], afterBlockId: 
           type: 'paragraph',
           attrs: {
             position: afterBlock.position + 1,
-            textAlign: 'left'
+            textAlign: 'left',
+            blockId: window.crypto.randomUUID()
           }
         }
       ]
@@ -364,7 +381,11 @@ export function createBlockAtEnd(pageId: string, blocks: any[]) {
       content: [
         {
           type: 'paragraph',
-          attrs: { position: blocks.length }
+          attrs: { 
+            position: blocks.length,
+            textAlign: 'left',
+            blockId: window.crypto.randomUUID()
+          }
         }
       ]
     },

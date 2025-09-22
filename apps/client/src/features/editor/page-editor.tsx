@@ -395,7 +395,9 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
             blockId: block.id,
             blockType: block.blockType,
             pageId: block.pageId,
-            content: currentContent
+            content: currentContent,
+            hasAccess: block.hasAccess,
+            userPermission: block.userPermission
           };
           
           console.log('📦 [getBlocksForSave] Final block data:', {
@@ -920,6 +922,9 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
                 onNavigateUp={() => navigateUp(block.id)}
                 onNavigateDown={() => navigateDown(block.id)}
                 onCreateBlockAfter={() => {
+                  console.log('[PageEditor] onCreateBlockAfter called for block:', block.id);
+                  console.trace('[PageEditor] Call stack for onCreateBlockAfter');
+                  
                   // Создаем новый блок
                   const newBlock = createBlockBetween(block.id, null);
 

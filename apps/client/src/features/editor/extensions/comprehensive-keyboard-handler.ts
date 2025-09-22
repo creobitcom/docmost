@@ -47,13 +47,7 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
     // Применяем изменения в документе
     editor.view.dispatch(tr);
     
-    // Создаем новый блок после применения изменений
-    setTimeout(() => {
-      if (options.onCreateBlockAfter) {
-        console.log('[ComprehensiveKeyboardHandler] Creating new block after list exit');
-        options.onCreateBlockAfter();
-      }
-    }, 0);
+    // НЕ создаем новый блок автоматически - пользователь может сам решить, нужен ли ему новый блок
     
     return true;
   } 
@@ -158,13 +152,7 @@ function handleBackspaceInList(editor: any, $from: any, listItemType: string, op
         tr.delete(listPos, listPos + listNode.nodeSize);
         editor.view.dispatch(tr);
         
-        // Создаем новый блок после удаления списка
-        setTimeout(() => {
-          if (options.onCreateBlockAfter) {
-            console.log('[ComprehensiveKeyboardHandler] Creating new block after list deletion');
-            options.onCreateBlockAfter();
-          }
-        }, 0);
+        // НЕ создаем новый блок автоматически - пользователь может сам решить, нужен ли ему новый блок
         
         return true;
       } else {
@@ -269,8 +257,11 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
 
         // ===== ENTER В ПАРАГРАФАХ =====
         if (parentType === 'paragraph') {
+          console.log('[ComprehensiveKeyboardHandler] Enter in paragraph, offset:', $from.parentOffset, 'size:', $from.parent.content.size);
+          
           // Enter в конце параграфа создаёт новый блок
           if ($from.parentOffset === $from.parent.content.size) {
+            console.log('[ComprehensiveKeyboardHandler] Enter at end of paragraph - creating new block');
             if (this.options.onCreateBlockAfter) {
               this.options.onCreateBlockAfter();
               return true;
@@ -278,6 +269,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
           }
           // Enter в начале пустого параграфа создаёт новый блок
           else if ($from.parentOffset === 0 && $from.parent.content.size === 0) {
+            console.log('[ComprehensiveKeyboardHandler] Enter in empty paragraph - creating new block');
             if (this.options.onCreateBlockAfter) {
               this.options.onCreateBlockAfter();
               return true;
@@ -285,6 +277,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
           }
           // Enter в середине параграфа разделяет его на два блока
           else if ($from.parentOffset < $from.parent.content.size) {
+            console.log('[ComprehensiveKeyboardHandler] Enter in middle of paragraph - creating new block');
             if (this.options.onCreateBlockAfter) {
               this.options.onCreateBlockAfter();
               return true;

@@ -287,9 +287,19 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
           },
           apply(tr, set) {
             set = set.map(tr.mapping, tr.doc);
-            if (tr.docChanged) {
-              console.log('[RealElementDragHandle] Document changed, recreating decorations');
-              return createElementDecorations(tr.doc);
+            // Оптимизация: пересоздаем декорации только при значительных изменениях
+            if (tr.docChanged && (tr.steps.length > 0)) {
+              // Проверяем, действительно ли нужно пересоздавать декорации
+              const hasListChanges = tr.steps.some(step => {
+                // Проверяем, затрагивает ли изменение списки
+                return (step as any).jsonID === 'addMark' || (step as any).jsonID === 'removeMark' || 
+                       (step as any).jsonID === 'replace' || (step as any).jsonID === 'replaceAround';
+              });
+              
+              if (hasListChanges) {
+                console.log('[RealElementDragHandle] Document changed, recreating decorations');
+                return createElementDecorations(tr.doc);
+              }
             }
             return set;
           }
