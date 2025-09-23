@@ -1,0 +1,5 @@
+---
+description: you can't use git wothout my permission
+globs:
+alwaysApply: true
+---

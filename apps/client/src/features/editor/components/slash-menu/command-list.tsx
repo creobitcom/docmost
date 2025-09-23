@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef } from "react";
 import {
   SlashMenuGroupedItemsType,
   SlashMenuItemType,
@@ -15,17 +15,12 @@ import classes from "./slash-menu.module.css";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
 
-const CommandList = ({
-  items,
-  command,
-  editor,
-  range,
-}: {
+const CommandList = forwardRef<{ onKeyDown: (props: { event: KeyboardEvent }) => boolean }, {
   items: SlashMenuGroupedItemsType;
   command: any;
   editor: any;
   range: any;
-}) => {
+}>(({ items, command, editor, range }, ref) => {
   const { t } = useTranslation();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [flatItems, setFlatItems] = useState<any[]>([]);
@@ -48,6 +43,7 @@ const CommandList = ({
   const selectItem = useCallback(
     (index: number) => {
       console.log('🎯 [CommandList] selectItem called with index:', index, 'flatItems.length:', flatItems.length);
+      console.log('🎯 [CommandList] Current selectedIndex state in selectItem:', selectedIndex);
       console.log('🎯 [CommandList] flatItems content:', flatItems.map(item => item.title));
       
       // Проверяем, что flatItems не пустой
@@ -66,13 +62,14 @@ const CommandList = ({
       if (item) {
         console.log('🎯 [CommandList] Selecting item:', item.title, 'at index:', index);
         console.log('🎯 [CommandList] Item details:', item);
+        console.log('🎯 [CommandList] About to execute command for item:', item.title);
         command(item);
         console.log('✅ [CommandList] Command executed for:', item.title);
       } else {
         console.warn('🎯 [CommandList] No item found at index:', index);
       }
     },
-    [command, flatItems], // Добавляем flatItems в зависимости
+    [command, flatItems, selectedIndex], // Добавляем selectedIndex в зависимости
   );
 
   useEffect(() => {
@@ -160,7 +157,8 @@ const CommandList = ({
         }
 
         if (e.key === "Enter") {
-          console.log('🎯 [CommandList] Enter key pressed');
+          console.log('🎯 [CommandList] Enter key pressed - handler called');
+          console.log('🎯 [CommandList] Event details:', { key: e.key, type: e.type, target: e.target });
           
           // Игнорируем Enter, если он нажат сразу после клика мыши (в течение 100ms)
           const timeSinceLastClick = Date.now() - lastClickTimeRef.current;
@@ -197,6 +195,8 @@ const CommandList = ({
           // Используем функциональное обновление для получения актуального selectedIndex
           setSelectedIndex(currentIndex => {
             console.log('🎯 [CommandList] Enter pressed, selecting item at index:', currentIndex);
+            console.log('🎯 [CommandList] Current selectedIndex state:', selectedIndex);
+            console.log('🎯 [CommandList] flatItems.length:', flatItems.length);
             
             // Проверяем, что currentIndex валидный
             if (isNaN(currentIndex) || currentIndex < 0) {
@@ -204,7 +204,9 @@ const CommandList = ({
               currentIndex = 0;
             }
             
+            console.log('🎯 [CommandList] About to call selectItem with index:', currentIndex);
             selectItem(currentIndex);
+            console.log('🎯 [CommandList] selectItem called, returning currentIndex:', currentIndex);
             return currentIndex; // Не изменяем selectedIndex
           });
           return true;
@@ -220,11 +222,12 @@ const CommandList = ({
 
   useEffect(() => {
     // Сбрасываем selectedIndex только если flatItems изменился и не пустой
-    if (flatItems.length > 0) {
+    // И только если selectedIndex еще не установлен (NaN или -1)
+    if (flatItems.length > 0 && (isNaN(selectedIndex) || selectedIndex < 0)) {
       setSelectedIndex(0);
       console.log('🎯 [CommandList] selectedIndex reset to 0, flatItems.length:', flatItems.length);
     }
-  }, [flatItems]);
+  }, [flatItems, selectedIndex]);
 
   // Дополнительная проверка для исправления NaN selectedIndex
   useEffect(() => {
@@ -239,6 +242,78 @@ const CommandList = ({
       ?.querySelector(`[data-item-index="${selectedIndex}"]`)
       ?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
+
+  // Метод для получения событий клавиатуры через ref
+  const onKeyDown = useCallback((props: { event: KeyboardEvent }) => {
+    console.log('🎯 [CommandList] onKeyDown called via ref with key:', props.event.key);
+    
+    const { event } = props;
+    const navigationKeys = ["ArrowUp", "ArrowDown", "Enter"];
+    
+    if (navigationKeys.includes(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.key === "ArrowUp") {
+        setSelectedIndex(prevIndex => {
+          if (!flatItems || flatItems.length === 0) {
+            return prevIndex;
+          }
+          if (isNaN(prevIndex) || prevIndex < 0) {
+            prevIndex = 0;
+          }
+          const newIndex = (prevIndex + flatItems.length - 1) % flatItems.length;
+          console.log('🎯 [CommandList] ArrowUp via ref: prevIndex:', prevIndex, 'newIndex:', newIndex);
+          return newIndex;
+        });
+        return true;
+      }
+
+      if (event.key === "ArrowDown") {
+        setSelectedIndex(prevIndex => {
+          if (!flatItems || flatItems.length === 0) {
+            return prevIndex;
+          }
+          if (isNaN(prevIndex) || prevIndex < 0) {
+            prevIndex = 0;
+          }
+          const newIndex = (prevIndex + 1) % flatItems.length;
+          console.log('🎯 [CommandList] ArrowDown via ref: prevIndex:', prevIndex, 'newIndex:', newIndex);
+          return newIndex;
+        });
+        return true;
+      }
+
+      if (event.key === "Enter") {
+        console.log('🎯 [CommandList] Enter key pressed via ref');
+        
+        if (!flatItems || flatItems.length === 0) {
+          console.warn('🎯 [CommandList] flatItems is empty in Enter via ref');
+          return true;
+        }
+        
+        setSelectedIndex(currentIndex => {
+          console.log('🎯 [CommandList] Enter via ref, selecting item at index:', currentIndex);
+          
+          if (isNaN(currentIndex) || currentIndex < 0) {
+            console.warn('🎯 [CommandList] Invalid currentIndex via ref, using 0');
+            currentIndex = 0;
+          }
+          
+          selectItem(currentIndex);
+          return currentIndex;
+        });
+        return true;
+      }
+    }
+    
+    return false;
+  }, [flatItems, selectItem]);
+
+  // Экспортируем onKeyDown через ref
+  useImperativeHandle(ref, () => ({
+    onKeyDown: onKeyDown
+  }), [onKeyDown]);
 
   return flatItems.length > 0 ? (
     <Paper id="slash-command" className="slash-menu" shadow="md" p="xs" withBorder>
@@ -297,6 +372,8 @@ const CommandList = ({
       </ScrollArea>
     </Paper>
   ) : null;
-};
+});
+
+CommandList.displayName = 'CommandList';
 
 export default CommandList;

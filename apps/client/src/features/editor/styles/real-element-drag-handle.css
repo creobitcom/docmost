@@ -23,6 +23,56 @@
   box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
+/* Tiptap-style popup drag handles */
+.real-element-drag-handle-widget.tiptap-style {
+  width: 1.2rem !important;
+  height: 1.5rem !important;
+  cursor: grab;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  opacity: 0.3;
+  transition: opacity 0.2s ease;
+  pointer-events: auto;
+  position: absolute;
+  left: -4rem !important;
+  top: 50% !important;
+  transform: translateY(-50%);
+  z-index: 1000;
+}
+
+/* Показываем хэндл при hover на родительском элементе */
+.ProseMirror li:hover .real-element-drag-handle-widget.tiptap-style,
+.ProseMirror [data-type="taskList"] li:hover .real-element-drag-handle-widget.tiptap-style,
+.ProseMirror [data-type="bulletList"] li:hover .real-element-drag-handle-widget.tiptap-style,
+.ProseMirror [data-type="orderedList"] li:hover .real-element-drag-handle-widget.tiptap-style,
+.ProseMirror ul li:hover .real-element-drag-handle-widget.tiptap-style,
+.ProseMirror ol li:hover .real-element-drag-handle-widget.tiptap-style {
+  opacity: 1 !important;
+}
+
+/* Дополнительные селекторы для различных структур списков */
+.ProseMirror li:hover .real-element-drag-handle-widget,
+.ProseMirror [data-type="taskList"] li:hover .real-element-drag-handle-widget,
+.ProseMirror [data-type="bulletList"] li:hover .real-element-drag-handle-widget,
+.ProseMirror [data-type="orderedList"] li:hover .real-element-drag-handle-widget {
+  opacity: 1 !important;
+}
+
+.real-element-drag-handle-widget.tiptap-style:hover {
+  opacity: 1 !important;
+  background: rgba(55, 53, 47, 0.1) !important;
+}
+
+.real-element-drag-handle-widget.tiptap-style:active {
+  cursor: grabbing;
+  background: rgba(55, 53, 47, 0.2) !important;
+}
+
 .real-element-drag-handle:hover {
   opacity: 1;
   background: linear-gradient(135deg, #059669, #047857);
@@ -206,6 +256,31 @@ body.real-block-dragging {
     left: -30px;
     font-size: 12px;
   }
+}
+
+/* Унифицированное позиционирование списков */
+
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 0;
+  margin-left: 0;
+}
+
+/* Применяем структуру taskList ко всем спискам */
+.ProseMirror li {
+  position: relative;
+  padding-left: 0;
+  margin-left: 0;
+}
+
+/* Для всех li создаем div-обертку как в taskList */
+.ProseMirror li > div {
+  padding-left: 2rem;
+  position: relative;
+}
+
+/* Если div уже есть (как в taskList), не добавляем еще один */
+.ProseMirror li > div > div {
+  padding-left: 0;
 }
 
 /* High Contrast Mode Support */

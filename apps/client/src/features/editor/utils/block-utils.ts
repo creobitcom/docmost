@@ -343,24 +343,41 @@ export function createBlockBetween(pageId: string, blocks: any[], afterBlockId: 
     return null;
   }
 
+  // Определяем тип блока на основе контекста
+  let blockType = 'paragraph';
+  let content = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        attrs: {
+          position: afterBlock.position + 1,
+          textAlign: 'left',
+          blockId: window.crypto.randomUUID()
+        }
+      }
+    ]
+  };
+
+  // Если предыдущий блок - это список, создаем параграф (не список)
+  const isAfterListBlock = afterBlock.blockType && (
+    afterBlock.blockType.includes('List') || 
+    afterBlock.blockType.includes('list') || 
+    afterBlock.blockType.includes('task')
+  );
+
+  if (isAfterListBlock) {
+    console.log('[createBlockBetween] Creating paragraph after list block to avoid empty list items');
+    // Создаем обычный параграф, а не список
+    blockType = 'paragraph';
+  }
+
   const newBlock = {
     id: window.crypto.randomUUID(),
     pageId: pageId,
-    blockType: 'paragraph',
+    blockType: blockType,
     position: afterBlock.position + 1,
-    content: {
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          attrs: {
-            position: afterBlock.position + 1,
-            textAlign: 'left',
-            blockId: window.crypto.randomUUID()
-          }
-        }
-      ]
-    },
+    content: content,
     hasAccess: true,
     userPermission: 'owner'
   };
@@ -371,24 +388,44 @@ export function createBlockBetween(pageId: string, blocks: any[], afterBlockId: 
 
 // Функция для создания блока в конце
 export function createBlockAtEnd(pageId: string, blocks: any[]) {
+  // Определяем тип блока на основе последнего блока
+  let blockType = 'paragraph';
+  let content = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        attrs: { 
+          position: blocks.length,
+          textAlign: 'left',
+          blockId: window.crypto.randomUUID()
+        }
+      }
+    ]
+  };
+
+  // Если последний блок - это список, создаем параграф (не список)
+  if (blocks.length > 0) {
+    const lastBlock = blocks[blocks.length - 1];
+    const isLastBlockList = lastBlock.blockType && (
+      lastBlock.blockType.includes('List') || 
+      lastBlock.blockType.includes('list') || 
+      lastBlock.blockType.includes('task')
+    );
+
+    if (isLastBlockList) {
+      console.log('[createBlockAtEnd] Creating paragraph after list block to avoid empty list items');
+      // Создаем обычный параграф, а не список
+      blockType = 'paragraph';
+    }
+  }
+
   const newBlock = {
     id: window.crypto.randomUUID(),
     pageId: pageId,
-    blockType: 'paragraph',
+    blockType: blockType,
     position: blocks.length,
-    content: {
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          attrs: { 
-            position: blocks.length,
-            textAlign: 'left',
-            blockId: window.crypto.randomUUID()
-          }
-        }
-      ]
-    },
+    content: content,
     hasAccess: true,
     userPermission: 'owner'
   };

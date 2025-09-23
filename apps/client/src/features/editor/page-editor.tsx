@@ -472,7 +472,25 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
               position: position === 'before' ? sourceBlock.position : sourceBlock.position + 1,
               blockId: window.crypto.randomUUID()
             },
-            content: [] // Пустой список, элемент будет добавлен автоматически
+            content: [
+              {
+                type: 'listItem',
+                attrs: {
+                  position: position === 'before' ? sourceBlock.position : sourceBlock.position + 1,
+                  blockId: window.crypto.randomUUID()
+                },
+                content: [
+                  {
+                    type: 'paragraph',
+                    attrs: {
+                      position: position === 'before' ? sourceBlock.position : sourceBlock.position + 1,
+                      blockId: window.crypto.randomUUID()
+                    },
+                    content: []
+                  }
+                ]
+              }
+            ]
           }
         ]
       } : {

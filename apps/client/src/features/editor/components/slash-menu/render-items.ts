@@ -49,14 +49,26 @@ const renderItems = () => {
         });
     },
     onKeyDown: (props: { event: KeyboardEvent }) => {
-      if (props.event.key === "Escape") {
-        popup?.[0].hide();
+      console.log('🎯 [RenderItems] onKeyDown called with key:', props.event.key);
 
+      if (props.event.key === "Escape") {
+        console.log('🎯 [RenderItems] Escape key - hiding popup');
+        popup?.[0].hide();
         return true;
       }
 
-      // @ts-ignore
-      return component?.ref?.onKeyDown(props);
+      console.log('🎯 [RenderItems] Forwarding key event to CommandList component');
+      console.log('🎯 [RenderItems] Component ref:', component?.ref);
+
+      // Проверяем, что ref существует и имеет метод onKeyDown
+      if (component?.ref && typeof (component.ref as any).onKeyDown === 'function') {
+        const result = (component.ref as any).onKeyDown(props);
+        console.log('🎯 [RenderItems] CommandList onKeyDown result:', result);
+        return result;
+      } else {
+        console.warn('🎯 [RenderItems] Component ref or onKeyDown method not found');
+        return false;
+      }
     },
     onExit: () => {
       if (popup && !popup[0].state.isDestroyed) {

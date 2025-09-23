@@ -497,10 +497,6 @@ export const EnhancedBlockHandle: React.FC<EnhancedBlockHandleProps> = ({
         <div className="drop-indicator drop-indicator-after" />
       )}
 
-      {/* Drop Indicator - Inside */}
-      {dragOverPosition === 'inside' && (
-        <div className="drop-indicator drop-indicator-inside" />
-      )}
     </div>
   );
 };

@@ -219,6 +219,21 @@ function insertElementIntoTiptapEditor(
       }
     }
 
+    // Проверяем, что элемент не пустой перед вставкой
+    if (element.content && element.content.size === 0) {
+      console.warn('⚠️ [TiptapCrossBlock] Attempting to insert empty element, skipping');
+      return false;
+    }
+
+    // Для taskItem проверяем, что есть содержимое
+    if (element.type.name === 'taskItem' || element.type.name === 'listItem') {
+      const hasContent = element.content && element.content.size > 0;
+      if (!hasContent) {
+        console.warn('⚠️ [TiptapCrossBlock] Attempting to insert empty list item, skipping');
+        return false;
+      }
+    }
+
     const tr = state.tr;
     tr.insert(insertPos, element);
     editor.view.dispatch(tr);

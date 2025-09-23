@@ -46,18 +46,23 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
     
     // Удаляем весь список только если это единственный элемент в блоке списка
     if (listNode && listNode.childCount === 1) {
-      // Если это единственный элемент в списке, удаляем весь блок списка
-      console.log('[ComprehensiveKeyboardHandler] Deleting entire list block (only item)');
-      tr.delete(listPos, listPos + listNode.nodeSize);
+      // Если это единственный элемент в списке, превращаем блок в параграф
+      console.log('[ComprehensiveKeyboardHandler] Only item in list - converting to paragraph');
       
-      // Применяем изменения в документе
-      editor.view.dispatch(tr);
+      // Создаем пустой параграф
+      const paragraph = state.schema.nodes.paragraph.create(null, []);
       
-      // Создаем новый блок после удаления списка
-      if (options.onCreateBlockAfter) {
-        console.log('[ComprehensiveKeyboardHandler] Creating new block after list deletion');
-        options.onCreateBlockAfter();
+      // Заменяем весь список на параграф
+      tr.replaceWith(listPos, listPos + listNode.nodeSize, paragraph);
+      
+      // Устанавливаем курсор в начало параграфа
+      const newPos = listPos + 1;
+      if (newPos <= tr.doc.content.size) {
+        tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
       }
+      
+      // Применяем все изменения одной транзакцией
+      editor.view.dispatch(tr);
     } else {
       // Удаляем только элемент списка (если в списке несколько элементов)
       console.log('[ComprehensiveKeyboardHandler] Deleting single list item (multiple items in list)');
@@ -170,17 +175,24 @@ function handleBackspaceInList(editor: any, $from: any, listItemType: string, op
       const listPos = $from.before($from.depth - 1);
       const listNode = state.doc.nodeAt(listPos);
       
-      if (listNode && listNode.childCount === 1) {
-        console.log('[ComprehensiveKeyboardHandler] Only item in list - deleting entire list block');
-        
-        // Если это единственный элемент в списке, удаляем весь блок списка
-        const tr = state.tr;
-        tr.delete(listPos, listPos + listNode.nodeSize);
-        editor.view.dispatch(tr);
-        
-        // НЕ создаем новый блок при удалении через Backspace - это обычное удаление
-        
-        return true;
+       if (listNode && listNode.childCount === 1) {
+         console.log('[ComprehensiveKeyboardHandler] Only item in list - converting to paragraph');
+         
+         // Если это единственный элемент в списке, превращаем блок в параграф
+         const tr = state.tr;
+         const paragraph = state.schema.nodes.paragraph.create(null, []);
+         tr.replaceWith(listPos, listPos + listNode.nodeSize, paragraph);
+         
+         // Устанавливаем курсор в начало параграфа
+         const newPos = listPos + 1;
+         if (newPos <= tr.doc.content.size) {
+           tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
+         }
+         
+         // Применяем все изменения одной транзакцией
+         editor.view.dispatch(tr);
+         
+         return true;
       } else {
         // Если это не последний элемент, удаляем только текущий элемент списка
         console.log('[ComprehensiveKeyboardHandler] Deleting single list item');
@@ -229,6 +241,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
     return {
       // ===== ENTER KEY HANDLING =====
       Enter: ({ editor }) => {
+        console.log('[ComprehensiveKeyboardHandler] Enter key pressed - handler called');
         const { state, view } = editor;
         const { selection } = state;
         const { $from } = selection;
@@ -238,14 +251,53 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
         
-        // Дополнительная проверка через DOM
-        const slashMenuElement = document.querySelector('.slash-menu, [data-suggestion-list]') as HTMLElement;
-        const isSlashMenuVisible = slashMenuElement && slashMenuElement.style.display !== 'none';
+        // Дополнительная проверка через DOM - ищем все возможные селекторы
+        const slashMenuSelectors = [
+          '#slash-command',
+          '.slash-menu',
+          '[data-suggestion-list]',
+          '.tiptap-suggestion-list',
+          '.suggestion-list',
+          '.command-list',
+          '[data-command-list]',
+          '.tippy-box', // tippy.js popup
+          '.tippy-content', // tippy.js content
+          '[data-tippy-root]' // tippy.js root
+        ];
+        
+        let slashMenuElement = null;
+        for (const selector of slashMenuSelectors) {
+          slashMenuElement = document.querySelector(selector) as HTMLElement;
+          if (slashMenuElement) break;
+        }
+        
+        const isSlashMenuVisible = slashMenuElement && 
+          slashMenuElement.style.display !== 'none' && 
+          slashMenuElement.style.visibility !== 'hidden' &&
+          slashMenuElement.offsetParent !== null &&
+          getComputedStyle(slashMenuElement).display !== 'none' &&
+          getComputedStyle(slashMenuElement).visibility !== 'hidden';
         
         const isSlashMenuReallyActive = isSlashMenuActive || isSlashMenuVisible;
 
+        console.log('[ComprehensiveKeyboardHandler] Slash menu check:', {
+          isSlashMenuActive,
+          isSlashMenuVisible,
+          slashMenuElement: slashMenuElement ? {
+            className: slashMenuElement.className,
+            id: slashMenuElement.id,
+            display: slashMenuElement.style.display,
+            visibility: slashMenuElement.style.visibility,
+            offsetParent: !!slashMenuElement.offsetParent
+          } : null,
+          isSlashMenuReallyActive
+        });
+
         if (isSlashMenuReallyActive) {
-          return false; // Позволяем slash menu обработать Enter
+          console.log('[ComprehensiveKeyboardHandler] Slash menu is active, allowing default behavior');
+          console.log('[ComprehensiveKeyboardHandler] Returning false to let slash menu handle Enter');
+          // Не обрабатываем Enter, позволяем slash menu обработать его
+          return false;
         }
 
         // ===== ENTER В СПИСКАХ =====
@@ -325,7 +377,49 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
         
-        if (isSlashMenuActive) {
+        // Дополнительная проверка через DOM
+        const slashMenuSelectors = [
+          '#slash-command',
+          '.slash-menu',
+          '[data-suggestion-list]',
+          '.tiptap-suggestion-list',
+          '.suggestion-list',
+          '.command-list',
+          '[data-command-list]',
+          '.tippy-box', // tippy.js popup
+          '.tippy-content', // tippy.js content
+          '[data-tippy-root]' // tippy.js root
+        ];
+        
+        let slashMenuElement = null;
+        for (const selector of slashMenuSelectors) {
+          slashMenuElement = document.querySelector(selector) as HTMLElement;
+          if (slashMenuElement) break;
+        }
+        const isSlashMenuVisible = slashMenuElement && 
+          slashMenuElement.style.display !== 'none' && 
+          slashMenuElement.style.visibility !== 'hidden' &&
+          slashMenuElement.offsetParent !== null &&
+          getComputedStyle(slashMenuElement).display !== 'none' &&
+          getComputedStyle(slashMenuElement).visibility !== 'hidden';
+        
+        const isSlashMenuReallyActive = isSlashMenuActive || isSlashMenuVisible;
+
+        console.log('[ComprehensiveKeyboardHandler] Backspace slash menu check:', {
+          isSlashMenuActive,
+          isSlashMenuVisible,
+          slashMenuElement: slashMenuElement ? {
+            className: slashMenuElement.className,
+            id: slashMenuElement.id,
+            display: slashMenuElement.style.display,
+            visibility: slashMenuElement.style.visibility,
+            offsetParent: !!slashMenuElement.offsetParent
+          } : null,
+          isSlashMenuReallyActive
+        });
+        
+        if (isSlashMenuReallyActive) {
+          console.log('[ComprehensiveKeyboardHandler] Slash menu is active, allowing default behavior for Backspace');
           return false; // Позволяем slash menu обработать Backspace
         }
 
