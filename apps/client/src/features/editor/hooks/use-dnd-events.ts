@@ -3,6 +3,7 @@ import { dndCoordinator } from '../dnd/DndCoordinator';
 import { CrossBlockMoveOperation, handleCrossBlockElementMove as handleCrossBlockMove } from '../utils/cross-block-element-utils';
 import { cleanupBlocksContent } from '../utils/cleanup-empty-paragraphs';
 import { moveElementWithinTiptapEditor, moveElementBetweenTiptapEditors, TiptapMoveOperation } from '../utils/tiptap-cross-block-utils';
+import { logCrossBlockTest, TestResult } from '../utils/dnd-test-logger';
 
 interface UseDndEventsOptions {
   blocks: any[];
@@ -86,6 +87,14 @@ export const useDndEvents = ({
       console.log('🎯 [ElementDrop] Event detail:', event.detail);
       console.log('🎯 [ElementDrop] Event type:', event.type);
       console.log('🎯 [ElementDrop] Event target:', event.target);
+      
+      // Логируем для тестирования cross-block операций
+      logCrossBlockTest(TestResult.NOT_TESTED, 'Element drop event received', {
+        eventType: event.type,
+        hasDetail: !!event.detail,
+        pageId: eventPageId,
+        operation: 'element-drop'
+      });
 
       const { elementId, targetBlockId, position } = event.detail;
 
@@ -186,12 +195,28 @@ export const useDndEvents = ({
       console.log('🎯 [ElementDrop] Saving blocks after element drop...');
       saveBlocksToServer(pageId, serverData);
       console.log('✅ [ElementDrop] ===== ELEMENT DROP COMPLETED =====');
+      
+      // Логируем успешное завершение
+      logCrossBlockTest(TestResult.SUCCESS, 'Element drop completed successfully', {
+        elementId,
+        targetBlockId,
+        position,
+        blocksUpdated: updatedBlocks.length,
+        operation: 'element-drop'
+      });
     };
 
     // Обработчик для вставки одноэлементного блока в состав другого блока
     const handleSingleElementBlockInsert = (event: CustomEvent) => {
       console.log('🔄 [SingleElementBlockInsert] ===== SINGLE ELEMENT BLOCK INSERT EVENT =====');
       console.log('🔄 [SingleElementBlockInsert] Event detail:', event.detail);
+      
+      // Логируем для тестирования cross-block операций
+      logCrossBlockTest(TestResult.NOT_TESTED, 'Single element block insert event received', {
+        eventType: event.type,
+        hasDetail: !!event.detail,
+        operation: 'single-element-block-insert'
+      });
 
       const { sourceBlockId, targetBlockId, elementId } = event.detail;
 
@@ -279,6 +304,15 @@ export const useDndEvents = ({
         saveBlocksToServer(pageId, serverData);
 
         console.log('✅ [SingleElementBlockInsert] ===== SINGLE ELEMENT BLOCK INSERT COMPLETED =====');
+        
+        // Логируем успешное завершение
+        logCrossBlockTest(TestResult.SUCCESS, 'Single element block insert completed successfully', {
+          sourceBlockId,
+          targetBlockId,
+          elementId,
+          blocksUpdated: finalBlocks.length,
+          operation: 'single-element-block-insert'
+        });
       } catch (error) {
         console.error('❌ [SingleElementBlockInsert] Error inserting element:', error);
       }
@@ -299,6 +333,14 @@ export const useDndEvents = ({
       console.log('🔄 [CrossBlockMove] Event detail:', event.detail);
       console.log('🔄 [CrossBlockMove] Event type:', event.type);
       console.log('🔄 [CrossBlockMove] Event target:', event.target);
+      
+      // Логируем для тестирования cross-block операций
+      logCrossBlockTest(TestResult.NOT_TESTED, 'Cross-block element move event received', {
+        eventType: event.type,
+        hasDetail: !!event.detail,
+        pageId: eventPageId,
+        operation: 'cross-block-element-move'
+      });
       console.log('🔄 [CrossBlockMove] Current blockRefs state at move start:', {
         size: blockRefs.size,
         keys: Array.from(blockRefs.keys()),
@@ -500,9 +542,28 @@ export const useDndEvents = ({
           dndCoordinator.forceCleanup();
 
           console.log('✅ [CrossBlockMove] ===== CROSS-BLOCK ELEMENT MOVE COMPLETED =====');
+          
+          // Логируем успешное завершение
+          logCrossBlockTest(TestResult.SUCCESS, 'Cross-block element move completed successfully', {
+            sourceBlockId: detail.sourceBlockId,
+            targetBlockId: detail.targetBlockId,
+            elementId,
+            targetPosition: detail.targetPosition || 'after',
+            blocksUpdated: updatedBlocks.length,
+            operation: 'cross-block-element-move'
+          });
         } else {
           console.warn('❌ [CrossBlockMove] Tiptap cross-block element move failed');
           console.log('❌ [CrossBlockMove] ===== CROSS-BLOCK ELEMENT MOVE FAILED =====');
+          
+          // Логируем неудачное завершение
+          logCrossBlockTest(TestResult.FAILED, 'Cross-block element move failed', {
+            sourceBlockId: detail.sourceBlockId,
+            targetBlockId: detail.targetBlockId,
+            elementId,
+            targetPosition: detail.targetPosition || 'after',
+            operation: 'cross-block-element-move'
+          });
         }
       };
 

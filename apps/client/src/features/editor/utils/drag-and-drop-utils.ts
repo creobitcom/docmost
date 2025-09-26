@@ -1,4 +1,5 @@
 import { Editor } from '@tiptap/core';
+import { logBlockTypeTest, TestResult } from './dnd-test-logger';
 
 // Типы для drag-and-drop операций
 export interface DragOperation {
@@ -132,9 +133,12 @@ export const moveElementBetweenBlocks = (
   
   // Проверяем совместимость типов
   if (!isCompatibleElementType(sourceNode, targetNode)) {
-    console.warn('[DnD] Incompatible element types:', {
+    logBlockTypeTest(TestResult.FAILED, 'Incompatible element types detected', {
       sourceType: getElementType(sourceNode),
-      targetType: getBlockType(targetNode)
+      targetType: getBlockType(targetNode),
+      sourceElementId,
+      targetBlockId,
+      operation: 'moveElementBetweenBlocks'
     });
     return false;
   }
@@ -176,12 +180,13 @@ export const moveElementBetweenBlocks = (
   // Применяем изменения
   editor.view.dispatch(tr);
   
-  console.log('[DnD] Element moved successfully:', {
+  logBlockTypeTest(TestResult.SUCCESS, 'Element moved successfully between compatible types', {
     sourceElementId,
     targetBlockId,
     position,
     sourceType: getElementType(sourceNode),
-    targetType: getBlockType(targetNode)
+    targetType: getBlockType(targetNode),
+    operation: 'moveElementBetweenBlocks'
   });
   
   // Создаем событие для уведомления о перемещении элемента
@@ -235,12 +240,30 @@ export const createBlockFromElement = (
   const sourcePos = findElementPosition(editor, sourceElementId);
   const targetPos = findBlockPosition(editor, targetBlockId);
   
-  if (sourcePos === -1 || targetPos === -1) return false;
+  if (sourcePos === -1 || targetPos === -1) {
+    logBlockTypeTest(TestResult.FAILED, 'Invalid positions for block creation', {
+      sourcePos,
+      targetPos,
+      sourceElementId,
+      targetBlockId,
+      operation: 'createBlockFromElement'
+    });
+    return false;
+  }
   
   const sourceNode = editor.state.doc.nodeAt(sourcePos);
   const targetNode = editor.state.doc.nodeAt(targetPos);
   
-  if (!sourceNode || !targetNode) return false;
+  if (!sourceNode || !targetNode) {
+    logBlockTypeTest(TestResult.FAILED, 'Invalid nodes for block creation', {
+      sourcePos,
+      targetPos,
+      sourceElementId,
+      targetBlockId,
+      operation: 'createBlockFromElement'
+    });
+    return false;
+  }
   
   const tr = editor.state.tr;
   
@@ -259,6 +282,16 @@ export const createBlockFromElement = (
   
   // Применяем изменения
   editor.view.dispatch(tr);
+  
+  // Логируем успешное создание блока
+  logBlockTypeTest(TestResult.SUCCESS, 'Block created successfully from element', {
+    sourceElementId,
+    targetBlockId,
+    sourceType: getElementType(sourceNode),
+    targetType: getBlockType(targetNode),
+    newBlockId: newBlock.attrs.id,
+    operation: 'createBlockFromElement'
+  });
   
   return true;
 };
@@ -286,7 +319,22 @@ export const isCompatibleElementType = (
     paragraph: ['doc', 'blockquote', 'codeBlock'],
   };
   
-  return compatibleTypes[sourceType]?.includes(targetType) || false;
+  const isCompatible = compatibleTypes[sourceType]?.includes(targetType) || false;
+  
+  // Логируем результат проверки совместимости
+  logBlockTypeTest(
+    isCompatible ? TestResult.SUCCESS : TestResult.FAILED,
+    `Type compatibility check: ${sourceType} -> ${targetType}`,
+    {
+      sourceType,
+      targetType,
+      isCompatible,
+      compatibleTypesForSource: compatibleTypes[sourceType] || [],
+      allCompatibleTypes: Object.keys(compatibleTypes)
+    }
+  );
+  
+  return isCompatible;
 };
 
 // Функция для определения типа элемента

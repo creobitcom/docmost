@@ -1,6 +1,7 @@
 import { Editor } from '@tiptap/core';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { v4 as uuidv4 } from 'uuid';
+import { logCrossBlockTest, logNestedTest, TestResult } from './dnd-test-logger';
 
 /**
  * Утилиты для работы с элементами списков между блоками
@@ -36,6 +37,14 @@ export function extractElementFromBlock(block: any, elementId: string): ElementD
   console.log('🔍 [CrossBlockUtils] Element ID:', elementId);
   console.log('🔍 [CrossBlockUtils] Block exists:', !!block);
   console.log('🔍 [CrossBlockUtils] Block type:', typeof block);
+  
+  // Логируем для тестирования nested structures
+  logNestedTest(TestResult.NOT_TESTED, 'Extracting element from block - nested structure check', {
+    elementId,
+    blockExists: !!block,
+    blockType: typeof block,
+    operation: 'extractElementFromBlock'
+  });
   
   if (!block || !elementId) {
     console.warn('⚠️ [CrossBlockUtils] Invalid parameters for extractElementFromBlock');
@@ -211,6 +220,16 @@ export function extractElementFromBlock(block: any, elementId: string): ElementD
         contentTypeName: elementData.content?.type?.name || elementData.content?.type
       });
       
+      // Логируем успешное извлечение для nested structures
+      logNestedTest(TestResult.SUCCESS, 'Element extracted successfully from nested structure', {
+        elementId,
+        elementType: elementData.type,
+        position: elementData.position,
+        parentBlockId: elementData.parentBlockId,
+        hasContent: !!elementData.content,
+        operation: 'extractElementFromBlock'
+      });
+      
       console.log('✅ [CrossBlockUtils] ===== EXTRACT ELEMENT FROM BLOCK SUCCESS =====');
       return elementData;
     }
@@ -344,6 +363,14 @@ export function extractElementFromBlock(block: any, elementId: string): ElementD
 
     console.warn(`⚠️ [CrossBlockUtils] Element not found: ${elementId} in blockType: ${block.type?.name || block.blockType || 'unknown'}`);
     console.warn('⚠️ [CrossBlockUtils] Block structure for debugging:', JSON.stringify(block, null, 2));
+    
+    // Логируем неудачное извлечение для nested structures
+    logNestedTest(TestResult.FAILED, 'Element not found in nested structure', {
+      elementId,
+      blockType: block.type?.name || block.blockType || 'unknown',
+      operation: 'extractElementFromBlock'
+    });
+    
     console.log('❌ [CrossBlockUtils] ===== EXTRACT ELEMENT FROM BLOCK FAILED =====');
     return null;
   } catch (error) {
@@ -489,6 +516,15 @@ export function addElementToBlock(
       targetPosition 
     });
     
+    // Логируем для тестирования nested structures
+    logNestedTest(TestResult.NOT_TESTED, 'Adding element to block - nested structure check', {
+      blockId: block.id,
+      elementId: elementData.id,
+      elementType: elementData.type,
+      targetPosition,
+      operation: 'addElementToBlock'
+    });
+    
     // Делаем глубокую копию для безопасности
     const updatedContent = JSON.parse(JSON.stringify(block.content));
     
@@ -543,6 +579,12 @@ export function addElementToBlock(
           listNode.content = [];
         }
         listNode.content.push(updatedElementContent);
+        logCrossBlockTest(TestResult.SUCCESS, 'Element inserted into existing list', {
+          listType: listNode.type,
+          elementType: elementData.type,
+          listItemsCount: listNode.content.length,
+          targetPosition: 'inside'
+        });
       } else {
         // Создаем новый список
         const newList = {
@@ -550,11 +592,22 @@ export function addElementToBlock(
           content: [updatedElementContent]
         };
         updatedContent.content.push(newList);
+        logCrossBlockTest(TestResult.SUCCESS, 'New list created for element insertion', {
+          newListType: newList.type,
+          elementType: elementData.type,
+          targetPosition: 'inside'
+        });
       }
     } else {
       // Добавляем элемент рядом с блоком (до/после всего содержимого блока)
       const insertIndex = targetPosition === 'after' ? updatedContent.content.length : 0;
       updatedContent.content.splice(insertIndex, 0, updatedElementContent);
+      logCrossBlockTest(TestResult.SUCCESS, 'Element inserted next to block', {
+        elementType: elementData.type,
+        targetPosition,
+        insertIndex,
+        totalContentItems: updatedContent.content.length
+      });
     }
     
     const updatedBlock = {
@@ -563,9 +616,30 @@ export function addElementToBlock(
     };
     
     console.log('[CrossBlockUtils] Element added successfully');
+    
+    // Логируем успешное добавление для nested structures
+    logNestedTest(TestResult.SUCCESS, 'Element added successfully to nested structure', {
+      blockId: block.id,
+      elementId: elementData.id,
+      elementType: elementData.type,
+      targetPosition,
+      operation: 'addElementToBlock'
+    });
+    
     return updatedBlock;
   } catch (error) {
     console.error('[CrossBlockUtils] Error adding element:', error);
+    
+    // Логируем ошибку для nested structures
+    logNestedTest(TestResult.FAILED, 'Error adding element to nested structure', {
+      blockId: block.id,
+      elementId: elementData.id,
+      elementType: elementData.type,
+      targetPosition,
+      error: error.message,
+      operation: 'addElementToBlock'
+    });
+    
     return block;
   }
 }
@@ -704,7 +778,12 @@ export function handleCrossBlockElementMove(
   operation: CrossBlockMoveOperation
 ): { updatedBlocks: any[]; success: boolean } {
   try {
-    console.log('[CrossBlockUtils] Handling cross-block element move:', operation);
+    logCrossBlockTest(TestResult.NOT_TESTED, 'Cross-block element move started', {
+      sourceBlockId: operation.sourceBlockId,
+      targetBlockId: operation.targetBlockId,
+      elementId: operation.elementData.id,
+      targetPosition: operation.targetPosition
+    });
     
     const updatedBlocks = moveElementBetweenBlocks(
       blocks,
@@ -717,12 +796,28 @@ export function handleCrossBlockElementMove(
     // Валидируем позиции после изменения
     const validatedBlocks = validateBlockPositions(updatedBlocks);
     
+    logCrossBlockTest(TestResult.SUCCESS, 'Cross-block element move completed', {
+      sourceBlockId: operation.sourceBlockId,
+      targetBlockId: operation.targetBlockId,
+      elementId: operation.elementData.id,
+      targetPosition: operation.targetPosition,
+      blocksUpdated: validatedBlocks.length,
+      success: true
+    });
+    
     return {
       updatedBlocks: validatedBlocks,
       success: true
     };
   } catch (error) {
-    console.error('[CrossBlockUtils] Error handling cross-block move:', error);
+    logCrossBlockTest(TestResult.FAILED, 'Cross-block element move failed', {
+      sourceBlockId: operation.sourceBlockId,
+      targetBlockId: operation.targetBlockId,
+      elementId: operation.elementData.id,
+      error: error.message,
+      success: false
+    });
+    
     return {
       updatedBlocks: blocks,
       success: false

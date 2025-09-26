@@ -5,6 +5,7 @@
 import { UnifiedDragData, ElementData } from '../types/drag-types';
 import { DragStateManager } from './drag-state-manager';
 import { autoFixDuplicateElementIds } from './fix-duplicate-element-ids';
+import { logFallbackTest, TestResult } from './dnd-test-logger';
 
 // Глобальный кэш для предотвращения повторных dragover событий
 let lastDragOverState: {
@@ -91,7 +92,7 @@ export function clearDragOverCache(): void {
 /**
  * Универсальный обработчик drag start
  */
-export function handleUnifiedDragStart(e: DragEvent): UnifiedDragData | null {
+export async function handleUnifiedDragStart(e: DragEvent): Promise<UnifiedDragData | null> {
   console.log('🎯 [UnifiedDragHandlers] ===== UNIFIED DRAG START =====');
   console.log('🎯 [UnifiedDragHandlers] Event type:', e.type);
   console.log('🎯 [UnifiedDragHandlers] Event target:', e.target);
@@ -152,6 +153,9 @@ export function handleUnifiedDragStart(e: DragEvent): UnifiedDragData | null {
       DragStateManager.set(dragData);
       console.log('✅ [UnifiedDragHandlers] Drag state set in DragStateManager');
 
+      // Синхронизируем со всеми источниками
+      await syncDragStateToAllSources(dragData);
+
       // Устанавливаем данные в DataTransfer
       console.log('🎯 [UnifiedDragHandlers] Setting DataTransfer data...');
       e.dataTransfer?.setData('application/json', JSON.stringify(dragData));
@@ -195,6 +199,9 @@ export function handleUnifiedDragStart(e: DragEvent): UnifiedDragData | null {
       DragStateManager.set(dragData);
       console.log('✅ [UnifiedDragHandlers] Drag state set in DragStateManager');
 
+      // Синхронизируем со всеми источниками
+      await syncDragStateToAllSources(dragData);
+
       // Устанавливаем данные в DataTransfer
       console.log('🎯 [UnifiedDragHandlers] Setting DataTransfer data...');
       e.dataTransfer?.setData('application/json', JSON.stringify(dragData));
@@ -222,56 +229,225 @@ export function handleUnifiedDragStart(e: DragEvent): UnifiedDragData | null {
 }
 
 /**
+ * Синхронизация drag состояния между всеми источниками
+ */
+async function syncDragStateToAllSources(dragData: UnifiedDragData): Promise<void> {
+  console.log('🔄 [UnifiedDragHandlers] Starting syncDragStateToAllSources with data:', dragData);
+  
+  try {
+    // Синхронизируем с DndCoordinator
+    console.log('🎯 [UnifiedDragHandlers] Syncing with DndCoordinator...');
+    try {
+      const { dndCoordinator } = await import('../dnd/DndCoordinator');
+      console.log('📦 [UnifiedDragHandlers] DndCoordinator module loaded');
+      
+      const coordinatorPayload = {
+        type: dragData.type,
+        sourceId: dragData.type === 'element' ? dragData.elementId! : dragData.blockId,
+        sourceBlockId: dragData.blockId,
+        blockId: dragData.blockId,
+        elementId: dragData.elementId
+      };
+      
+      console.log('📋 [UnifiedDragHandlers] DndCoordinator payload:', coordinatorPayload);
+      dndCoordinator.start(coordinatorPayload);
+      console.log('✅ [UnifiedDragHandlers] DndCoordinator synchronized successfully');
+    } catch (error) {
+      console.error('❌ [UnifiedDragHandlers] DndCoordinator sync failed:', error);
+    }
+
+    // Синхронизируем с Window Global State
+    console.log('🎯 [UnifiedDragHandlers] Syncing with Window Global State...');
+    try {
+      if (!(window as any).docmostDragState) {
+        (window as any).docmostDragState = {};
+        console.log('📦 [UnifiedDragHandlers] Created window.docmostDragState object');
+      }
+      (window as any).docmostDragState.current = dragData;
+      console.log('✅ [UnifiedDragHandlers] Window global state synchronized successfully');
+      console.log('📋 [UnifiedDragHandlers] Window global state data:', (window as any).docmostDragState.current);
+    } catch (error) {
+      console.error('❌ [UnifiedDragHandlers] Window global state sync failed:', error);
+    }
+    
+    console.log('✅ [UnifiedDragHandlers] syncDragStateToAllSources completed successfully');
+  } catch (error) {
+    console.error('❌ [UnifiedDragHandlers] Critical error in syncDragStateToAllSources:', error);
+  }
+}
+
+/**
+ * Восстановление drag данных из различных источников с правильной последовательностью fallback
+ */
+async function recoverDragData(e: DragEvent, operation: 'dragover' | 'drop'): Promise<{ dragData: UnifiedDragData | null; fallbackUsed: string }> {
+  let dragData: UnifiedDragData | null = null;
+  let fallbackUsed = 'none';
+
+  // 1. Первичный источник: DragStateManager
+  const dragState = DragStateManager.get();
+  if (dragState && DragStateManager.hasValid()) {
+    // Преобразуем DragState в UnifiedDragData
+    dragData = {
+      version: dragState.version,
+      type: dragState.type,
+      blockId: dragState.blockId,
+      elementId: dragState.elementId,
+      sourceHandle: dragState.sourceHandle || (dragState.type === 'element' ? 'element' : 'global'),
+      timestamp: dragState.timestamp
+    };
+    fallbackUsed = 'DragStateManager';
+    logFallbackTest(TestResult.SUCCESS, `DragStateManager primary source successful in ${operation}`, {
+      dragDataType: dragData.type,
+      hasElementId: !!dragData.elementId,
+      hasBlockId: !!dragData.blockId,
+      operation,
+      fallbackMethod: 'DragStateManager'
+    });
+    return { dragData, fallbackUsed };
+  }
+
+  // 2. Fallback: DataTransfer (наиболее надежный источник)
+  if (e.dataTransfer) {
+    try {
+      const jsonData = e.dataTransfer.getData('application/json');
+      if (jsonData) {
+        const parsed = JSON.parse(jsonData);
+        if (parsed && parsed.type && parsed.version === '2.0') {
+          dragData = parsed as UnifiedDragData;
+          fallbackUsed = 'DataTransfer';
+          
+          // Восстанавливаем состояние в DragStateManager для будущих вызовов
+          DragStateManager.restoreFromFallback(dragData, 'DataTransfer');
+          
+          logFallbackTest(TestResult.SUCCESS, `DataTransfer fallback successful in ${operation}`, {
+            hasJsonData: !!jsonData,
+            parsedType: parsed.type,
+            version: parsed.version,
+            operation,
+            fallbackMethod: 'DataTransfer',
+            stateRestored: true
+          });
+          return { dragData, fallbackUsed };
+        }
+      }
+    } catch (error) {
+      logFallbackTest(TestResult.FAILED, `DataTransfer fallback failed in ${operation}`, {
+        error: error.message,
+        hasDataTransfer: !!e.dataTransfer,
+        operation,
+        fallbackMethod: 'DataTransfer'
+      });
+    }
+  }
+
+  // 3. Fallback: DndCoordinator (для элементов и блоков)
+  try {
+    const { dndCoordinator } = await import('../dnd/DndCoordinator');
+    const coordinatorState = dndCoordinator.getCurrentPayload();
+    
+    if (coordinatorState && (coordinatorState.type === 'element' || coordinatorState.type === 'block')) {
+      // Преобразуем данные из dndCoordinator в формат UnifiedDragData
+      dragData = {
+        version: '2.0',
+        type: coordinatorState.type,
+        blockId: coordinatorState.sourceBlockId,
+        elementId: coordinatorState.type === 'element' ? coordinatorState.sourceId : undefined,
+        sourceHandle: coordinatorState.type === 'element' ? 'element' : 'global',
+        timestamp: Date.now()
+      };
+      
+      // Восстанавливаем состояние в DragStateManager для будущих вызовов
+      DragStateManager.restoreFromFallback(dragData, 'DndCoordinator');
+      fallbackUsed = 'DndCoordinator';
+      
+      logFallbackTest(TestResult.SUCCESS, `DndCoordinator fallback successful in ${operation}`, {
+        coordinatorType: coordinatorState.type,
+        sourceBlockId: coordinatorState.sourceBlockId,
+        sourceId: coordinatorState.sourceId,
+        operation,
+        fallbackMethod: 'DndCoordinator',
+        stateRestored: true
+      });
+      return { dragData, fallbackUsed };
+    }
+  } catch (error) {
+    logFallbackTest(TestResult.FAILED, `DndCoordinator fallback failed in ${operation}`, {
+      error: error.message,
+      operation,
+      fallbackMethod: 'DndCoordinator'
+    });
+  }
+
+  // 4. Fallback: Window global state (последний резерв)
+  try {
+    const windowState = (window as any).docmostDragState?.current;
+    if (windowState && windowState.blockId && windowState.type) {
+      dragData = {
+        version: '2.0',
+        type: windowState.type,
+        blockId: windowState.blockId,
+        elementId: windowState.elementId,
+        sourceHandle: windowState.type === 'element' ? 'element' : 'global',
+        timestamp: Date.now()
+      };
+      
+      // Восстанавливаем состояние в DragStateManager для будущих вызовов
+      DragStateManager.restoreFromFallback(dragData, 'WindowGlobal');
+      fallbackUsed = 'WindowGlobal';
+      
+      logFallbackTest(TestResult.SUCCESS, `Window global fallback successful in ${operation}`, {
+        windowStateType: windowState.type,
+        windowStateBlockId: windowState.blockId,
+        windowStateElementId: windowState.elementId,
+        operation,
+        fallbackMethod: 'WindowGlobal',
+        stateRestored: true
+      });
+      return { dragData, fallbackUsed };
+    }
+  } catch (error) {
+    logFallbackTest(TestResult.FAILED, `Window global fallback failed in ${operation}`, {
+      error: error.message,
+      operation,
+      fallbackMethod: 'WindowGlobal'
+    });
+  }
+
+  // Все fallback методы не сработали
+  logFallbackTest(TestResult.FAILED, `All fallback methods failed in ${operation}`, {
+    fallbackMethods: ['DragStateManager', 'DataTransfer', 'DndCoordinator', 'WindowGlobal'],
+    hasDataTransfer: !!e.dataTransfer,
+    dataTransferTypes: e.dataTransfer?.types || [],
+    operation,
+    fallbackMethod: 'none'
+  });
+
+  return { dragData: null, fallbackUsed: 'none' };
+}
+
+/**
  * Универсальный обработчик drag over
  */
 export async function handleUnifiedDragOver(e: DragEvent): Promise<boolean> {
   try {
-    // Получаем данные из безопасного менеджера состояния
-    let dragData = DragStateManager.get();
+    // Восстанавливаем drag данные с правильной последовательностью fallback
+    const { dragData, fallbackUsed } = await recoverDragData(e, 'dragover');
 
-    // Fallback: пытаемся получить данные из DataTransfer
-    if (!dragData && e.dataTransfer) {
-      try {
-        const jsonData = e.dataTransfer.getData('application/json');
-        if (jsonData) {
-          const parsed = JSON.parse(jsonData);
-          if (parsed && parsed.type && parsed.version === '2.0') {
-            dragData = parsed as UnifiedDragData;
-          }
-        }
-      } catch (error) {
-        // Silent fallback
-      }
-    }
-
-    // 🔧 ИСПРАВЛЕНИЕ: Дополнительный fallback через dndCoordinator
     if (!dragData) {
-      try {
-        const { dndCoordinator } = await import('../dnd/DndCoordinator');
-        const coordinatorState = dndCoordinator.getCurrentPayload();
-        
-        if (coordinatorState && coordinatorState.type === 'element') {
-          // Преобразуем данные из dndCoordinator в формат UnifiedDragData
-          dragData = {
-            version: '2.0',
-            type: 'element',
-            blockId: coordinatorState.sourceBlockId,
-            elementId: coordinatorState.sourceId,
-            sourceHandle: 'element',
-            timestamp: Date.now()
-          };
-          
-          // Сохраняем в DragStateManager для будущих вызовов
-          DragStateManager.set(dragData);
-        }
-      } catch (error) {
-        // Silent fallback
-      }
-    }
-
-    if (!dragData || !DragStateManager.hasValid()) {
       return false;
     }
+
+    // Логируем успешное восстановление данных
+    logFallbackTest(TestResult.SUCCESS, `Drag data recovered successfully in dragover: ${fallbackUsed}`, {
+      fallbackMethod: fallbackUsed,
+      dragDataType: dragData.type,
+      hasElementId: !!dragData.elementId,
+      hasBlockId: !!dragData.blockId,
+      operation: 'dragover'
+    });
+
+    // Проверяем необходимость принудительной очистки
+    await checkAndCleanupIfNeeded();
 
     // Сценарий 1: перетаскиваем элемент
     if (dragData.type === 'element') {
@@ -346,81 +522,38 @@ export async function handleUnifiedDrop(
   onElementMove?: (sourceBlockId: string, elementId: string, targetBlockId: string, beforeElementId?: string) => void,
   onBlockMove?: (sourceBlockId: string, targetBlockId: string, position?: 'before' | 'after' | 'inside') => void
 ): Promise<boolean> {
-  console.log('🎯 [UnifiedDragHandlers] ===== UNIFIED DROP =====');
-  console.log('🎯 [UnifiedDragHandlers] Event type:', e.type);
-  console.log('🎯 [UnifiedDragHandlers] Event target:', e.target);
-  console.log('🎯 [UnifiedDragHandlers] Event currentTarget:', e.currentTarget);
-  console.log('🎯 [UnifiedDragHandlers] Event clientX:', e.clientX);
-  console.log('🎯 [UnifiedDragHandlers] Event clientY:', e.clientY);
-  console.log('🎯 [UnifiedDragHandlers] DataTransfer types:', e.dataTransfer?.types);
-  console.log('🎯 [UnifiedDragHandlers] DataTransfer dropEffect:', e.dataTransfer?.dropEffect);
-  console.log('🎯 [UnifiedDragHandlers] onElementMove callback provided:', !!onElementMove);
-  console.log('🎯 [UnifiedDragHandlers] onBlockMove callback provided:', !!onBlockMove);
+  console.log('🎯 [UnifiedDragHandlers] ===== UNIFIED DROP START =====');
 
   try {
-    // Получаем данные из безопасного менеджера состояния
-    console.log('🎯 [UnifiedDragHandlers] Getting drag state from DragStateManager...');
-    let dragData = DragStateManager.get();
-    console.log('🎯 [UnifiedDragHandlers] Current drag state for drop:', dragData);
+    // Восстанавливаем drag данные с правильной последовательностью fallback
+    const { dragData, fallbackUsed } = await recoverDragData(e, 'drop');
 
-    // Fallback: пытаемся получить данные из DataTransfer
-    if (!dragData && e.dataTransfer) {
-      console.log('🎯 [UnifiedDragHandlers] No drag state found, trying DataTransfer fallback...');
-      try {
-        const jsonData = e.dataTransfer.getData('application/json');
-        console.log('🎯 [UnifiedDragHandlers] DataTransfer jsonData:', jsonData);
-        if (jsonData) {
-          const parsed = JSON.parse(jsonData);
-          console.log('🎯 [UnifiedDragHandlers] Parsed DataTransfer data:', parsed);
-          if (parsed && parsed.type && parsed.version === '2.0') {
-            dragData = parsed as UnifiedDragData;
-            console.log('✅ [UnifiedDragHandlers] Using DataTransfer data for drop:', dragData);
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️ [UnifiedDragHandlers] Could not parse DataTransfer data:', error);
-      }
-    }
-
-    // 🔧 ИСПРАВЛЕНИЕ: Дополнительный fallback через dndCoordinator для drop
     if (!dragData) {
-      console.log('🎯 [UnifiedDragHandlers] No drag state found, trying dndCoordinator fallback for drop...');
-      try {
-        const { dndCoordinator } = await import('../dnd/DndCoordinator');
-        const coordinatorState = dndCoordinator.getCurrentPayload();
-        console.log('🎯 [UnifiedDragHandlers] dndCoordinator state for drop:', coordinatorState);
-        
-        if (coordinatorState && coordinatorState.type === 'element') {
-          // Преобразуем данные из dndCoordinator в формат UnifiedDragData
-          dragData = {
-            version: '2.0',
-            type: 'element',
-            blockId: coordinatorState.sourceBlockId,
-            elementId: coordinatorState.sourceId,
-            sourceHandle: 'element',
-            timestamp: Date.now()
-          };
-          console.log('✅ [UnifiedDragHandlers] Using dndCoordinator data for drop:', dragData);
-          
-          // Сохраняем в DragStateManager для будущих вызовов
-          DragStateManager.set(dragData);
-          console.log('✅ [UnifiedDragHandlers] Data synced to DragStateManager for drop');
-        }
-      } catch (error) {
-        console.warn('⚠️ [UnifiedDragHandlers] Could not get dndCoordinator data for drop:', error);
-      }
-    }
-
-    if (!dragData || !DragStateManager.hasValid()) {
-      console.log('⚠️ [UnifiedDragHandlers] No valid drag data found for drop');
-      console.log('🎯 [UnifiedDragHandlers] DragStateManager.hasValid():', DragStateManager.hasValid());
-      console.log('❌ [UnifiedDragHandlers] ===== UNIFIED DROP FAILED =====');
+      console.log('❌ [UnifiedDragHandlers] No drag data recovered, drop failed');
+      console.log('❌ [UnifiedDragHandlers] ===== UNIFIED DROP FAILED (NO DATA) =====');
       return false;
     }
 
-    console.log('✅ [UnifiedDragHandlers] Drop with data:', dragData);
-    console.log('🎯 [UnifiedDragHandlers] Drag data type:', dragData.type);
-    console.log('🎯 [UnifiedDragHandlers] Drag data version:', dragData.version);
+    // Логируем успешное восстановление данных
+    logFallbackTest(TestResult.SUCCESS, `Drag data recovered successfully in drop: ${fallbackUsed}`, {
+      fallbackMethod: fallbackUsed,
+      dragDataType: dragData.type,
+      hasElementId: !!dragData.elementId,
+      hasBlockId: !!dragData.blockId,
+      operation: 'drop'
+    });
+
+    console.log('✅ [UnifiedDragHandlers] Drag data recovered:', {
+      type: dragData.type,
+      blockId: dragData.blockId,
+      elementId: dragData.elementId,
+      fallbackUsed
+    });
+
+    // Проверяем необходимость принудительной очистки
+    await checkAndCleanupIfNeeded();
+
+    // Drop with valid data
 
     // Сценарий 1: перетаскиваем элемент
     if (dragData.type === 'element') {
@@ -688,9 +821,28 @@ export async function handleUnifiedDrop(
 }
 
 /**
+ * Проверяет необходимость принудительной очистки состояния
+ */
+async function checkAndCleanupIfNeeded(): Promise<void> {
+  if (DragStateManager.shouldForceCleanup()) {
+    const stats = DragStateManager.getRecoveryStats();
+    console.warn('⚠️ [UnifiedDragHandlers] Force cleanup triggered due to frequent fallback recoveries:', stats);
+    
+    logFallbackTest(TestResult.PARTIAL, 'Force cleanup triggered due to frequent fallback recoveries', {
+      recoveryCount: stats.count,
+      lastRecoveryTime: stats.lastTime,
+      isRecent: stats.isRecent,
+      reason: 'frequent_fallback_recoveries'
+    });
+    
+    await cleanupDragState();
+  }
+}
+
+/**
  * Очистка drag состояния
  */
-export function cleanupDragState(): void {
+export async function cleanupDragState(): Promise<void> {
   console.log('🧹 [UnifiedDragHandlers] ===== CLEANUP DRAG STATE =====');
 
   try {
@@ -698,6 +850,37 @@ export function cleanupDragState(): void {
     console.log('🧹 [UnifiedDragHandlers] Clearing drag state from DragStateManager...');
     DragStateManager.clear();
     console.log('✅ [UnifiedDragHandlers] Drag state cleared from DragStateManager');
+
+    // Очищаем DndCoordinator
+    try {
+      const dndCoordinatorModule = await import('../dnd/DndCoordinator');
+      const dndCoordinator = dndCoordinatorModule.dndCoordinator;
+      dndCoordinator.forceCleanup();
+      console.log('✅ [UnifiedDragHandlers] DndCoordinator force cleanup completed');
+    } catch (error) {
+      console.warn('⚠️ [UnifiedDragHandlers] DndCoordinator cleanup failed:', error);
+    }
+
+    // Очищаем window global state
+    try {
+      if ((window as any).docmostDragState) {
+        (window as any).docmostDragState.current = null;
+        console.log('✅ [UnifiedDragHandlers] Window global state cleared');
+      }
+    } catch (error) {
+      console.warn('⚠️ [UnifiedDragHandlers] Window global state cleanup failed:', error);
+    }
+
+    // Очищаем DataTransfer (если возможно)
+    try {
+      // DataTransfer очищается автоматически браузером, но можем попробовать очистить кэш
+      if ((window as any).dragDataCache) {
+        (window as any).dragDataCache = null;
+        console.log('✅ [UnifiedDragHandlers] DataTransfer cache cleared');
+      }
+    } catch (error) {
+      console.warn('⚠️ [UnifiedDragHandlers] DataTransfer cache cleanup failed:', error);
+    }
 
     // Убираем все подсветки
     console.log('🧹 [UnifiedDragHandlers] Removing drag over highlights...');

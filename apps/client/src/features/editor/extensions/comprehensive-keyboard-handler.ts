@@ -7,13 +7,13 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
   const { state } = editor;
   const listItemNode = $from.parent;
   const isAtEnd = $from.pos === $from.end();
-  
+
   // Более точное определение пустого элемента списка
   // Элемент считается пустым только если он содержит только пустой параграф
-  const hasOnlyEmptyParagraph = listItemNode.content.size === 2 && 
+  const hasOnlyEmptyParagraph = listItemNode.content.size === 2 &&
     listItemNode.content.firstChild?.type.name === 'paragraph' &&
     listItemNode.content.firstChild?.content.size === 0;
-  
+
   // Элемент считается пустым только если он действительно не содержит текста
   // Проверяем как пустые параграфы, так и элементы без содержимого
   const isEmpty = hasOnlyEmptyParagraph || listItemNode.content.size === 0;
@@ -30,12 +30,12 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
   // Выход из списка при Enter в пустом элементе
   if (isEmpty && isAtEnd) {
     console.log('[ComprehensiveKeyboardHandler] Empty list item at end - exiting list');
-    
+
     const tr = state.tr;
     const listItemPos = $from.before($from.depth);
     const listPos = $from.before($from.depth - 1);
     const listNode = state.doc.nodeAt(listPos);
-    
+
     console.log('[ComprehensiveKeyboardHandler] List info:', {
       listItemPos,
       listPos,
@@ -43,119 +43,119 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
       listChildCount: listNode?.childCount,
       listNodeSize: listNode?.nodeSize
     });
-    
+
     // Удаляем весь список только если это единственный элемент в блоке списка
     if (listNode && listNode.childCount === 1) {
       // Если это единственный элемент в списке, превращаем блок в параграф
       console.log('[ComprehensiveKeyboardHandler] Only item in list - converting to paragraph');
-      
+
       // Создаем пустой параграф
-      const paragraph = state.schema.nodes.paragraph.create(null, []);
-      
+      const paragraph = state.schema.nodes.paragraph.create();
+
       // Заменяем весь список на параграф
       tr.replaceWith(listPos, listPos + listNode.nodeSize, paragraph);
-      
+
       // Устанавливаем курсор в начало параграфа
       const newPos = listPos + 1;
       if (newPos <= tr.doc.content.size) {
         tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
       }
-      
+
       // Применяем все изменения одной транзакцией
       editor.view.dispatch(tr);
     } else {
       // Удаляем только элемент списка (если в списке несколько элементов)
       console.log('[ComprehensiveKeyboardHandler] Deleting single list item (multiple items in list)');
       tr.delete(listItemPos, listItemPos + listItemNode.nodeSize);
-      
+
       // Применяем изменения в документе
       editor.view.dispatch(tr);
     }
-    
+
     return true;
-  } 
+  }
   // Создание нового элемента списка в конце
   else if (isAtEnd) {
     console.log('[ComprehensiveKeyboardHandler] At end of list item - creating new list item');
-    
+
     const tr = state.tr;
-    
+
     // Проверяем, что мы можем создать новый элемент списка
     if (!listItemNode.type || !state.schema.nodes.paragraph) {
       console.warn('[ComprehensiveKeyboardHandler] Cannot create new list item - missing node types');
       return false;
     }
-    
+
     try {
       // Создаем пустой параграф для нового элемента списка
-      const paragraph = state.schema.nodes.paragraph.create(null, []);
-      
+      const paragraph = state.schema.nodes.paragraph.create();
+
       // Создаем новый элемент списка с пустым параграфом
       const newListItem = listItemNode.type.create(null, paragraph);
-      
+
       // Проверяем, что позиция для вставки корректна
       const insertPos = $from.pos + 1;
       if (insertPos > tr.doc.content.size) {
         console.warn('[ComprehensiveKeyboardHandler] Insert position out of bounds:', insertPos, 'doc size:', tr.doc.content.size);
         return false;
       }
-      
+
       // Вставляем новый элемент списка
       tr.insert(insertPos, newListItem);
-      
+
       // Устанавливаем селекцию в новый элемент списка
       const newPos = insertPos + 1;
       if (newPos <= tr.doc.content.size) {
         tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
       }
-      
+
       editor.view.dispatch(tr);
       return true;
     } catch (error) {
       console.error('[ComprehensiveKeyboardHandler] Error creating new list item:', error);
       return false;
     }
-  } 
+  }
   // Разделение элемента списка в середине
   else {
     console.log('[ComprehensiveKeyboardHandler] In middle of list item - splitting');
-    
+
     const tr = state.tr;
-    
+
     // Проверяем, что мы можем создать новый элемент списка
     if (!listItemNode.type || !state.schema.nodes.paragraph) {
       console.warn('[ComprehensiveKeyboardHandler] Cannot split list item - missing node types');
       return false;
     }
-    
+
     try {
       // Создаем пустой параграф для нового элемента списка
-      const paragraph = state.schema.nodes.paragraph.create(null, []);
-      
+      const paragraph = state.schema.nodes.paragraph.create();
+
       // Создаем новый элемент списка с пустым параграфом
       const newListItem = listItemNode.type.create(null, paragraph);
-      
+
       // Проверяем, что можем разделить в текущей позиции
       if ($from.pos >= tr.doc.content.size) {
         console.warn('[ComprehensiveKeyboardHandler] Split position out of bounds:', $from.pos, 'doc size:', tr.doc.content.size);
         return false;
       }
-      
+
       // Разделяем элемент списка
       tr.split($from.pos);
-      
+
       // Проверяем позицию для вставки после разделения
       const insertPos = $from.pos + 1;
       if (insertPos <= tr.doc.content.size) {
         tr.insert(insertPos, newListItem);
-        
+
         // Устанавливаем селекцию в новый элемент списка
         const newPos = insertPos + 1;
         if (newPos <= tr.doc.content.size) {
           tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
         }
       }
-      
+
       editor.view.dispatch(tr);
       return true;
     } catch (error) {
@@ -174,24 +174,24 @@ function handleBackspaceInList(editor: any, $from: any, listItemType: string, op
     if (listItem && (listItem.type.name === 'listItem' || listItem.type.name === 'taskItem')) {
       const listPos = $from.before($from.depth - 1);
       const listNode = state.doc.nodeAt(listPos);
-      
+
        if (listNode && listNode.childCount === 1) {
          console.log('[ComprehensiveKeyboardHandler] Only item in list - converting to paragraph');
-         
+
          // Если это единственный элемент в списке, превращаем блок в параграф
          const tr = state.tr;
-         const paragraph = state.schema.nodes.paragraph.create(null, []);
+         const paragraph = state.schema.nodes.paragraph.create();
          tr.replaceWith(listPos, listPos + listNode.nodeSize, paragraph);
-         
+
          // Устанавливаем курсор в начало параграфа
          const newPos = listPos + 1;
          if (newPos <= tr.doc.content.size) {
            tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
          }
-         
+
          // Применяем все изменения одной транзакцией
          editor.view.dispatch(tr);
-         
+
          return true;
       } else {
         // Если это не последний элемент, удаляем только текущий элемент списка
@@ -250,7 +250,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         // Проверяем, активен ли slash menu
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
-        
+
         // Дополнительная проверка через DOM - ищем все возможные селекторы
         const slashMenuSelectors = [
           '#slash-command',
@@ -264,20 +264,20 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
           '.tippy-content', // tippy.js content
           '[data-tippy-root]' // tippy.js root
         ];
-        
+
         let slashMenuElement = null;
         for (const selector of slashMenuSelectors) {
           slashMenuElement = document.querySelector(selector) as HTMLElement;
           if (slashMenuElement) break;
         }
-        
-        const isSlashMenuVisible = slashMenuElement && 
-          slashMenuElement.style.display !== 'none' && 
+
+        const isSlashMenuVisible = slashMenuElement &&
+          slashMenuElement.style.display !== 'none' &&
           slashMenuElement.style.visibility !== 'hidden' &&
           slashMenuElement.offsetParent !== null &&
           getComputedStyle(slashMenuElement).display !== 'none' &&
           getComputedStyle(slashMenuElement).visibility !== 'hidden';
-        
+
         const isSlashMenuReallyActive = isSlashMenuActive || isSlashMenuVisible;
 
         console.log('[ComprehensiveKeyboardHandler] Slash menu check:', {
@@ -306,7 +306,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         let listItemType = null;
         for (let i = 0; i <= $from.depth; i++) {
           const node = $from.node(i);
-          if (node.type.name === 'list_item' || node.type.name === 'listItem' || 
+          if (node.type.name === 'list_item' || node.type.name === 'listItem' ||
               node.type.name === 'task_item' || node.type.name === 'taskItem') {
             inList = true;
             listItemType = node.type.name;
@@ -336,7 +336,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         // ===== ENTER В ПАРАГРАФАХ =====
         if (parentType === 'paragraph') {
           console.log('[ComprehensiveKeyboardHandler] Enter in paragraph, offset:', $from.parentOffset, 'size:', $from.parent.content.size);
-          
+
           // Enter в конце параграфа создаёт новый блок
           if ($from.parentOffset === $from.parent.content.size) {
             console.log('[ComprehensiveKeyboardHandler] Enter at end of paragraph - creating new block');
@@ -376,7 +376,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         // Проверяем, активен ли slash menu
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
-        
+
         // Дополнительная проверка через DOM
         const slashMenuSelectors = [
           '#slash-command',
@@ -390,19 +390,19 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
           '.tippy-content', // tippy.js content
           '[data-tippy-root]' // tippy.js root
         ];
-        
+
         let slashMenuElement = null;
         for (const selector of slashMenuSelectors) {
           slashMenuElement = document.querySelector(selector) as HTMLElement;
           if (slashMenuElement) break;
         }
-        const isSlashMenuVisible = slashMenuElement && 
-          slashMenuElement.style.display !== 'none' && 
+        const isSlashMenuVisible = slashMenuElement &&
+          slashMenuElement.style.display !== 'none' &&
           slashMenuElement.style.visibility !== 'hidden' &&
           slashMenuElement.offsetParent !== null &&
           getComputedStyle(slashMenuElement).display !== 'none' &&
           getComputedStyle(slashMenuElement).visibility !== 'hidden';
-        
+
         const isSlashMenuReallyActive = isSlashMenuActive || isSlashMenuVisible;
 
         console.log('[ComprehensiveKeyboardHandler] Backspace slash menu check:', {
@@ -417,7 +417,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
           } : null,
           isSlashMenuReallyActive
         });
-        
+
         if (isSlashMenuReallyActive) {
           console.log('[ComprehensiveKeyboardHandler] Slash menu is active, allowing default behavior for Backspace');
           return false; // Позволяем slash menu обработать Backspace
@@ -435,7 +435,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         let listItemType = null;
         for (let i = 0; i <= $from.depth; i++) {
           const node = $from.node(i);
-          if (node.type.name === 'list_item' || node.type.name === 'listItem' || 
+          if (node.type.name === 'list_item' || node.type.name === 'listItem' ||
               node.type.name === 'task_item' || node.type.name === 'taskItem') {
             inList = true;
             listItemType = node.type.name;
@@ -452,7 +452,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
           // Проверяем, можно ли удалить этот блок
           if (this.options.canDeleteBlock && this.options.currentBlock && this.options.allBlocks) {
             const canDelete = this.options.canDeleteBlock(this.options.currentBlock, this.options.allBlocks);
-            
+
             if (!canDelete) {
               console.warn('Cannot delete the last block on the page');
               return false; // Предотвращаем удаление
@@ -487,7 +487,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         // Проверяем, активен ли slash menu
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
-        
+
         if (isSlashMenuActive) {
           return false; // Позволяем slash menu обработать Delete
         }
@@ -520,7 +520,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         // Проверяем, активен ли slash menu
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
-        
+
         if (isSlashMenuActive) {
           return false; // Позволяем slash menu обработать ArrowUp
         }
@@ -548,7 +548,7 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         // Проверяем, активен ли slash menu
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
-        
+
         if (isSlashMenuActive) {
           return false; // Позволяем slash menu обработать ArrowDown
         }
@@ -570,11 +570,11 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
       // ===== CTRL+ARROW KEYS FOR QUICK NAVIGATION =====
       'Ctrl-Home': ({ editor }) => {
         const { state, view } = editor;
-        
+
         // Проверяем, активен ли slash menu
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
-        
+
         if (isSlashMenuActive) {
           return false;
         }
@@ -589,11 +589,11 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
 
       'Ctrl-End': ({ editor }) => {
         const { state, view } = editor;
-        
+
         // Проверяем, активен ли slash menu
         const slashMenuState = slashMenuPluginKey.getState(state);
         const isSlashMenuActive = slashMenuState && slashMenuState.active;
-        
+
         if (isSlashMenuActive) {
           return false;
         }

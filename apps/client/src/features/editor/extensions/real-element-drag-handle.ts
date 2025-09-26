@@ -46,7 +46,7 @@ function ensurePositioningCSS() {
       .ProseMirror li > div {
         position: relative;
       }
-      
+
       .real-element-drag-handle-widget {
         position: absolute !important;
         left: -4rem !important;
@@ -54,31 +54,31 @@ function ensurePositioningCSS() {
         transform: translateY(-50%) !important;
         z-index: 1000 !important;
       }
-      
+
       /* Унифицируем позиционирование всех типов списков под стиль taskList */
       .ProseMirror ul, .ProseMirror ol {
         padding-left: 0;
         margin-left: 0;
       }
-      
+
       /* Применяем структуру taskList ко всем спискам */
       .ProseMirror li {
         position: relative;
         padding-left: 0;
         margin-left: 0;
       }
-      
+
       /* Для всех li создаем div-обертку как в taskList */
       .ProseMirror li > div {
         padding-left: 2rem;
         position: relative;
       }
-      
+
       /* Если div уже есть (как в taskList), не добавляем еще один */
       .ProseMirror li > div > div {
         padding-left: 0;
       }
-      
+
     `;
     document.head.appendChild(style);
     console.log('[RealElementDragHandle] Added positioning CSS');
@@ -89,17 +89,17 @@ function ensurePositioningCSS() {
 function createElementDecorations(doc: any): DecorationSet {
   // Обеспечиваем CSS для позиционирования
   ensurePositioningCSS();
-  
+
   const decorations: Decoration[] = [];
   let handleIndex = 0;
 
   doc.descendants((node: any, pos: number) => {
     // Поддерживаем все типы списков
-    if (node.type.name === 'listItem' || node.type.name === 'taskItem' || 
+    if (node.type.name === 'listItem' || node.type.name === 'taskItem' ||
         node.type.name === 'list_item' || node.type.name === 'task_item' ||
         node.type.name === 'bulletListItem' || node.type.name === 'orderedListItem') {
       const elementId = `element-${pos}-${node.type.name}`;
-      
+
       console.log('[RealElementDragHandle] Creating drag handle for:', {
         nodeType: node.type.name,
         pos,
@@ -110,7 +110,7 @@ function createElementDecorations(doc: any): DecorationSet {
 
       // 🚀 КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Размещаем widget внутри элемента
       let widgetPos = pos + 1; // Позиция ВНУТРИ элемента списка
-      
+
       const decoration = Decoration.widget(widgetPos, (view, getPos) => {
         const handle = document.createElement('div');
         handle.className = 'real-element-drag-handle-widget tiptap-style';
@@ -118,14 +118,14 @@ function createElementDecorations(doc: any): DecorationSet {
         handle.setAttribute('data-element-drag-handle', 'true');
         handle.setAttribute('data-element-id', elementId);
         handle.setAttribute('data-pos', pos.toString());
-        
+
         // Используем SVG иконку как в стандартном Tiptap drag handle
         handle.innerHTML = `
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" style="fill: rgba(55, 53, 47, 0.4); width: 10px; height: 10px;">
             <path d="M3,2 C2.44771525,2 2,1.55228475 2,1 C2,0.44771525 2.44771525,0 3,0 C3.55228475,0 4,0.44771525 4,1 C4,1.55228475 3.55228475,2 3,2 Z M3,6 C2.44771525,6 2,5.55228475 2,5 C2,4.44771525 2.44771525,4 3,4 C3.55228475,4 4,4.44771525 4,5 C4,5.55228475 3.55228475,6 3,6 Z M3,10 C2.44771525,10 2,9.55228475 2,9 C2,8.44771525 2.44771525,8 3,8 C3.55228475,8 4,8.44771525 4,9 C4,9.55228475 3.55228475,10 3,10 Z M7,2 C6.44771525,2 6,1.55228475 6,1 C6,0.44771525 6.44771525,0 7,0 C7.55228475,0 8,0.44771525 8,1 C8,1.55228475 7.55228475,2 7,2 Z M7,6 C6.44771525,6 6,5.55228475 6,5 C6,4.44771525 6.44771525,4 7,4 C7.55228475,4 8,4.44771525 8,5 C8,5.55228475 7.55228475,6 7,6 Z M7,10 C6.44771525,10 6,9.55228475 6,9 C6,8.44771525 6.44771525,8 7,8 C7.55228475,8 8,8.44771525 8,9 C8,9.55228475 7.55228475,10 7,10 Z"></path>
           </svg>
         `;
-        
+
         // Стили как у стандартного Tiptap drag handle, но всплывающие
         handle.style.cssText = `
           width: 1.2rem;
@@ -157,7 +157,7 @@ function createElementDecorations(doc: any): DecorationSet {
           listItem.addEventListener('mouseenter', () => {
             handle.style.opacity = '1';
           });
-          
+
           listItem.addEventListener('mouseleave', () => {
             handle.style.opacity = '0';
           });
@@ -170,7 +170,7 @@ function createElementDecorations(doc: any): DecorationSet {
 
           const currentPos = getPos ? getPos() : pos;
           const currentNode = view.state.doc.nodeAt(currentPos);
-          
+
           if (!currentNode) {
             console.warn('[RealElementDragHandle] No node found at position:', currentPos);
             return;
@@ -179,7 +179,7 @@ function createElementDecorations(doc: any): DecorationSet {
           // Find the list item node (parent of the paragraph)
           let listItemNode = currentNode;
           let listItemPos = currentPos;
-          
+
           // If current node is a paragraph, find its parent list item
           if (currentNode.type.name === 'paragraph') {
             const $pos = view.state.doc.resolve(currentPos);
@@ -219,11 +219,11 @@ function createElementDecorations(doc: any): DecorationSet {
           document.body.setAttribute('data-drag-type', 'element');
 
           // Update coordinator
-          dndCoordinator.start({ 
-            type: 'element', 
+          dndCoordinator.start({
+            type: 'element',
             sourceId: payload.elementId,
             sourceBlockId: payload.sourceBlockId,
-            payload 
+            payload
           });
 
           // Dispatch global drag start event
@@ -251,7 +251,7 @@ function createElementDecorations(doc: any): DecorationSet {
           handle.classList.remove('dragging');
           document.body.classList.remove('element-dragging');
           document.body.removeAttribute('data-drag-type');
-          
+
           // Remove placeholder
           removePlaceholder();
 
@@ -276,7 +276,7 @@ function createElementDecorations(doc: any): DecorationSet {
 
         console.log('[RealElementDragHandle] Widget created successfully for:', elementId);
         return handle;
-      }, { 
+      }, {
         // 🚀 КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: side: -1 для размещения widget в начале внутренней позиции
         side: -1,
         key: `real-element-drag-handle-${widgetPos}`
@@ -294,7 +294,7 @@ function createElementDecorations(doc: any): DecorationSet {
 // Placeholder management functions
 function insertPlaceholder(view: EditorView, targetPos: number, isAfter: boolean = false) {
   removePlaceholder(); // Remove existing placeholder first
-  
+
   const placeholder = document.createElement('div');
   placeholder.className = 'drag-placeholder';
   placeholder.setAttribute('data-drag-placeholder', 'true');
@@ -306,13 +306,13 @@ function insertPlaceholder(view: EditorView, targetPos: number, isAfter: boolean
     opacity: 0.8;
     pointer-events: none;
   `;
-  
+
   // Find the target DOM element
   const targetDom = view.domAtPos(targetPos);
-  const targetElement = targetDom.node.nodeType === Node.TEXT_NODE 
-    ? targetDom.node.parentElement 
+  const targetElement = targetDom.node.nodeType === Node.TEXT_NODE
+    ? targetDom.node.parentElement
     : targetDom.node as HTMLElement;
-  
+
   if (targetElement) {
     // Убеждаемся, что мы не вставляем placeholder в неподходящее место
     const parentList = targetElement.closest('ul, ol');
@@ -337,7 +337,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
     return [
       new Plugin({
         key: new PluginKey('realElementDragHandle'),
-        
+
         state: {
           init(config, state) {
             console.log('[RealElementDragHandle] Plugin initialized');
@@ -350,10 +350,10 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
               // Проверяем, действительно ли нужно пересоздавать декорации
               const hasListChanges = tr.steps.some(step => {
                 // Проверяем, затрагивает ли изменение списки
-                return (step as any).jsonID === 'addMark' || (step as any).jsonID === 'removeMark' || 
+                return (step as any).jsonID === 'addMark' || (step as any).jsonID === 'removeMark' ||
                        (step as any).jsonID === 'replace' || (step as any).jsonID === 'replaceAround';
               });
-              
+
               if (hasListChanges) {
                 console.log('[RealElementDragHandle] Document changed, recreating decorations');
                 return createElementDecorations(tr.doc);
@@ -371,14 +371,14 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
           handleDOMEvents: {
             dragover: (view: EditorView, event: DragEvent) => {
               event.preventDefault();
-              
+
               const target = (event.target as HTMLElement).closest('[data-element-drag-handle="true"]');
               if (!target) return false;
 
               const pos = parseInt(target.getAttribute('data-pos') || '0');
               const rect = target.getBoundingClientRect();
               const isAfter = event.clientY > rect.top + rect.height / 2;
-              
+
               insertPlaceholder(view, pos, isAfter);
               return true;
             },
@@ -395,11 +395,11 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
               const mimePayload = event.dataTransfer?.getData(DOCMOST_MIME);
               const jsonPayload = event.dataTransfer?.getData('application/json');
               const textPayload = event.dataTransfer?.getData('text/plain');
-              
+
               console.log('[RealElementDragHandle] MIME payload:', mimePayload);
               console.log('[RealElementDragHandle] JSON payload:', jsonPayload);
               console.log('[RealElementDragHandle] Text payload:', textPayload);
-              
+
               const raw = mimePayload || jsonPayload || textPayload || '';
               let payload: DndPayload | null = null;
 
@@ -411,7 +411,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
 
               if (!payload || payload.type !== 'element') {
                 console.warn('[RealElementDragHandle] No valid element payload found in dataTransfer');
-                
+
                 // Try to get payload from global state
                 const globalPayload = dndCoordinator.getCurrentPayload();
                 if (globalPayload && globalPayload.type === 'element') {
@@ -427,14 +427,14 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
 
               // Get target information - try multiple approaches
               let target = (event.target as HTMLElement).closest('[data-element-drag-handle="true"]');
-              
+
               // If not found, try to find by coordinates
               if (!target) {
                 console.log('[RealElementDragHandle] Target not found by closest, trying by coordinates');
                 const elementsAtPoint = document.elementsFromPoint(event.clientX, event.clientY);
                 target = elementsAtPoint.find(el => el.hasAttribute('data-element-drag-handle')) as HTMLElement;
               }
-              
+
               // If still not found, try to find any element drag handle in the current block
               if (!target) {
                 console.log('[RealElementDragHandle] Target not found by coordinates, trying to find any handle in block');
@@ -443,18 +443,18 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                   target = currentBlock.querySelector('[data-element-drag-handle="true"]') as HTMLElement;
                 }
               }
-              
+
               // If still not found, try to find by looking for list items near the drop point
               if (!target) {
                 console.log('[RealElementDragHandle] Target not found in block, trying to find list items near drop point');
                 const elementsAtPoint = document.elementsFromPoint(event.clientX, event.clientY);
-                const listItem = elementsAtPoint.find(el => 
-                  el.tagName === 'LI' || 
-                  el.closest('li') || 
+                const listItem = elementsAtPoint.find(el =>
+                  el.tagName === 'LI' ||
+                  el.closest('li') ||
                   el.hasAttribute('data-checked') ||
                   el.closest('[data-checked]')
                 ) as HTMLElement;
-                
+
                 if (listItem) {
                   // Find the drag handle for this list item
                   const li = listItem.tagName === 'LI' ? listItem : listItem.closest('li');
@@ -464,7 +464,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                   }
                 }
               }
-              
+
               if (!target) {
                 console.warn('[RealElementDragHandle] No valid drop target found');
                 console.log('[RealElementDragHandle] Event target:', event.target);
@@ -485,13 +485,22 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
 
               // Extract source position from nested payload
               const sourcePos = payload.payload?.sourcePos;
-              
+
               console.log('[RealElementDragHandle] Drop details:', {
                 sourcePos: sourcePos,
                 targetPos: finalTargetPos,
                 sourceBlockId: payload.sourceBlockId,
                 targetBlockId,
-                isAfter
+                isAfter,
+                payloadType: payload.type,
+                sourceId: payload.sourceId
+              });
+
+              // Дополнительная отладочная информация
+              console.log('[RealElementDragHandle] Document structure analysis:', {
+                docSize: view.state.doc.content.size,
+                sourceNode: sourcePos ? view.state.doc.nodeAt(sourcePos) : null,
+                targetNode: view.state.doc.nodeAt(finalTargetPos)
               });
 
               // Determine operation type
@@ -500,64 +509,292 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
 
               if (isIntraList) {
                 console.log('[RealElementDragHandle] 🔄 INTRA-LIST reorder detected');
-                
+
                 // Create ProseMirror transaction for intra-list reordering
                 const tr = view.state.tr;
                 const nodeJSON = payload.payload?.nodeJSON;
                 const node = view.state.schema.nodeFromJSON(nodeJSON);
-                
+
                 // Находим правильную позицию для вставки
                 let insertPos: number;
-                
+
                 if (isAfter) {
                   // Вставляем после target элемента
                   const $targetPos = view.state.doc.resolve(targetPos);
                   let targetListItemPos = -1;
-                  
+
+                  console.log('[RealElementDragHandle] Target position analysis:', {
+                    targetPos,
+                    depth: $targetPos.depth,
+                    nodeTypes: Array.from({ length: $targetPos.depth + 1 }, (_, i) => ({
+                      depth: i,
+                      nodeType: $targetPos.node(i).type.name,
+                      start: $targetPos.start(i),
+                      end: $targetPos.end(i),
+                      size: $targetPos.node(i).nodeSize
+                    }))
+                  });
+
                   // Находим позицию list item, содержащего target
+                  // Сначала ищем taskItem на более глубоких уровнях
+                  let foundTaskItem = false;
+                  
+                  // Проверяем все уровни от текущей глубины до 0
                   for (let i = $targetPos.depth; i >= 0; i--) {
                     const node = $targetPos.node(i);
+                    console.log(`[RealElementDragHandle] Checking depth ${i}:`, {
+                      nodeType: node.type.name,
+                      start: $targetPos.start(i),
+                      end: $targetPos.end(i),
+                      size: node.nodeSize
+                    });
+                    
                     if (node.type.name === 'listItem' || node.type.name === 'taskItem') {
                       targetListItemPos = $targetPos.start(i) + node.nodeSize;
+                      console.log('[RealElementDragHandle] Found list item at depth', i, 'position:', targetListItemPos);
+                      foundTaskItem = true;
                       break;
                     }
                   }
                   
-                  if (targetListItemPos === -1) {
-                    console.warn('[RealElementDragHandle] Could not find target list item position');
-                    return false;
+                  // Если не нашли taskItem, ищем его внутри taskList
+                  if (!foundTaskItem) {
+                    console.log('[RealElementDragHandle] No taskItem found at current depth, searching inside taskList');
+                    
+                    // Ищем taskItem внутри taskList
+                    const taskListPos = $targetPos.pos;
+                    const taskListNode = view.state.doc.nodeAt(taskListPos);
+                    
+                    if (taskListNode && (taskListNode.type.name === 'taskList' || taskListNode.type.name === 'bulletList' || taskListNode.type.name === 'orderedList')) {
+                      console.log('[RealElementDragHandle] Found taskList, searching for taskItem inside');
+                      console.log('[RealElementDragHandle] TaskList details (after):', {
+                        pos: taskListPos,
+                        childCount: taskListNode.childCount,
+                        children: Array.from({ length: taskListNode.childCount }, (_, i) => ({
+                          index: i,
+                          type: taskListNode.child(i).type.name,
+                          size: taskListNode.child(i).nodeSize
+                        }))
+                      });
+                      
+                      // Ищем taskItem внутри taskList, который ближе всего к targetPos
+                      let closestItemPos = -1;
+                      let minDistance = Infinity;
+                      
+                      taskListNode.forEach((node, offset) => {
+                        if (node.type.name === 'taskItem' || node.type.name === 'listItem') {
+                          const itemPos = taskListPos + offset + 1; // +1 для позиции после открывающего тега
+                          const distance = Math.abs(itemPos - targetPos);
+                          
+                          console.log('[RealElementDragHandle] Found taskItem at position (after):', itemPos, 'distance from target:', distance);
+                          
+                          if (distance < minDistance) {
+                            minDistance = distance;
+                            closestItemPos = itemPos + node.nodeSize; // Для "after" добавляем размер узла
+                          }
+                        }
+                      });
+                      
+                      if (closestItemPos !== -1) {
+                        targetListItemPos = closestItemPos;
+                        foundTaskItem = true;
+                        console.log('[RealElementDragHandle] Using closest taskItem position (after):', targetListItemPos);
+                      } else {
+                        console.warn('[RealElementDragHandle] No taskItem found inside taskList (after)');
+                      }
+                    } else {
+                      console.warn('[RealElementDragHandle] Target node is not a list (after):', taskListNode?.type.name);
+                    }
                   }
-                  
+
+                  if (targetListItemPos === -1) {
+                    console.warn('[RealElementDragHandle] Could not find target list item position, trying alternative approach');
+                    
+                    // Альтернативный подход: используем позицию target напрямую
+                    // Если targetPos указывает на taskList, ищем ближайший taskItem
+                    const targetNode = view.state.doc.nodeAt(targetPos);
+                    if (targetNode && (targetNode.type.name === 'taskList' || targetNode.type.name === 'bulletList' || targetNode.type.name === 'orderedList')) {
+                      console.log('[RealElementDragHandle] Target is a list, finding closest item position');
+                      
+                      // Ищем ближайший taskItem к targetPos
+                      let closestItemPos = -1;
+                      let minDistance = Infinity;
+                      
+                      targetNode.forEach((node, offset) => {
+                        if (node.type.name === 'taskItem' || node.type.name === 'listItem') {
+                          const itemPos = targetPos + offset + 1; // +1 для позиции после открывающего тега
+                          const distance = Math.abs(itemPos - targetPos);
+                          
+                          if (distance < minDistance) {
+                            minDistance = distance;
+                            closestItemPos = itemPos;
+                          }
+                        }
+                      });
+                      
+                      if (closestItemPos !== -1) {
+                        targetListItemPos = closestItemPos;
+                        console.log('[RealElementDragHandle] Using closest item position:', targetListItemPos);
+                      } else {
+                        console.warn('[RealElementDragHandle] No items found in target list');
+                        return false;
+                      }
+                    } else {
+                      // Если targetPos не указывает на список, используем его напрямую
+                      targetListItemPos = targetPos;
+                      console.log('[RealElementDragHandle] Using target position directly:', targetListItemPos);
+                    }
+                    
+                    if (targetListItemPos === -1) {
+                      console.warn('[RealElementDragHandle] Could not find target list item position with alternative approach');
+                      return false;
+                    }
+                  }
+
                   insertPos = targetListItemPos;
                 } else {
                   // Вставляем перед target элементом
                   const $targetPos = view.state.doc.resolve(targetPos);
                   let targetListItemPos = -1;
-                  
+
+                  console.log('[RealElementDragHandle] Target position analysis (before):', {
+                    targetPos,
+                    depth: $targetPos.depth,
+                    nodeTypes: Array.from({ length: $targetPos.depth + 1 }, (_, i) => ({
+                      depth: i,
+                      nodeType: $targetPos.node(i).type.name,
+                      start: $targetPos.start(i),
+                      end: $targetPos.end(i),
+                      size: $targetPos.node(i).nodeSize
+                    }))
+                  });
+
                   // Находим позицию list item, содержащего target
+                  // Сначала ищем taskItem на более глубоких уровнях
+                  let foundTaskItem = false;
+                  
+                  // Проверяем все уровни от текущей глубины до 0
                   for (let i = $targetPos.depth; i >= 0; i--) {
                     const node = $targetPos.node(i);
+                    console.log(`[RealElementDragHandle] Checking depth ${i} (before):`, {
+                      nodeType: node.type.name,
+                      start: $targetPos.start(i),
+                      end: $targetPos.end(i),
+                      size: node.nodeSize
+                    });
+                    
                     if (node.type.name === 'listItem' || node.type.name === 'taskItem') {
                       targetListItemPos = $targetPos.start(i);
+                      console.log('[RealElementDragHandle] Found list item at depth', i, 'position (before):', targetListItemPos);
+                      foundTaskItem = true;
                       break;
                     }
                   }
                   
-                  if (targetListItemPos === -1) {
-                    console.warn('[RealElementDragHandle] Could not find target list item position');
-                    return false;
+                  // Если не нашли taskItem, ищем его внутри taskList
+                  if (!foundTaskItem) {
+                    console.log('[RealElementDragHandle] No taskItem found at current depth, searching inside taskList');
+                    
+                    // Ищем taskItem внутри taskList
+                    const taskListPos = $targetPos.pos;
+                    const taskListNode = view.state.doc.nodeAt(taskListPos);
+                    
+                    if (taskListNode && (taskListNode.type.name === 'taskList' || taskListNode.type.name === 'bulletList' || taskListNode.type.name === 'orderedList')) {
+                      console.log('[RealElementDragHandle] Found taskList, searching for taskItem inside');
+                      console.log('[RealElementDragHandle] TaskList details:', {
+                        pos: taskListPos,
+                        childCount: taskListNode.childCount,
+                        children: Array.from({ length: taskListNode.childCount }, (_, i) => ({
+                          index: i,
+                          type: taskListNode.child(i).type.name,
+                          size: taskListNode.child(i).nodeSize
+                        }))
+                      });
+                      
+                      // Ищем taskItem внутри taskList, который ближе всего к targetPos
+                      let closestItemPos = -1;
+                      let minDistance = Infinity;
+                      
+                      taskListNode.forEach((node, offset) => {
+                        if (node.type.name === 'taskItem' || node.type.name === 'listItem') {
+                          const itemPos = taskListPos + offset + 1; // +1 для позиции после открывающего тега
+                          const distance = Math.abs(itemPos - targetPos);
+                          
+                          console.log('[RealElementDragHandle] Found taskItem at position:', itemPos, 'distance from target:', distance);
+                          
+                          if (distance < minDistance) {
+                            minDistance = distance;
+                            closestItemPos = itemPos;
+                          }
+                        }
+                      });
+                      
+                      if (closestItemPos !== -1) {
+                        targetListItemPos = closestItemPos;
+                        foundTaskItem = true;
+                        console.log('[RealElementDragHandle] Using closest taskItem position:', targetListItemPos);
+                      } else {
+                        console.warn('[RealElementDragHandle] No taskItem found inside taskList');
+                      }
+                    } else {
+                      console.warn('[RealElementDragHandle] Target node is not a list:', taskListNode?.type.name);
+                    }
                   }
-                  
+
+                  if (targetListItemPos === -1) {
+                    console.warn('[RealElementDragHandle] Could not find target list item position (before), trying alternative approach');
+                    
+                    // Альтернативный подход: используем позицию target напрямую
+                    // Если targetPos указывает на taskList, ищем ближайший taskItem
+                    const targetNode = view.state.doc.nodeAt(targetPos);
+                    if (targetNode && (targetNode.type.name === 'taskList' || targetNode.type.name === 'bulletList' || targetNode.type.name === 'orderedList')) {
+                      console.log('[RealElementDragHandle] Target is a list, finding closest item position (before)');
+                      
+                      // Ищем ближайший taskItem к targetPos
+                      let closestItemPos = -1;
+                      let minDistance = Infinity;
+                      
+                      targetNode.forEach((node, offset) => {
+                        if (node.type.name === 'taskItem' || node.type.name === 'listItem') {
+                          const itemPos = targetPos + offset + 1; // +1 для позиции после открывающего тега
+                          const distance = Math.abs(itemPos - targetPos);
+                          
+                          if (distance < minDistance) {
+                            minDistance = distance;
+                            closestItemPos = itemPos;
+                          }
+                        }
+                      });
+                      
+                      if (closestItemPos !== -1) {
+                        targetListItemPos = closestItemPos;
+                        console.log('[RealElementDragHandle] Using closest item position (before):', targetListItemPos);
+                      } else {
+                        console.warn('[RealElementDragHandle] No items found in target list (before)');
+                        return false;
+                      }
+                    } else {
+                      // Если targetPos не указывает на список, используем его напрямую
+                      targetListItemPos = targetPos;
+                      console.log('[RealElementDragHandle] Using target position directly (before):', targetListItemPos);
+                    }
+                    
+                    if (targetListItemPos === -1) {
+                      console.warn('[RealElementDragHandle] Could not find target list item position (before) with alternative approach');
+                      return false;
+                    }
+                  }
+
                   insertPos = targetListItemPos;
                 }
-                
+
                 // Учитываем удаление source элемента при расчете позиции вставки
                 let deletePos = sourcePos;
                 if (deletePos < insertPos) {
                   // Если удаляем элемент до позиции вставки, корректируем позицию
                   insertPos = insertPos - payload.payload?.nodeSize;
                 }
-                
+
                 console.log('[RealElementDragHandle] Move details:', {
                   sourcePos: deletePos,
                   targetPos: insertPos,
@@ -565,22 +802,22 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                   isAfter,
                   originalTargetPos: targetPos
                 });
-                
+
                 // Perform the move
                 const nodeSize = payload.payload?.nodeSize;
-                
+
                 // Сначала удаляем элемент из исходной позиции
                 tr.delete(deletePos, deletePos + nodeSize);
-                
+
                 // Затем вставляем в новую позицию
                 tr.insert(insertPos, node);
-                
+
                 view.dispatch(tr.scrollIntoView());
                 console.log('[RealElementDragHandle] ✅ Intra-list move completed');
-                
+
                 // Убеждаемся, что placeholder удален после успешного drop
                 removePlaceholder();
-                
+
               } else if (isCrossBlock) {
                 console.log('🔄 [RealElementDragHandle] ===== CROSS-BLOCK ELEMENT DROP DETECTED =====');
                 console.log('🔄 [RealElementDragHandle] Source block ID:', payload.sourceBlockId);
@@ -590,7 +827,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                 console.log('🔄 [RealElementDragHandle] Is after:', isAfter);
                 console.log('🔄 [RealElementDragHandle] Target position:', isAfter ? 'after' : 'before');
                 console.log('🔄 [RealElementDragHandle] Node JSON:', payload.payload?.nodeJSON);
-                
+
                 // For cross-block, we'll use the existing cross-block event system
                 // but also try to handle it through ProseMirror if possible
                 const node = view.state.schema.nodeFromJSON(payload.payload?.nodeJSON);
@@ -599,7 +836,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                   attrs: node.attrs,
                   contentSize: node.content?.size || 0
                 });
-                
+
                 const eventDetail = {
                   sourceBlockId: payload.sourceBlockId,
                   targetBlockId,
@@ -613,19 +850,19 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                   targetPosition: isAfter ? 'after' : 'before',
                   elementId: payload.elementId
                 };
-                
+
                 console.log('🔄 [RealElementDragHandle] Creating cross-block event with detail:', eventDetail);
                 const crossBlockEvent = new CustomEvent('cross-block-element-move', {
                   detail: eventDetail
                 });
-                
+
                 console.log('🔄 [RealElementDragHandle] Event created:', {
                   type: crossBlockEvent.type,
                   detail: crossBlockEvent.detail,
                   bubbles: crossBlockEvent.bubbles,
                   cancelable: crossBlockEvent.cancelable
                 });
-                
+
                 console.log('🔄 [RealElementDragHandle] Dispatching cross-block event...');
                 document.dispatchEvent(crossBlockEvent);
                 console.log('✅ [RealElementDragHandle] Cross-block event dispatched successfully');

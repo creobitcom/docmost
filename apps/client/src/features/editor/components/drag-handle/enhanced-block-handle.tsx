@@ -106,7 +106,7 @@ export const EnhancedBlockHandle: React.FC<EnhancedBlockHandleProps> = ({
     };
   }, [blockId]);
 
-  const handleDragStart = (event: React.DragEvent) => {
+  const handleDragStart = async (event: React.DragEvent) => {
     // Начинаем новую операцию логирования
     const operationId = dragDebugLogger.startOperation();
 
@@ -143,7 +143,7 @@ export const EnhancedBlockHandle: React.FC<EnhancedBlockHandleProps> = ({
         value: event.currentTarget,
         writable: false
       });
-      const dragData = handleUnifiedDragStart(nativeEvent);
+      const dragData = await handleUnifiedDragStart(nativeEvent);
 
       // Логируем drag start в централизованную систему
       dragDebugLogger.logDragStart(

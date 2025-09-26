@@ -80,3 +80,8 @@ class DndCoordinatorClass {
 }
 
 export const dndCoordinator = new DndCoordinatorClass();
+
+// Добавляем в window для тестирования
+if (typeof window !== 'undefined') {
+  (window as any).dndCoordinator = dndCoordinator;
+}

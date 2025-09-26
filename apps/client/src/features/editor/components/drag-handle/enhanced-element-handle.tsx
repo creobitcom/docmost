@@ -28,7 +28,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
   const [dragOverPosition, setDragOverPosition] = useState<'before' | 'after' | null>(null);
   const elementRef = useRef<HTMLDivElement>(null);
 
-  const handleDragStart = (event: React.DragEvent) => {
+  const handleDragStart = async (event: React.DragEvent) => {
     console.log('🎯 [EnhancedElementHandle] ===== DRAG START =====');
     console.log('🎯 [EnhancedElementHandle] Element ID:', elementId);
     console.log('🎯 [EnhancedElementHandle] Block ID:', blockId);
@@ -39,23 +39,31 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
     console.log('🎯 [EnhancedElementHandle] Event cancelable:', event.cancelable);
     console.log('🎯 [EnhancedElementHandle] DataTransfer types:', event.dataTransfer?.types);
     console.log('🎯 [EnhancedElementHandle] DataTransfer effectAllowed:', event.dataTransfer?.effectAllowed);
-    
+
     try {
       // 🚨 КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Только stopPropagation, НЕ preventDefault!
       // preventDefault() в dragstart блокирует весь drag-and-drop
       event.stopPropagation();
       console.log('🎯 [EnhancedElementHandle] Event propagation stopped');
-      
+
       setIsDragging(true);
       console.log('🎯 [EnhancedElementHandle] Dragging state set to true');
-      
+
       onDragStart?.(elementId);
       console.log('🎯 [EnhancedElementHandle] onDragStart callback called');
 
       // 🎯 ИСПОЛЬЗУЕМ УНИФИЦИРОВАННЫЕ ОБРАБОТЧИКИ
       console.log('🎯 [EnhancedElementHandle] Calling handleUnifiedDragStart...');
-      const dragData = handleUnifiedDragStart(event.nativeEvent);
-      
+      console.log('🎯 [EnhancedElementHandle] Event details:', {
+        type: event.type,
+        target: event.target,
+        nativeEvent: event.nativeEvent,
+        dataTransfer: event.dataTransfer
+      });
+
+      const dragData = await handleUnifiedDragStart(event.nativeEvent);
+      console.log('🎯 [EnhancedElementHandle] handleUnifiedDragStart completed, result:', dragData);
+
       if (dragData) {
         console.log('✅ [EnhancedElementHandle] Element drag data set successfully:', dragData);
         console.log('✅ [EnhancedElementHandle] Drag data type:', dragData.type);
@@ -68,7 +76,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
       console.error('❌ [EnhancedElementHandle] Error in handleDragStart:', error);
       console.error('❌ [EnhancedElementHandle] Error stack:', error.stack);
     }
-    
+
     console.log('🎯 [EnhancedElementHandle] ===== DRAG START END =====');
   };
 
@@ -80,14 +88,14 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
     console.log('🏁 [EnhancedElementHandle] Event target:', event.target);
     console.log('🏁 [EnhancedElementHandle] DataTransfer dropEffect:', event.dataTransfer?.dropEffect);
     console.log('🏁 [EnhancedElementHandle] DataTransfer effectAllowed:', event.dataTransfer?.effectAllowed);
-    
+
     try {
       setIsDragging(false);
       console.log('🏁 [EnhancedElementHandle] Dragging state set to false');
-      
+
       onDragEnd?.(elementId);
       console.log('🏁 [EnhancedElementHandle] onDragEnd callback called');
-      
+
       // Очистка drag состояния
       console.log('🏁 [EnhancedElementHandle] Cleaning up drag state...');
       cleanupDragState();
@@ -97,7 +105,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
       console.error('❌ [EnhancedElementHandle] Error in handleDragEnd:', error);
       console.error('❌ [EnhancedElementHandle] Error stack:', error.stack);
     }
-    
+
     console.log('🏁 [EnhancedElementHandle] ===== DRAG END END =====');
   };
 
@@ -108,13 +116,13 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
     console.log('🔄 [EnhancedElementHandle] Event type:', event.type);
     console.log('🔄 [EnhancedElementHandle] Event clientY:', event.clientY);
     console.log('🔄 [EnhancedElementHandle] Event target:', event.target);
-    
+
     try {
       // 🎯 ИСПОЛЬЗУЕМ УНИФИЦИРОВАННЫЕ ОБРАБОТЧИКИ
       console.log('🔄 [EnhancedElementHandle] Calling handleUnifiedDragOver...');
       const handled = handleUnifiedDragOver(event.nativeEvent);
       console.log('🔄 [EnhancedElementHandle] handleUnifiedDragOver result:', handled);
-      
+
       if (handled) {
         // Определяем позицию drop для визуальных индикаторов
         if (elementRef.current) {
@@ -138,7 +146,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
       console.error('❌ [EnhancedElementHandle] Error in handleDragOver:', error);
       console.error('❌ [EnhancedElementHandle] Error stack:', error.stack);
     }
-    
+
     console.log('🔄 [EnhancedElementHandle] ===== DRAG OVER END =====');
   };
 
@@ -146,7 +154,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
     console.log('🚪 [EnhancedElementHandle] ===== DRAG LEAVE =====');
     console.log('🚪 [EnhancedElementHandle] Element ID:', elementId);
     console.log('🚪 [EnhancedElementHandle] Block ID:', blockId);
-    
+
     try {
       setDragOverPosition(null);
       console.log('🚪 [EnhancedElementHandle] Drag over position cleared');
@@ -154,7 +162,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
       console.error('❌ [EnhancedElementHandle] Error in handleDragLeave:', error);
       console.error('❌ [EnhancedElementHandle] Error stack:', error.stack);
     }
-    
+
     console.log('🚪 [EnhancedElementHandle] ===== DRAG LEAVE END =====');
   };
 
@@ -166,7 +174,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
     console.log('🎯 [EnhancedElementHandle] Event target:', event.target);
     console.log('🎯 [EnhancedElementHandle] DataTransfer dropEffect:', event.dataTransfer?.dropEffect);
     console.log('🎯 [EnhancedElementHandle] DataTransfer types:', event.dataTransfer?.types);
-    
+
     try {
       setDragOverPosition(null);
       console.log('🎯 [EnhancedElementHandle] Drag over position cleared');
@@ -193,11 +201,11 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
             console.log('🔄 [EnhancedElementHandle] Target element ID:', elementId);
             console.log('🔄 [EnhancedElementHandle] Before element ID:', beforeElementId);
             console.log('🔄 [EnhancedElementHandle] Target position:', beforeElementId ? 'before' : 'after');
-            
+
             // 🔧 ИСПРАВЛЕНИЕ: Правильно определяем позицию на основе dragOverPosition
             let targetPosition: 'before' | 'after' = 'after';
             let finalBeforeElementId = beforeElementId;
-            
+
             if (dragOverPosition === 'before') {
               targetPosition = 'before';
               finalBeforeElementId = elementId; // Вставляем перед текущим элементом
@@ -209,7 +217,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
               targetPosition = 'before';
               finalBeforeElementId = beforeElementId;
             }
-            
+
             const eventDetail = {
               sourceBlockId,
               targetBlockId,
@@ -224,7 +232,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
               beforeElementId: finalBeforeElementId,
               elementId: sourceElementId,
             };
-            
+
             console.log('🔍 [EnhancedElementHandle] Final dropDetails before dispatch:', {
               sourceBlockId,
               targetBlockId,
@@ -239,14 +247,14 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
             const crossBlockEvent = new CustomEvent('cross-block-element-move', {
               detail: eventDetail
             });
-            
+
             console.log('🔄 [EnhancedElementHandle] Event created:', {
               type: crossBlockEvent.type,
               detail: crossBlockEvent.detail,
               bubbles: crossBlockEvent.bubbles,
               cancelable: crossBlockEvent.cancelable
             });
-            
+
             console.log('🔄 [EnhancedElementHandle] Dispatching cross-block event...');
             document.dispatchEvent(crossBlockEvent);
             console.log('✅ [EnhancedElementHandle] Cross-block element move event dispatched successfully');
@@ -254,10 +262,10 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
           } else {
             // Внутриблоковое перемещение
             console.log('🔄 [EnhancedElementHandle] Intra-block drop detected, calling onElementDrop...');
-            
+
             // 🔧 ИСПРАВЛЕНИЕ: Используем реальную позицию из dragOverPosition
             const actualPosition = dragOverPosition || (beforeElementId ? 'before' : 'after');
-            
+
             // 🔧 ИСПРАВЛЕНИЕ: Правильно определяем targetElementId для внутриблокового перемещения
             let targetElementId: string;
             if (beforeElementId) {
@@ -278,7 +286,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
                 targetElementId = elementId;
               }
             }
-            
+
             console.log('🔄 [EnhancedElementHandle] Drop parameters:', {
               sourceElementId,
               targetElementId,
@@ -287,7 +295,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
               beforeElementId,
               elementId
             });
-            
+
             onElementDrop?.(sourceElementId, targetElementId, actualPosition);
             console.log('✅ [EnhancedElementHandle] Intra-block drop handled');
           }
@@ -302,7 +310,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
       console.error('❌ [EnhancedElementHandle] Error in handleDrop:', error);
       console.error('❌ [EnhancedElementHandle] Error stack:', error.stack);
     }
-    
+
     console.log('🎯 [EnhancedElementHandle] ===== DROP END =====');
   };
 
@@ -377,7 +385,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
 
       {/* Drop Indicator - Before */}
       {dragOverPosition === 'before' && (
-        <div 
+        <div
           className="element-drop-indicator element-drop-indicator-before"
           style={{
             position: 'absolute',
@@ -399,7 +407,7 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
 
       {/* Drop Indicator - After */}
       {dragOverPosition === 'after' && (
-        <div 
+        <div
           className="element-drop-indicator element-drop-indicator-after"
           style={{
             position: 'absolute',
