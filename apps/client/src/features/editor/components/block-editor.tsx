@@ -21,6 +21,7 @@ import {
   creobitExtentions,
   mainExtensions,
 } from "@/features/editor/extensions/extensions";
+import { createFlexibleContent } from "@/features/editor/extensions/flexible-document";
 import { SmartListHandler } from "@/features/editor/extensions/smart-list-handler";
 import { slashMenuPluginKey } from "@/features/editor/extensions/slash-command";
 import { getTokenFromCollabQuery, saveBlocksToServer, hasTextContent } from "../utils/block-utils";
@@ -131,9 +132,8 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
 
       if (isListBlock) {
         // Для блоков-списков берем весь контент как есть, не фильтруем параграфы
-        contentToInit = {
-          type: 'doc',
-          content: parsedContent.content?.map(node => ({
+        contentToInit = createFlexibleContent(
+          parsedContent.content?.map(node => ({
             ...node,
             attrs: {
               ...node.attrs,
@@ -141,7 +141,7 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
               blockId: block.id
             }
           })) || []
-        };
+        );
       } else {
         // Для обычных блоков берем только первый параграф
         const paragraphs = parsedContent.content?.filter(node =>
@@ -154,72 +154,57 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
           // Проверяем, что параграф не пустой
           if (hasTextContent(firstParagraph)) {
             // Гарантируем, что создается только один параграф
-            contentToInit = {
-              type: 'doc',
-              content: [{
-                ...firstParagraph,
-                attrs: {
-                  ...firstParagraph.attrs,
-                  position: block.position,
-                  blockId: block.id
-                }
-              }]
-            };
-
-            // Дополнительная проверка - убеждаемся, что в content только один элемент
-            if (contentToInit.content.length > 1) {
-              console.warn('[BlockEditor] Multiple content elements detected, keeping only first');
-              contentToInit.content = [contentToInit.content[0]];
-            }
+            contentToInit = createFlexibleContent([{
+              ...firstParagraph,
+              attrs: {
+                ...firstParagraph.attrs,
+                position: block.position,
+                blockId: block.id
+              }
+            }]);
           } else {
             // Если параграф пустой, не создаем контент вообще
-            contentToInit = null;
+            contentToInit = createFlexibleContent();
           }
         } else {
           // Если нет параграфов, не создаем контент вообще
-          contentToInit = null;
+          contentToInit = createFlexibleContent();
         }
       }
     } else if (parsedContent.type === 'paragraph') {
       // Если это параграф, проверяем что он не пустой
       if (hasTextContent(parsedContent)) {
-        contentToInit = {
-          type: 'doc',
-          content: [{
-            ...parsedContent,
-            attrs: {
-              ...parsedContent.attrs,
-              position: block.position,
-              blockId: block.id
-            }
-          }]
-        };
+        contentToInit = createFlexibleContent([{
+          ...parsedContent,
+          attrs: {
+            ...parsedContent.attrs,
+            position: block.position,
+            blockId: block.id
+          }
+        }]);
       } else {
         // Если параграф пустой, не создаем контент
-        contentToInit = null;
+        contentToInit = createFlexibleContent();
       }
     } else {
       // Оборачиваем одиночный узел в doc только если он не пустой
       if (hasTextContent(parsedContent)) {
-        contentToInit = {
-          type: 'doc',
-          content: [{
-            ...parsedContent,
-            attrs: {
-              ...parsedContent.attrs,
-              position: block.position,
-              blockId: block.id
-            }
-          }]
-        };
+        contentToInit = createFlexibleContent([{
+          ...parsedContent,
+          attrs: {
+            ...parsedContent.attrs,
+            position: block.position,
+            blockId: block.id
+          }
+        }]);
       } else {
         // Если узел пустой, не создаем контент
-        contentToInit = null;
+        contentToInit = createFlexibleContent();
       }
     }
   } else {
     // Если контент пустой или null - не создаем контент вообще
-    contentToInit = null;
+    contentToInit = createFlexibleContent();
   }
 
 
@@ -257,6 +242,9 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
 
       if (firstParagraph && hasTextContent(firstParagraph)) {
         contentToSave = firstParagraph;
+      } else {
+        // Если нет валидного параграфа, не сохраняем контент
+        contentToSave = null;
       }
     }
 
@@ -379,18 +367,7 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
   const editor = useEditor({
     extensions,
     editable,
-    content: contentToInit || {
-      type: 'doc',
-      content: [{
-        type: 'paragraph',
-        attrs: {
-          textAlign: 'left',
-          position: block.position,
-          blockId: block.id
-        },
-        content: []
-      }]
-    },
+    content: contentToInit || createFlexibleContent(),
     editorProps: {
       attributes: {
         "data-block-id": block.id,

@@ -1,4 +1,5 @@
 // Утилитарные функции для работы с блоками
+import { cleanupBlocksContent } from './cleanup-empty-elements';
 
 export function getTokenFromCollabQuery(collabQuery: any): string | undefined {
   // console.log('[getTokenFromCollabQuery] collabQuery:', collabQuery);
@@ -18,6 +19,29 @@ const lastSavedBlocks = new Map<string, any[]>();
 export async function saveBlocksToServer(pageId: string, blocks: any[]) {
   console.log('💾 [saveBlocksToServer] Starting save for pageId:', pageId, 'blocks:', blocks.length);
   
+  // Валидация входных данных
+  if (!pageId || !blocks || !Array.isArray(blocks)) {
+    console.error('❌ [saveBlocksToServer] Invalid input data:', { pageId, blocks });
+    return;
+  }
+
+  // Фильтруем пустые или невалидные блоки
+  const validBlocks = blocks.filter(block => {
+    if (!block || !block.blockId || !block.blockType) {
+      console.warn('⚠️ [saveBlocksToServer] Filtering out invalid block:', block);
+      return false;
+    }
+    return true;
+  });
+
+  // Очищаем пустые элементы из контента блоков
+  const cleanedBlocks = cleanupBlocksContent(validBlocks);
+
+  if (cleanedBlocks.length === 0) {
+    console.warn('⚠️ [saveBlocksToServer] No valid blocks to save after cleanup');
+    return;
+  }
+
   // Очищаем предыдущий таймер для этой страницы
   if (saveTimeouts.has(pageId)) {
     clearTimeout(saveTimeouts.get(pageId)!);
@@ -27,26 +51,20 @@ export async function saveBlocksToServer(pageId: string, blocks: any[]) {
   // Устанавливаем новый таймер с дебаунсом 500ms
   const timeout = setTimeout(async () => {
     console.log('🚀 [saveBlocksToServer] Executing save for pageId:', pageId);
-    console.log('📝 [saveBlocksToServer] Blocks to save:', blocks.map(b => ({
-      blockId: b.blockId,
-      blockType: b.blockType,
-      pageId: b.pageId,
-      hasContent: !!b.content,
-      isRequired: b.isRequired,
-      hasAccess: b.hasAccess,
-      userPermission: b.userPermission,
-      allKeys: Object.keys(b)
-    })));
+    console.log('📝 [saveBlocksToServer] Cleaned blocks to save:', cleanedBlocks.length);
     
     // Детальное логирование для отладки
     console.log('🔍 [saveBlocksToServer] DETAILED BLOCK DATA:');
-    blocks.forEach((block, index) => {
+    cleanedBlocks.forEach((block, index) => {
       console.log(`Block ${index}:`, {
         blockId: block.blockId,
+        blockType: block.blockType,
+        pageId: block.pageId,
+        hasContent: !!block.content,
+        contentSize: block.content ? JSON.stringify(block.content).length : 0,
         isRequired: block.isRequired,
         hasAccess: block.hasAccess,
-        userPermission: block.userPermission,
-        allProperties: block
+        userPermission: block.userPermission
       });
     });
     
@@ -55,20 +73,35 @@ export async function saveBlocksToServer(pageId: string, blocks: any[]) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ blocks }),
+        body: JSON.stringify({ blocks: cleanedBlocks }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ [saveBlocksToServer] Error:', response.status, errorText);
-        console.error('❌ [saveBlocksToServer] Request body:', JSON.stringify({ blocks }, null, 2));
+        console.error('❌ [saveBlocksToServer] Server error:', response.status, errorText);
+        console.error('❌ [saveBlocksToServer] Request body:', JSON.stringify({ blocks: cleanedBlocks }, null, 2));
+        
+        // Попытка повторного сохранения через 2 секунды
+        setTimeout(() => {
+          console.log('🔄 [saveBlocksToServer] Retrying save after error...');
+          saveBlocksToServer(pageId, cleanedBlocks);
+        }, 2000);
       } else {
         const responseData = await response.json();
         console.log('✅ [saveBlocksToServer] Success:', responseData);
+        
+        // Обновляем кэш последних сохраненных блоков
+        lastSavedBlocks.set(pageId, [...cleanedBlocks]);
       }
     } catch (error) {
       console.error('❌ [saveBlocksToServer] Network error:', error);
-      console.error('❌ [saveBlocksToServer] Request body:', JSON.stringify({ blocks }, null, 2));
+      console.error('❌ [saveBlocksToServer] Request body:', JSON.stringify({ blocks: cleanedBlocks }, null, 2));
+      
+      // Попытка повторного сохранения через 3 секунды при сетевой ошибке
+      setTimeout(() => {
+        console.log('🔄 [saveBlocksToServer] Retrying save after network error...');
+        saveBlocksToServer(pageId, cleanedBlocks);
+      }, 3000);
     } finally {
       saveTimeouts.delete(pageId);
       console.log('🧹 [saveBlocksToServer] Cleaned up timeout for pageId:', pageId);
@@ -254,13 +287,20 @@ export async function fetchBlocks(pageId: string) {
     ? result
     : [];
   
-  console.log('✅ [fetchBlocks] Processed blocks:', {
-    pageId,
-    blocksCount: blocks.length,
-    blocks: blocks.map(b => ({ id: b.id, blockType: b.blockType, position: b.position }))
+  // Сортируем блоки по позициям
+  const sortedBlocks = blocks.sort((a, b) => {
+    const posA = a.position ?? 0;
+    const posB = b.position ?? 0;
+    return posA - posB;
   });
   
-  return blocks;
+  console.log('✅ [fetchBlocks] Processed blocks:', {
+    pageId,
+    blocksCount: sortedBlocks.length,
+    blocks: sortedBlocks.map(b => ({ id: b.id, blockType: b.blockType, position: b.position }))
+  });
+  
+  return sortedBlocks;
 }
 
 // Функция для проверки наличия текста в параграфе
@@ -347,16 +387,7 @@ export function createBlockBetween(pageId: string, blocks: any[], afterBlockId: 
   let blockType = 'paragraph';
   let content = {
     type: 'doc',
-    content: [
-      {
-        type: 'paragraph',
-        attrs: {
-          position: afterBlock.position + 1,
-          textAlign: 'left',
-          blockId: window.crypto.randomUUID()
-        }
-      }
-    ]
+    content: [] // Начинаем с пустого контента
   };
 
   // Если предыдущий блок - это список, создаем параграф (не список)
@@ -392,16 +423,7 @@ export function createBlockAtEnd(pageId: string, blocks: any[]) {
   let blockType = 'paragraph';
   let content = {
     type: 'doc',
-    content: [
-      {
-        type: 'paragraph',
-        attrs: { 
-          position: blocks.length,
-          textAlign: 'left',
-          blockId: window.crypto.randomUUID()
-        }
-      }
-    ]
+    content: [] // Начинаем с пустого контента
   };
 
   // Если последний блок - это список, создаем параграф (не список)

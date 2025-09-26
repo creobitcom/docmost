@@ -100,13 +100,14 @@ function createElementDecorations(doc: any): DecorationSet {
         node.type.name === 'bulletListItem' || node.type.name === 'orderedListItem') {
       const elementId = `element-${pos}-${node.type.name}`;
 
-      console.log('[RealElementDragHandle] Creating drag handle for:', {
-        nodeType: node.type.name,
-        pos,
-        elementId,
-        handleIndex,
-        nodeContent: node.content ? node.content.size : 0
-      });
+      // Уменьшаем логирование для производительности
+      // console.log('[RealElementDragHandle] Creating drag handle for:', {
+      //   nodeType: node.type.name,
+      //   pos,
+      //   elementId,
+      //   handleIndex,
+      //   nodeContent: node.content ? node.content.size : 0
+      // });
 
       // 🚀 КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Размещаем widget внутри элемента
       let widgetPos = pos + 1; // Позиция ВНУТРИ элемента списка
@@ -287,7 +288,8 @@ function createElementDecorations(doc: any): DecorationSet {
     }
   });
 
-  console.log('[RealElementDragHandle] Total decorations created:', decorations.length);
+  // Уменьшаем логирование для производительности
+  // console.log('[RealElementDragHandle] Total decorations created:', decorations.length);
   return DecorationSet.create(doc, decorations);
 }
 
@@ -345,6 +347,12 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
           },
           apply(tr, set) {
             set = set.map(tr.mapping, tr.doc);
+            
+            // Игнорируем транзакции от FlexibleDocument плагина
+            if (tr.getMeta('flexibleDocument') === true) {
+              return set;
+            }
+            
             // Оптимизация: пересоздаем декорации только при значительных изменениях
             if (tr.docChanged && (tr.steps.length > 0)) {
               // Проверяем, действительно ли нужно пересоздавать декорации
@@ -355,7 +363,8 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
               });
 
               if (hasListChanges) {
-                console.log('[RealElementDragHandle] Document changed, recreating decorations');
+                // Уменьшаем логирование для производительности
+                // console.log('[RealElementDragHandle] Document changed, recreating decorations');
                 return createElementDecorations(tr.doc);
               }
             }
@@ -387,9 +396,16 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
               event.preventDefault();
               event.stopPropagation();
 
-              console.log('[RealElementDragHandle] ProseMirror drop event triggered');
-              console.log('[RealElementDragHandle] DataTransfer types:', event.dataTransfer?.types);
-              console.log('[RealElementDragHandle] DataTransfer items:', event.dataTransfer?.items);
+              // Добавляем таймаут для предотвращения зависаний
+              const dropTimeout = setTimeout(() => {
+                console.warn('[RealElementDragHandle] Drop operation timed out, aborting');
+                return false;
+              }, 1000); // 1 секунда таймаут
+
+              try {
+                console.log('[RealElementDragHandle] ProseMirror drop event triggered');
+                console.log('[RealElementDragHandle] DataTransfer types:', event.dataTransfer?.types);
+                console.log('[RealElementDragHandle] DataTransfer items:', event.dataTransfer?.items);
 
               // Get payload from different sources
               const mimePayload = event.dataTransfer?.getData(DOCMOST_MIME);
@@ -419,6 +435,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                   payload = globalPayload;
                 } else {
                   console.warn('[RealElementDragHandle] No valid element payload found in global state either');
+                  clearTimeout(dropTimeout);
                   return false;
                 }
               }
@@ -469,6 +486,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                 console.warn('[RealElementDragHandle] No valid drop target found');
                 console.log('[RealElementDragHandle] Event target:', event.target);
                 console.log('[RealElementDragHandle] Elements at point:', document.elementsFromPoint(event.clientX, event.clientY));
+                clearTimeout(dropTimeout);
                 return false;
               }
 
@@ -604,6 +622,13 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                       }
                     } else {
                       console.warn('[RealElementDragHandle] Target node is not a list (after):', taskListNode?.type.name);
+                      
+                      // Если targetPos указывает на taskItem, используем его позицию + размер для "after"
+                      if (taskListNode && (taskListNode.type.name === 'taskItem' || taskListNode.type.name === 'listItem')) {
+                        targetListItemPos = targetPos + taskListNode.nodeSize;
+                        foundTaskItem = true;
+                        console.log('[RealElementDragHandle] Using taskItem position + size for after:', targetListItemPos);
+                      }
                     }
                   }
 
@@ -637,6 +662,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                         console.log('[RealElementDragHandle] Using closest item position:', targetListItemPos);
                       } else {
                         console.warn('[RealElementDragHandle] No items found in target list');
+                        clearTimeout(dropTimeout);
                         return false;
                       }
                     } else {
@@ -647,6 +673,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                     
                     if (targetListItemPos === -1) {
                       console.warn('[RealElementDragHandle] Could not find target list item position with alternative approach');
+                      clearTimeout(dropTimeout);
                       return false;
                     }
                   }
@@ -738,6 +765,13 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                       }
                     } else {
                       console.warn('[RealElementDragHandle] Target node is not a list:', taskListNode?.type.name);
+                      
+                      // Если targetPos указывает на taskItem, используем его позицию для "before"
+                      if (taskListNode && (taskListNode.type.name === 'taskItem' || taskListNode.type.name === 'listItem')) {
+                        targetListItemPos = targetPos;
+                        foundTaskItem = true;
+                        console.log('[RealElementDragHandle] Using taskItem position for before:', targetListItemPos);
+                      }
                     }
                   }
 
@@ -771,6 +805,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                         console.log('[RealElementDragHandle] Using closest item position (before):', targetListItemPos);
                       } else {
                         console.warn('[RealElementDragHandle] No items found in target list (before)');
+                        clearTimeout(dropTimeout);
                         return false;
                       }
                     } else {
@@ -781,6 +816,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                     
                     if (targetListItemPos === -1) {
                       console.warn('[RealElementDragHandle] Could not find target list item position (before) with alternative approach');
+                      clearTimeout(dropTimeout);
                       return false;
                     }
                   }
@@ -790,30 +826,188 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
 
                 // Учитываем удаление source элемента при расчете позиции вставки
                 let deletePos = sourcePos;
+                let finalInsertPos = insertPos;
+                const nodeSize = node.nodeSize;
+                
+                // Если удаляем элемент до позиции вставки, корректируем позицию
                 if (deletePos < insertPos) {
-                  // Если удаляем элемент до позиции вставки, корректируем позицию
-                  insertPos = insertPos - payload.payload?.nodeSize;
+                  finalInsertPos = insertPos - nodeSize;
+                }
+
+                // Дополнительная проверка: убеждаемся, что позиция вставки корректна
+                // после удаления source элемента
+                if (finalInsertPos < 0) {
+                  console.warn('[RealElementDragHandle] Final insert position is negative, adjusting');
+                  finalInsertPos = 0;
                 }
 
                 console.log('[RealElementDragHandle] Move details:', {
                   sourcePos: deletePos,
-                  targetPos: insertPos,
-                  nodeSize: payload.payload?.nodeSize,
+                  targetPos: finalInsertPos,
+                  nodeSize: nodeSize,
                   isAfter,
-                  originalTargetPos: targetPos
+                  originalTargetPos: targetPos,
+                  correctedPosition: finalInsertPos
                 });
 
-                // Perform the move
-                const nodeSize = payload.payload?.nodeSize;
+                // Проверяем, что позиция вставки валидна
+                if (finalInsertPos < 0 || finalInsertPos > view.state.doc.content.size) {
+                  console.warn('[RealElementDragHandle] Invalid insert position:', finalInsertPos);
+                  clearTimeout(dropTimeout);
+                  return false;
+                }
 
+                // Perform the move
                 // Сначала удаляем элемент из исходной позиции
                 tr.delete(deletePos, deletePos + nodeSize);
 
-                // Затем вставляем в новую позицию
-                tr.insert(insertPos, node);
+                // Проверяем, что узел для вставки не пустой
+                if (!node || !node.content || node.content.size === 0) {
+                  console.warn('[RealElementDragHandle] Node to insert is empty, skipping insertion');
+                  clearTimeout(dropTimeout);
+                  return false;
+                }
+
+                // Дополнительная проверка: узел должен содержать валидный контент
+                let hasValidContent = false;
+                node.content.forEach((child: any) => {
+                  if (child.type.name === 'paragraph') {
+                    if (child.content && child.content.size > 0) {
+                      child.content.forEach((textNode: any) => {
+                        if (textNode.type.name === 'text' && textNode.text && textNode.text.trim().length > 0) {
+                          hasValidContent = true;
+                        }
+                      });
+                    }
+                  } else {
+                    hasValidContent = true; // Не-параграфы считаем валидными
+                  }
+                });
+
+                if (!hasValidContent) {
+                  console.warn('[RealElementDragHandle] Node has no valid content, skipping insertion');
+                  clearTimeout(dropTimeout);
+                  return false;
+                }
+
+                // Проверяем, что позиция вставки находится внутри списка
+                // Используем исходную позицию до удаления для проверки
+                const $originalInsertPos = view.state.doc.resolve(insertPos);
+                
+                // Ищем родительский список на всех уровнях
+                let listNode = null;
+                let listDepth = -1;
+                
+                for (let i = $originalInsertPos.depth; i >= 0; i--) {
+                  const node = $originalInsertPos.node(i);
+                  if (['taskList', 'bulletList', 'orderedList'].includes(node.type.name)) {
+                    listNode = node;
+                    listDepth = i;
+                    break;
+                  }
+                }
+                
+                console.log('[RealElementDragHandle] Insert position validation:', {
+                  originalInsertPos: insertPos,
+                  finalInsertPos: finalInsertPos,
+                  listNodeType: listNode?.type.name,
+                  listDepth: listDepth,
+                  totalDepth: $originalInsertPos.depth,
+                  allNodes: Array.from({ length: $originalInsertPos.depth + 1 }, (_, i) => ({
+                    depth: i,
+                    nodeType: $originalInsertPos.node(i).type.name,
+                    start: $originalInsertPos.start(i),
+                    end: $originalInsertPos.end(i)
+                  }))
+                });
+                
+                if (!listNode) {
+                  console.warn('[RealElementDragHandle] Insert position is not inside a list, aborting');
+                  clearTimeout(dropTimeout);
+                  return false;
+                }
+
+                // Вставляем элемент в правильную позицию внутри списка
+                try {
+                  tr.insert(finalInsertPos, node);
+                } catch (error) {
+                  console.error('[RealElementDragHandle] Error inserting node:', error);
+                  clearTimeout(dropTimeout);
+                  return false;
+                }
+
+                // Очищаем пустые элементы после вставки
+                // Собираем позиции пустых элементов для удаления
+                const emptyPositions: { pos: number; size: number }[] = [];
+                
+                tr.doc.descendants((node, pos) => {
+                  if (node.type.name === 'taskItem' || node.type.name === 'listItem') {
+                    // Проверяем, пустой ли элемент списка
+                    if (!node.content || node.content.size === 0) {
+                      console.log('[RealElementDragHandle] Found empty list item at position:', pos);
+                      emptyPositions.push({ pos, size: node.nodeSize });
+                    } else {
+                      // Дополнительная проверка: элемент содержит только пустые параграфы
+                      let hasValidContent = false;
+                      node.content.forEach((child: any) => {
+                        if (child.type.name === 'paragraph') {
+                          if (child.content && child.content.size > 0) {
+                            child.content.forEach((textNode: any) => {
+                              if (textNode.type.name === 'text' && textNode.text && textNode.text.trim().length > 0) {
+                                hasValidContent = true;
+                              }
+                            });
+                          }
+                        } else {
+                          hasValidContent = true;
+                        }
+                      });
+                      
+                      if (!hasValidContent) {
+                        console.log('[RealElementDragHandle] Found list item with only empty paragraphs at position:', pos);
+                        emptyPositions.push({ pos, size: node.nodeSize });
+                      }
+                    }
+                  }
+                });
+                
+                // Удаляем пустые элементы в обратном порядке (чтобы позиции не сбились)
+                emptyPositions.reverse().forEach(({ pos, size }) => {
+                  console.log('[RealElementDragHandle] Removing empty list item at position:', pos);
+                  try {
+                    tr.delete(pos, pos + size);
+                  } catch (error) {
+                    console.warn('[RealElementDragHandle] Error deleting empty item:', error);
+                  }
+                });
 
                 view.dispatch(tr.scrollIntoView());
                 console.log('[RealElementDragHandle] ✅ Intra-list move completed');
+
+                // Дополнительная очистка пустых элементов через DOM
+                setTimeout(() => {
+                  // Ищем все возможные пустые элементы списка
+                  const emptyListItems = view.dom.querySelectorAll('li.is-empty, li[data-placeholder], li:empty, li:not(:has(*))');
+                  emptyListItems.forEach((item: Element) => {
+                    console.log('[RealElementDragHandle] Removing empty DOM list item:', item);
+                    item.remove();
+                  });
+                  
+                  // Дополнительно ищем элементы списка, которые содержат только пустые параграфы
+                  const allListItems = view.dom.querySelectorAll('li');
+                  allListItems.forEach((item: Element) => {
+                    const paragraphs = item.querySelectorAll('p');
+                    if (paragraphs.length > 0) {
+                      const hasTextContent = Array.from(paragraphs).some(p => 
+                        p.textContent && p.textContent.trim().length > 0
+                      );
+                      if (!hasTextContent) {
+                        console.log('[RealElementDragHandle] Removing list item with only empty paragraphs:', item);
+                        item.remove();
+                      }
+                    }
+                  });
+                }, 100);
 
                 // Убеждаемся, что placeholder удален после успешного drop
                 removePlaceholder();
@@ -822,7 +1016,7 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                 console.log('🔄 [RealElementDragHandle] ===== CROSS-BLOCK ELEMENT DROP DETECTED =====');
                 console.log('🔄 [RealElementDragHandle] Source block ID:', payload.sourceBlockId);
                 console.log('🔄 [RealElementDragHandle] Target block ID:', targetBlockId);
-                console.log('🔄 [RealElementDragHandle] Element ID:', payload.elementId);
+                console.log('🔄 [RealElementDragHandle] Element ID:', payload.sourceId); // Исправляем: используем sourceId
                 console.log('🔄 [RealElementDragHandle] Source position:', sourcePos);
                 console.log('🔄 [RealElementDragHandle] Is after:', isAfter);
                 console.log('🔄 [RealElementDragHandle] Target position:', isAfter ? 'after' : 'before');
@@ -841,14 +1035,14 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                   sourceBlockId: payload.sourceBlockId,
                   targetBlockId,
                   elementData: {
-                    id: payload.elementId,
+                    id: payload.sourceId, // Исправляем: используем sourceId вместо elementId
                     type: node.type.name,
                     content: payload.payload?.nodeJSON,
                     position: sourcePos,
                     parentBlockId: payload.sourceBlockId
                   },
                   targetPosition: isAfter ? 'after' : 'before',
-                  elementId: payload.elementId
+                  elementId: payload.sourceId // Исправляем: используем sourceId вместо elementId
                 };
 
                 console.log('🔄 [RealElementDragHandle] Creating cross-block event with detail:', eventDetail);
@@ -871,7 +1065,14 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
 
               // Clean up
               removePlaceholder();
+              clearTimeout(dropTimeout);
               return true;
+              } catch (error) {
+                console.error('[RealElementDragHandle] Error in drop handler:', error);
+                clearTimeout(dropTimeout);
+                removePlaceholder();
+                return false;
+              }
             }
           }
         }

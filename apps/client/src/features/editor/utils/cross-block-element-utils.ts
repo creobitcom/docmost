@@ -4,6 +4,67 @@ import { v4 as uuidv4 } from 'uuid';
 import { logCrossBlockTest, logNestedTest, TestResult } from './dnd-test-logger';
 
 /**
+ * Рекурсивно очищает пустые элементы из контента
+ */
+function cleanupContentRecursive(content: any): any {
+  if (!content || !Array.isArray(content.content)) {
+    return content;
+  }
+
+  const newContent = content.content.filter((item: any) => {
+    // Рекурсивно очищаем вложенный контент
+    if (item.content) {
+      item.content = cleanupContentRecursive(item);
+    }
+
+    // Фильтруем пустые параграфы
+    if (item.type === 'paragraph') {
+      const hasText = item.content && item.content.some((node: any) => node.type === 'text' && node.text && node.text.trim().length > 0);
+      if (!hasText) {
+        return false; // Удаляем пустой параграф
+      }
+    }
+
+    // Фильтруем пустые элементы списка
+    if (item.type === 'listItem' || item.type === 'taskItem') {
+      const hasContent = item.content && item.content.length > 0;
+      if (!hasContent) {
+        console.log('[CrossBlockUtils] Filtering out empty list item:', item.type);
+        return false; // Удаляем пустой элемент списка
+      }
+      
+      // Дополнительная проверка: если элемент списка содержит только пустые параграфы
+      if (item.content && item.content.length > 0) {
+        const hasValidContent = item.content.some((paragraph: any) => 
+          paragraph.type === 'paragraph' && 
+          paragraph.content && 
+          paragraph.content.length > 0 &&
+          paragraph.content.some((textNode: any) => 
+            textNode.type === 'text' && textNode.text && textNode.text.trim().length > 0
+          )
+        );
+        if (!hasValidContent) {
+          console.log('[CrossBlockUtils] Filtering out list item with only empty paragraphs');
+          return false;
+        }
+      }
+    }
+
+    return true;
+  });
+
+  // Если список (bulletList, orderedList, taskList) становится пустым, удаляем его
+  if ((content.type === 'bulletList' || content.type === 'orderedList' || content.type === 'taskList') && newContent.length === 0) {
+    return null; // Указываем, что список должен быть удален
+  }
+
+  return {
+    ...content,
+    content: newContent
+  };
+}
+
+/**
  * Утилиты для работы с элементами списков между блоками
  */
 
@@ -553,16 +614,41 @@ export function addElementToBlock(
       updatedElementContent.content = updatedElementContent.content.filter((item: any) => {
         // Убираем пустые параграфы
         if (item.type === 'paragraph' && (!item.content || item.content.length === 0)) {
+          console.log('[CrossBlockUtils] Filtering out empty paragraph');
           return false;
         }
         // Убираем параграфы с только пробелами
         if (item.type === 'paragraph' && item.content && item.content.length === 1 && 
             item.content[0].type === 'text' && item.content[0].text?.trim() === '') {
+          console.log('[CrossBlockUtils] Filtering out whitespace-only paragraph');
           return false;
+        }
+        // Убираем параграфы с только пустыми текстовыми узлами
+        if (item.type === 'paragraph' && item.content && item.content.length > 0) {
+          const hasNonEmptyText = item.content.some((textNode: any) => 
+            textNode.type === 'text' && textNode.text && textNode.text.trim().length > 0
+          );
+          if (!hasNonEmptyText) {
+            console.log('[CrossBlockUtils] Filtering out paragraph with only empty text nodes');
+            return false;
+          }
         }
         return true;
       });
+      
+      // Если после фильтрации не осталось контента, НЕ создаем минимальный контент
+      // Вместо этого возвращаем null, чтобы предотвратить создание пустого элемента
+      if (updatedElementContent.content.length === 0) {
+        console.log('[CrossBlockUtils] No valid content left after filtering, aborting element creation');
+        return null; // Это предотвратит создание пустого элемента
+      }
     }
+    // Проверяем, что элемент имеет валидное содержимое
+    if (!updatedElementContent || !updatedElementContent.content || updatedElementContent.content.length === 0) {
+      console.log('[CrossBlockUtils] Element has no valid content, aborting addition');
+      return block; // Возвращаем исходный блок без изменений
+    }
+
     console.log('[CrossBlockUtils] Updated element content:', updatedElementContent);
     console.log('[CrossBlockUtils] Updated element content.attrs:', updatedElementContent.attrs);
     console.log('[CrossBlockUtils] Updated element content.content:', updatedElementContent.content);
@@ -609,6 +695,32 @@ export function addElementToBlock(
         totalContentItems: updatedContent.content.length
       });
     }
+    
+    // Дополнительная проверка: убеждаемся, что мы не создали пустые элементы
+    updatedContent.content = updatedContent.content.filter((item: any) => {
+      // Проверяем, что элемент имеет валидное содержимое
+      if (item.type === 'listItem' || item.type === 'taskItem') {
+        // Для элементов списка проверяем, что есть хотя бы один параграф с контентом
+        if (item.content && item.content.length > 0) {
+          const hasValidContent = item.content.some((paragraph: any) => 
+            paragraph.type === 'paragraph' && 
+            paragraph.content && 
+            paragraph.content.length > 0 &&
+            paragraph.content.some((textNode: any) => 
+              textNode.type === 'text' && textNode.text && textNode.text.trim().length > 0
+            )
+          );
+          if (!hasValidContent) {
+            console.log('[CrossBlockUtils] Filtering out list item with no valid content');
+            return false;
+          }
+        } else {
+          console.log('[CrossBlockUtils] Filtering out list item with no content');
+          return false;
+        }
+      }
+      return true;
+    });
     
     const updatedBlock = {
       ...block,
@@ -719,6 +831,13 @@ export function moveElementBetweenBlocks(
     // Добавляем элемент в target блок
     console.log('🔄 [CrossBlockUtils] Step 3: Adding element to target block...');
     const updatedTargetBlock = addElementToBlock(targetBlock, effectiveElement, targetPosition);
+    
+    // Проверяем, что элемент был успешно добавлен
+    if (!updatedTargetBlock) {
+      console.warn('⚠️ [CrossBlockUtils] Failed to add element to target block, aborting move');
+      return blocks; // Возвращаем исходные блоки без изменений
+    }
+    
     console.log('✅ [CrossBlockUtils] Element added to target block');
     
     // Обновляем массив блоков
@@ -733,9 +852,23 @@ export function moveElementBetweenBlocks(
       return block;
     });
     
+    // Очищаем пустые элементы после перемещения
+    const cleanedBlocks = updatedBlocks.map(block => {
+      if (!block || !block.content) {
+        return block;
+      }
+
+      const cleanedContent = cleanupContentRecursive(block.content);
+
+      return {
+        ...block,
+        content: cleanedContent
+      };
+    });
+
     console.log('✅ [CrossBlockUtils] Element moved successfully');
     console.log('✅ [CrossBlockUtils] ===== MOVE ELEMENT BETWEEN BLOCKS SUCCESS =====');
-    return updatedBlocks;
+    return cleanedBlocks;
   } catch (error) {
     console.error('❌ [CrossBlockUtils] Error moving element:', error);
     console.error('❌ [CrossBlockUtils] Error stack:', error.stack);

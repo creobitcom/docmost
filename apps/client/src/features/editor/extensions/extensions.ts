@@ -86,7 +86,7 @@ import { BlockTypes } from "@/features/editor/utils/block-types";
 import { SmartEnter } from "@/features/editor/extensions/smart-enter";
 import { SmartListHandler } from "@/features/editor/extensions/smart-list-handler";
 import { ComprehensiveKeyboardHandler } from "@/features/editor/extensions/comprehensive-keyboard-handler";
-import Document from "@tiptap/extension-document";
+import { FlexibleDocument } from "./flexible-document";
 
 
 const lowlight = createLowlight(common);
@@ -102,8 +102,8 @@ lowlight.register("haskell", haskell);
 lowlight.register("scala", scala);
 
 export const mainExtensions = [
-  Document.extend({
-    content: "(block|container)+",
+  FlexibleDocument.extend({
+    content: "(block|container)*", // Изменяем + на * для разрешения пустых документов
   }),
   StarterKit.configure({
     document: false,

@@ -82,12 +82,12 @@ export const useDndEvents = ({
         console.log('🎯 [ElementDrop] Event from different page, ignoring:', { eventPageId, currentPageId: pageId });
         return;
       }
-      
+
       console.log('🎯 [ElementDrop] ===== ELEMENT DROP EVENT RECEIVED =====');
       console.log('🎯 [ElementDrop] Event detail:', event.detail);
       console.log('🎯 [ElementDrop] Event type:', event.type);
       console.log('🎯 [ElementDrop] Event target:', event.target);
-      
+
       // Логируем для тестирования cross-block операций
       logCrossBlockTest(TestResult.NOT_TESTED, 'Element drop event received', {
         eventType: event.type,
@@ -180,11 +180,12 @@ export const useDndEvents = ({
       setBlocks(updatedBlocks);
 
       // Отправляем на сервер
-      const serverData = updatedBlocks.map(block => ({
-        blockId: block.id,
+      const serverData = updatedBlocks.map((block, index) => ({
+        blockId: block.id || block.blockId, // Используем id или blockId
         blockType: block.blockType,
         pageId: block.pageId,
-        content: block.content
+        content: block.content,
+        position: index // Добавляем позицию блока
       }));
 
       console.log('🎯 [ElementDrop] Server data prepared:', {
@@ -195,7 +196,7 @@ export const useDndEvents = ({
       console.log('🎯 [ElementDrop] Saving blocks after element drop...');
       saveBlocksToServer(pageId, serverData);
       console.log('✅ [ElementDrop] ===== ELEMENT DROP COMPLETED =====');
-      
+
       // Логируем успешное завершение
       logCrossBlockTest(TestResult.SUCCESS, 'Element drop completed successfully', {
         elementId,
@@ -210,7 +211,7 @@ export const useDndEvents = ({
     const handleSingleElementBlockInsert = (event: CustomEvent) => {
       console.log('🔄 [SingleElementBlockInsert] ===== SINGLE ELEMENT BLOCK INSERT EVENT =====');
       console.log('🔄 [SingleElementBlockInsert] Event detail:', event.detail);
-      
+
       // Логируем для тестирования cross-block операций
       logCrossBlockTest(TestResult.NOT_TESTED, 'Single element block insert event received', {
         eventType: event.type,
@@ -293,18 +294,19 @@ export const useDndEvents = ({
         setBlocks(finalBlocks);
 
         // Сохраняем на сервер
-        const serverData = finalBlocks.map(block => ({
-          blockId: block.id,
+        const serverData = finalBlocks.map((block, index) => ({
+          blockId: block.id || block.blockId, // Используем id или blockId
           blockType: block.blockType,
           pageId: block.pageId,
-          content: block.content
+          content: block.content,
+          position: index // Добавляем позицию блока
         }));
 
         console.log('🔄 [SingleElementBlockInsert] Saving to server...');
         saveBlocksToServer(pageId, serverData);
 
         console.log('✅ [SingleElementBlockInsert] ===== SINGLE ELEMENT BLOCK INSERT COMPLETED =====');
-        
+
         // Логируем успешное завершение
         logCrossBlockTest(TestResult.SUCCESS, 'Single element block insert completed successfully', {
           sourceBlockId,
@@ -328,12 +330,12 @@ export const useDndEvents = ({
         console.log('🔄 [CrossBlockMove] Event from different page, ignoring:', { eventPageId, currentPageId: pageId });
         return;
       }
-      
+
       console.log('🔄 [CrossBlockMove] ===== CROSS-BLOCK ELEMENT MOVE EVENT =====');
       console.log('🔄 [CrossBlockMove] Event detail:', event.detail);
       console.log('🔄 [CrossBlockMove] Event type:', event.type);
       console.log('🔄 [CrossBlockMove] Event target:', event.target);
-      
+
       // Логируем для тестирования cross-block операций
       logCrossBlockTest(TestResult.NOT_TESTED, 'Cross-block element move event received', {
         eventType: event.type,
@@ -382,17 +384,25 @@ export const useDndEvents = ({
         const sourceBlockRef = blockRefs.get(detail.sourceBlockId);
         const targetBlockRef = blockRefs.get(detail.targetBlockId);
 
+        // Проверяем, что ref.current существует и содержит editor
+        const sourceEditor = sourceBlockRef?.current?.editor || sourceBlockRef?.editor;
+        const targetEditor = targetBlockRef?.current?.editor || targetBlockRef?.editor;
+        const sourceProvider = sourceBlockRef?.current?.provider || sourceBlockRef?.provider;
+        const targetProvider = targetBlockRef?.current?.provider || targetBlockRef?.provider;
+
         console.log(`[PageEditor] Checking editor readiness (attempt ${retryCount + 1}/${maxRetries}):`, {
           sourceBlockId: detail.sourceBlockId,
           targetBlockId: detail.targetBlockId,
-          sourceEditor: !!sourceBlockRef?.current?.editor,
-          targetEditor: !!targetBlockRef?.current?.editor,
-          sourceEditorReady: sourceBlockRef?.current?.editor?.isEditable,
-          targetEditorReady: targetBlockRef?.current?.editor?.isEditable,
-          sourceProviderStatus: sourceBlockRef?.current?.provider?.status,
-          targetProviderStatus: targetBlockRef?.current?.provider?.status,
+          sourceEditor: !!sourceEditor,
+          targetEditor: !!targetEditor,
+          sourceEditorReady: sourceEditor?.isEditable,
+          targetEditorReady: targetEditor?.isEditable,
+          sourceProviderStatus: sourceProvider?.status,
+          targetProviderStatus: targetProvider?.status,
           availableEditors: Array.from(blockRefs.keys()),
-          blockRefsSize: blockRefs.size
+          blockRefsSize: blockRefs.size,
+          sourceRefType: typeof sourceBlockRef,
+          targetRefType: typeof targetBlockRef
         });
 
         // Детальная диагностика для source и target блоков
@@ -418,7 +428,7 @@ export const useDndEvents = ({
           });
         }
 
-        if (!sourceBlockRef?.current?.editor || !targetBlockRef?.current?.editor) {
+        if (!sourceEditor || !targetEditor) {
           if (retryCount < maxRetries) {
             console.log(`[PageEditor] Editors not ready, retrying... (${retryCount + 1}/${maxRetries})`);
 
@@ -467,7 +477,7 @@ export const useDndEvents = ({
           // Перемещение внутри одного редактора
           console.log('🔄 [CrossBlockMove] Executing within-editor move...');
           moveSuccess = moveElementWithinTiptapEditor(
-            sourceBlockRef.current.editor,
+            sourceEditor,
             elementId,
             detail.targetPosition || 'after',
             detail.beforeElementId
@@ -476,8 +486,8 @@ export const useDndEvents = ({
           // Перемещение между разными редакторами
           console.log('🔄 [CrossBlockMove] Executing between-editors move...');
           const tiptapOperation: TiptapMoveOperation = {
-            sourceEditor: sourceBlockRef.current.editor,
-            targetEditor: targetBlockRef.current.editor,
+            sourceEditor: sourceEditor,
+            targetEditor: targetEditor,
             elementId,
             targetPosition: detail.targetPosition || 'after',
             beforeElementId: detail.beforeElementId
@@ -521,12 +531,15 @@ export const useDndEvents = ({
           console.log('🔄 [CrossBlockMove] Setting updated blocks state...');
           setBlocks(updatedBlocks);
 
-          // Сохраняем на сервер
-          const serverData = updatedBlocks.map(block => ({
-            blockId: block.id,
+          // Сохраняем на сервер с улучшенной обработкой
+          const serverData = updatedBlocks.map((block, index) => ({
+            blockId: block.id || block.blockId, // Используем id или blockId
             blockType: block.blockType,
             pageId: block.pageId,
             content: block.content,
+            position: index, // Добавляем позицию блока
+            hasAccess: block.hasAccess,
+            userPermission: block.userPermission
           }));
 
           console.log('🔄 [CrossBlockMove] Saving to server:', {
@@ -535,14 +548,57 @@ export const useDndEvents = ({
             targetBlockData: serverData.find(b => b.blockId === detail.targetBlockId)
           });
 
-          saveBlocksToServer(pageId, serverData);
+        // Сохраняем с обработкой ошибок
+        const saveToServer = async () => {
+          try {
+            await saveBlocksToServer(pageId, serverData);
+            console.log('✅ [CrossBlockMove] Successfully saved to server');
+          } catch (error) {
+            console.error('❌ [CrossBlockMove] Failed to save to server:', error);
+            // Попытка повторного сохранения
+            setTimeout(() => {
+              console.log('🔄 [CrossBlockMove] Retrying save...');
+              saveBlocksToServer(pageId, serverData);
+            }, 1000);
+          }
+        };
+
+        saveToServer();
+
+        // Дополнительная очистка пустых элементов через DOM
+        setTimeout(() => {
+          const allEditors = document.querySelectorAll('[data-block-id]');
+          allEditors.forEach((editor: Element) => {
+            // Ищем все возможные пустые элементы списка
+            const emptyListItems = editor.querySelectorAll('li.is-empty, li[data-placeholder], li:empty, li:not(:has(*))');
+            emptyListItems.forEach((item: Element) => {
+              console.log('[CrossBlockMove] Removing empty DOM list item:', item);
+              item.remove();
+            });
+
+            // Дополнительно ищем элементы списка, которые содержат только пустые параграфы
+            const allListItems = editor.querySelectorAll('li');
+            allListItems.forEach((item: Element) => {
+              const paragraphs = item.querySelectorAll('p');
+              if (paragraphs.length > 0) {
+                const hasTextContent = Array.from(paragraphs).some(p =>
+                  p.textContent && p.textContent.trim().length > 0
+                );
+                if (!hasTextContent) {
+                  console.log('[CrossBlockMove] Removing list item with only empty paragraphs:', item);
+                  item.remove();
+                }
+              }
+            });
+          });
+        }, 200);
 
           // Очищаем координатор
           console.log('🔄 [CrossBlockMove] Cleaning up DnD coordinator...');
           dndCoordinator.forceCleanup();
 
           console.log('✅ [CrossBlockMove] ===== CROSS-BLOCK ELEMENT MOVE COMPLETED =====');
-          
+
           // Логируем успешное завершение
           logCrossBlockTest(TestResult.SUCCESS, 'Cross-block element move completed successfully', {
             sourceBlockId: detail.sourceBlockId,
@@ -555,7 +611,7 @@ export const useDndEvents = ({
         } else {
           console.warn('❌ [CrossBlockMove] Tiptap cross-block element move failed');
           console.log('❌ [CrossBlockMove] ===== CROSS-BLOCK ELEMENT MOVE FAILED =====');
-          
+
           // Логируем неудачное завершение
           logCrossBlockTest(TestResult.FAILED, 'Cross-block element move failed', {
             sourceBlockId: detail.sourceBlockId,
@@ -580,7 +636,7 @@ export const useDndEvents = ({
         console.log('🔄 [CrossBlockBlockMove] Event from different page, ignoring:', { eventPageId, currentPageId: pageId });
         return;
       }
-      
+
       console.log('[PageEditor] Cross-block block move event received:', event.detail);
 
       const { sourceBlockId, targetBlockId, blockData } = event.detail as any;
@@ -632,11 +688,12 @@ export const useDndEvents = ({
       setBlocks(updatedBlocks);
 
       // Отправляем на сервер
-      const serverData = updatedBlocks.map(block => ({
-        blockId: block.id,
+      const serverData = updatedBlocks.map((block, index) => ({
+        blockId: block.id || block.blockId, // Используем id или blockId
         blockType: block.blockType,
         pageId: block.pageId,
-        content: block.content
+        content: block.content,
+        position: index // Добавляем позицию блока
       }));
 
       console.log('[PageEditor] Saving blocks after cross-block block move:', serverData);
@@ -652,7 +709,7 @@ export const useDndEvents = ({
         console.log('🔄 [AutoDragElementToBlock] Event from different page, ignoring:', { eventPageId, currentPageId: pageId });
         return;
       }
-      
+
       console.log('🔄 [AutoDragElementToBlock] ===== AUTO DRAG ELEMENT TO BLOCK EVENT =====');
       console.log('🔄 [AutoDragElementToBlock] Event detail:', event.detail);
 
@@ -677,7 +734,7 @@ export const useDndEvents = ({
         const moveResult = handleCrossBlockMove(blocksRef.current, {
           sourceBlockId,
           targetBlockId,
-          elementData: { 
+          elementData: {
             id: elementId,
             type: 'listItem' as const,
             content: null,
@@ -689,7 +746,7 @@ export const useDndEvents = ({
 
         if (moveResult.success) {
           console.log('✅ [AutoDragElementToBlock] Element moved successfully');
-          
+
           // Обновляем состояние блоков
           const updatedBlocks = blocksRef.current.map(block => {
             if (block.id === sourceBlockId || block.id === targetBlockId) {

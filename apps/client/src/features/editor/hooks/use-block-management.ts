@@ -320,17 +320,7 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
         position: 0,
         content: {
           type: 'doc',
-          content: [
-            {
-              type: 'paragraph',
-              attrs: {
-                textAlign: 'left',
-                position: 0,
-                blockId: window.crypto.randomUUID()
-              },
-              content: []
-            }
-          ]
+          content: [] // Начинаем с пустого контента
         },
         hasAccess: true,
         userPermission: 'owner'
@@ -350,9 +340,18 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
 
       setBlocks([initialBlock]);
     } else {
-      // Блоки есть - просто устанавливаем их
+      // Блоки есть - сортируем их по позициям и устанавливаем
       console.log("Blocks found, setting blocks:", blocksData.length);
-      setBlocks(blocksData);
+      
+      // Сортируем блоки по позициям
+      const sortedBlocks = blocksData.sort((a, b) => {
+        const posA = a.position ?? 0;
+        const posB = b.position ?? 0;
+        return posA - posB;
+      });
+      
+      console.log("Blocks sorted by position:", sortedBlocks.map(b => ({ id: b.id, position: b.position })));
+      setBlocks(sortedBlocks);
     }
 
     setIsInitialized(true);
