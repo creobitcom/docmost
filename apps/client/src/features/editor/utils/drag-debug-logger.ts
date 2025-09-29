@@ -72,6 +72,7 @@ export interface DragDebugInfo {
 class DragDebugLogger {
   private currentOperation: DragDebugInfo | null = null;
   private operationCounter = 0;
+  private editorDiagnosticsCallback: ((eventType: 'dragStart' | 'dragEnd') => void) | null = null;
   
   startOperation(): string {
     this.operationCounter++;
@@ -90,6 +91,12 @@ class DragDebugLogger {
     };
     
     console.log(`🎯 [DragDebug] Starting operation: ${operationId}`);
+    
+    // Вызываем диагностику редакторов при начале драга
+    if (this.editorDiagnosticsCallback) {
+      this.editorDiagnosticsCallback('dragStart');
+    }
+    
     return operationId;
   }
   
@@ -201,6 +208,11 @@ class DragDebugLogger {
     this.currentOperation.endTime = Date.now();
     this.currentOperation.duration = this.currentOperation.endTime - this.currentOperation.startTime;
     
+    // Вызываем диагностику редакторов при окончании драга
+    if (this.editorDiagnosticsCallback) {
+      this.editorDiagnosticsCallback('dragEnd');
+    }
+    
     this.outputCompleteLog();
     this.currentOperation = null;
   }
@@ -310,6 +322,16 @@ class DragDebugLogger {
            'handleUnifiedDragStart' in window && 
            'handleUnifiedDragOver' in window && 
            'handleUnifiedDrop' in window;
+  }
+  
+  // Метод для регистрации callback'а диагностики редакторов
+  setEditorDiagnosticsCallback(callback: (eventType: 'dragStart' | 'dragEnd') => void) {
+    this.editorDiagnosticsCallback = callback;
+  }
+  
+  // Метод для отключения callback'а диагностики редакторов
+  clearEditorDiagnosticsCallback() {
+    this.editorDiagnosticsCallback = null;
   }
 }
 

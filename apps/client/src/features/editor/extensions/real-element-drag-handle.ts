@@ -1024,12 +1024,37 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
 
                 // For cross-block, we'll use the existing cross-block event system
                 // but also try to handle it through ProseMirror if possible
-                const node = view.state.schema.nodeFromJSON(payload.payload?.nodeJSON);
+                const nodeJSON = payload.payload?.nodeJSON;
+                if (nodeJSON && !nodeJSON.attrs?.elementId) {
+                  // Добавляем elementId в атрибуты, если его нет
+                  nodeJSON.attrs = { ...nodeJSON.attrs, elementId: payload.sourceId };
+                }
+                const node = view.state.schema.nodeFromJSON(nodeJSON);
                 console.log('🔄 [RealElementDragHandle] Node created from JSON:', {
                   type: node.type.name,
                   attrs: node.attrs,
                   contentSize: node.content?.size || 0
                 });
+
+                // Определяем beforeElementId для правильной позиции вставки
+                let beforeElementId: string | undefined;
+                if (!isAfter) {
+                  // Если вставляем "before", нужно найти элемент, перед которым вставляем
+                  const targetNode = view.state.doc.nodeAt(targetPos);
+                  if (targetNode && targetNode.attrs?.elementId) {
+                    beforeElementId = targetNode.attrs.elementId;
+                  } else {
+                    // Ищем ближайший элемент с elementId
+                    const $targetPos = view.state.doc.resolve(targetPos);
+                    for (let i = $targetPos.depth; i >= 0; i--) {
+                      const node = $targetPos.node(i);
+                      if (node.attrs?.elementId) {
+                        beforeElementId = node.attrs.elementId;
+                        break;
+                      }
+                    }
+                  }
+                }
 
                 const eventDetail = {
                   sourceBlockId: payload.sourceBlockId,
@@ -1037,12 +1062,13 @@ export const RealElementDragHandle = Extension.create<ElementDragHandleOptions>(
                   elementData: {
                     id: payload.sourceId, // Исправляем: используем sourceId вместо elementId
                     type: node.type.name,
-                    content: payload.payload?.nodeJSON,
+                    content: nodeJSON, // Используем обновленный JSON с elementId
                     position: sourcePos,
                     parentBlockId: payload.sourceBlockId
                   },
                   targetPosition: isAfter ? 'after' : 'before',
-                  elementId: payload.sourceId // Исправляем: используем sourceId вместо elementId
+                  elementId: payload.sourceId, // Исправляем: используем sourceId вместо elementId
+                  beforeElementId: beforeElementId
                 };
 
                 console.log('🔄 [RealElementDragHandle] Creating cross-block event with detail:', eventDetail);

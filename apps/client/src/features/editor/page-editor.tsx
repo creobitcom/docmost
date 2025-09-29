@@ -1,5 +1,5 @@
 import "@/features/editor/styles/index.css";
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback, useMemo, useRef } from "react";
 import { EnhancedBlockHandle } from "@/features/editor/components/drag-handle/enhanced-block-handle";
 import { EnhancedDndProviderV2 } from "@/features/editor/components/drag-handle/enhanced-dnd-provider-v2";
 import { useDragAndDrop } from "@/features/editor/hooks/use-drag-and-drop";
@@ -9,6 +9,7 @@ import { BlockDropZone } from "@/features/editor/components/drag-handle/block-dr
 import { useBlockManagement } from "@/features/editor/hooks/use-block-management";
 import { useEditorDiagnostics } from "@/features/editor/hooks/use-editor-diagnostics";
 import { useDndEvents } from "@/features/editor/hooks/use-dnd-events";
+import { dragDebugLogger } from "@/features/editor/utils/drag-debug-logger";
 import { saveBlocksToServer, startPeriodicSave, stopPeriodicSave, forceSaveBlocks } from "@/features/editor/utils/block-utils";
 import { cleanupBlocksContent } from "@/features/editor/utils/cleanup-empty-paragraphs";
 import { addElementToBlock, handleCrossBlockElementMove } from "@/features/editor/utils/cross-block-element-utils";
@@ -65,18 +66,28 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
     createBlockAtEnd,
   } = blockManagement;
 
-  // Используем хук для диагностики редакторов - логи отключены
+  // Используем хук для диагностики редакторов - логи только при драг-событиях
   const editorDiagnostics = useEditorDiagnostics({
     blocks,
     blockRefs: blockRefs.current,
     isReady,
-    enableLogging: false
+    enableLogging: true,
+    logOnlyOnDragEvents: true
   });
 
-  // Настраиваем глобальные функции отладки
+  // Настраиваем глобальные функции отладки и интеграцию с dragDebugLogger
   useEffect(() => {
     editorDiagnostics.setupGlobalDebugFunctions(blocksRef, blockRefs.current);
     
+    // Регистрируем callback для диагностики редакторов при драг-событиях
+    if (editorDiagnostics.logDiagnosticsOnDragEvent) {
+      dragDebugLogger.setEditorDiagnosticsCallback(editorDiagnostics.logDiagnosticsOnDragEvent);
+    }
+    
+    // Cleanup при размонтировании
+    return () => {
+      dragDebugLogger.clearEditorDiagnosticsCallback();
+    };
   }, [editorDiagnostics, blocksRef, blockRefs]);
 
   // Обработчики событий для DnD системы
@@ -725,54 +736,35 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
   // Убрали renderKey чтобы избежать перерендера страницы при создании/удалении блоков
 
 
-  // Проверка готовности всех компонентов - логи отключены
+  // Проверка готовности всех компонентов - логи только при изменении состояния
   useEffect(() => {
     const checkReadiness = () => {
-      // console.log('[PageEditor] 🔍 Checking editor readiness...', {
-      //   blocksCount: blocks.length,
-      //   blockRefsSize: blockRefs.current.size,
-      //   diagnostics: editorDiagnostics.diagnostics
-      // });
-
       if (blocks.length === 0) {
-        // console.log('[PageEditor] No blocks, setting ready to true');
         setIsReady(true);
         return;
       }
 
       // Проверяем готовность без детальной диагностики
       const allReady = blockRefs.current.size === blocks.length && 
-        Array.from(blockRefs.current.values()).every(ref => ref?.current?.editor);
+        Array.from(blockRefs.current.values()).every(ref => ref?.editor);
 
-      // console.log('[PageEditor] 🎯 Final readiness check:', {
-      //   allReady,
-      //   blocksCount: blocks.length,
-      //   blockRefsSize: blockRefs.current.size
-      // });
-
-      if (!allReady && editorDiagnostics.recommendations.length > 0) {
-        // console.warn('[PageEditor] ⚠️ Editors not ready. Recommendations:', editorDiagnostics.recommendations);
+      // Логируем только при изменении состояния готовности
+      if (allReady !== isReady) {
+        console.log('[PageEditor] 🎯 Readiness state changed:', {
+          allReady,
+          blocksCount: blocks.length,
+          blockRefsSize: blockRefs.current.size,
+          previousState: isReady
+        });
       }
 
       setIsReady(allReady);
     };
 
     checkReadiness();
-  }, [blocks, editorDiagnostics, blockRefs, setIsReady]);
+  }, [blocks, blockRefs, setIsReady, isReady]);
 
-  // Периодическая диагностика отключена
-  // useEffect(() => {
-  //   if (blocks.length > 0 && blockRefs.current.size > 0) {
-  //     const interval = setInterval(() => {
-  //       if (!isReady) {
-  //         console.log('[PageEditor] 🔄 Periodic diagnostics (editors not ready yet)...');
-  //         editorDiagnostics.logBlockEditorsState(blockRefs.current);
-  //       }
-  //     }, 2000); // Каждые 2 секунды
-
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [blocks.length, blockRefs.current.size, isReady, editorDiagnostics]);
+  // Периодическая диагностика отключена - диагностика только при драг-событиях
 
   // Загружаем блоки при инициализации
   useEffect(() => {
@@ -889,8 +881,166 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
                  return markers;
                };
 
+               // Глобальная функция для мониторинга готовности редакторов в реальном времени
+               (window as any).__monitorEditorReadiness = () => {
+                 console.log('🔍 [Monitor] Starting real-time editor readiness monitoring...');
+                 const interval = setInterval(() => {
+                   console.log('🔍 [Monitor] Current state:', {
+                     isReady,
+                     blocksCount: blocks.length,
+                     blockRefsSize: blockRefs.current.size,
+                     blockRefsDetails: Array.from(blockRefs.current.entries()).map(([id, ref]) => ({
+                       blockId: id,
+                       hasRef: !!ref,
+                       hasCurrent: !!ref?.current,
+                       hasEditor: !!ref?.editor,
+                       hasProvider: !!ref?.provider,
+                       editorReady: ref?.editor?.isEditable,
+                       providerStatus: ref?.provider?.status
+                     }))
+                   });
+                   
+                   if (isReady) {
+                     console.log('✅ [Monitor] All editors are ready! Stopping monitoring.');
+                     clearInterval(interval);
+                   }
+                 }, 1000); // Каждую секунду
+                 
+                 // Останавливаем мониторинг через 30 секунд
+                 setTimeout(() => {
+                   clearInterval(interval);
+                   console.log('⏰ [Monitor] Monitoring stopped after 30 seconds.');
+                 }, 30000);
+                 
+                 return interval;
+               };
+
                console.log('🧪 [Test] Global test functions added to window object');
              }, []);
+
+  // Создаем стабильные колбэки БЕЗ зависимостей
+  const stableCallbacks = useRef<Map<string, any>>(new Map());
+  
+  const getStableCallbacks = useCallback((blockId: string) => {
+    if (!stableCallbacks.current.has(blockId)) {
+      stableCallbacks.current.set(blockId, {
+        onFocus: () => {
+          // Используем функциональное обновление для получения актуального состояния
+          setFocusedBlockId(blockId);
+        },
+        onNavigateUp: () => {
+          navigateUp(blockId);
+        },
+        onNavigateDown: () => {
+          navigateDown(blockId);
+        },
+        onDeleteBlock: () => {
+          handleBlockDeleted(blockId);
+        },
+        onCreateBlockAfter: () => {
+          console.log('[PageEditor] onCreateBlockAfter called for block:', blockId);
+          const newBlock = createBlockBetween(blockId, null);
+          if (newBlock) {
+            setBlocks(currentBlocks => {
+              const currentBlockIndex = currentBlocks.findIndex(b => b.id === blockId);
+              const updatedBlocks = currentBlocks.map((existingBlock, index) => {
+                if (index > currentBlockIndex) {
+                  return {
+                    ...existingBlock,
+                    position: index + 1,
+                    content: {
+                      ...existingBlock.content,
+                      attrs: {
+                        ...(existingBlock.content.attrs || {}),
+                        position: index + 1
+                      }
+                    }
+                  };
+                }
+                return existingBlock;
+              });
+              updatedBlocks.splice(currentBlockIndex + 1, 0, {
+                ...newBlock,
+                position: currentBlockIndex + 1,
+                content: {
+                  ...newBlock.content,
+                  attrs: {
+                    ...((newBlock.content as any).attrs || {}),
+                    position: currentBlockIndex + 1
+                  }
+                }
+              });
+              const serverData = updatedBlocks.map(block => ({
+                blockId: block.id,
+                blockType: block.blockType,
+                pageId: block.pageId,
+                content: block.content
+              }));
+              setTimeout(() => saveBlocksToServer(pageId, serverData), 0);
+              return updatedBlocks;
+            });
+            focusBlockWithRetry(newBlock.id, 'start');
+          }
+        },
+        onCreateBlockAtEnd: () => {
+          const newBlock = createBlockAtEnd();
+          if (newBlock) {
+            setBlocks(currentBlocks => {
+              const updatedBlocks = currentBlocks.map((existingBlock, index) => ({
+                ...existingBlock,
+                position: index,
+                content: {
+                  ...existingBlock.content,
+                  attrs: {
+                    ...(existingBlock.content.attrs || {}),
+                    position: index
+                  }
+                }
+              }));
+              const finalBlocks = [...updatedBlocks, {
+                ...newBlock,
+                position: currentBlocks.length,
+                content: {
+                  ...newBlock.content,
+                  attrs: {
+                    ...((newBlock.content as any).attrs || {}),
+                    position: currentBlocks.length
+                  }
+                }
+              }];
+              const serverData = finalBlocks.map(block => ({
+                blockId: block.id,
+                blockType: block.blockType,
+                pageId: block.pageId,
+                content: block.content
+              }));
+              setTimeout(() => saveBlocksToServer(pageId, serverData), 0);
+              return finalBlocks;
+            });
+            handleBlockCreated(newBlock);
+          }
+        },
+        setBlockRef: (ref: any) => {
+          console.log('[PageEditor] 🔗 setBlockRef called for block:', blockId, {
+            hasRef: !!ref,
+            refType: typeof ref,
+            hasCurrent: !!ref?.current,
+            hasEditor: !!ref?.editor,
+            hasProvider: !!ref?.provider,
+            refObject: ref
+          });
+          if (ref) {
+            blockRefs.current.set(blockId, ref);
+            console.log('[PageEditor] ✅ BlockRef set for block:', blockId);
+          } else {
+            blockRefs.current.delete(blockId);
+            console.log('[PageEditor] 🗑️ BlockRef deleted for block:', blockId);
+          }
+        }
+      });
+    }
+    return stableCallbacks.current.get(blockId);
+  }, []); // УБИРАЕМ ВСЕ ЗАВИСИМОСТИ!
 
              return (
        <EnhancedDndProviderV2>
@@ -898,6 +1048,8 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
         {blocks.map((block, index) => {
 
           const blockEditable = block.userPermission === "edit" || block.userPermission === "owner";
+          // Получаем стабильные колбэки для блока
+          const blockCallbacks = getStableCallbacks(block.id);
           // Логи проверки редактируемости отключены
           // console.log('[PageEditor] 📝 Block editable check:', {
           //   blockId: block.id,
@@ -936,130 +1088,13 @@ export default function PageEditor({ pageId, editable, content, syncPageOriginId
                 saveBlocksToServer={saveBlocksToServer}
                 pageId={pageId}
                 syncPageOriginId={syncPageOriginId}
-                onFocus={() => setFocusedBlockId(block.id)}
-                onNavigateUp={() => navigateUp(block.id)}
-                onNavigateDown={() => navigateDown(block.id)}
-                onCreateBlockAfter={() => {
-                  console.log('[PageEditor] onCreateBlockAfter called for block:', block.id);
-                  console.trace('[PageEditor] Call stack for onCreateBlockAfter');
-                  
-                  // Создаем новый блок
-                  const newBlock = createBlockBetween(block.id, null);
-
-                  if (newBlock) {
-                    // Находим позицию для вставки - сразу после текущего блока
-                    const currentBlockIndex = blocks.findIndex(b => b.id === block.id);
-                    
-                    // Создаем новый массив с иммутабельными обновлениями
-                    const updatedBlocks = blocks.map((existingBlock, index) => {
-                      if (index > currentBlockIndex) {
-                        // Обновляем позиции блоков после вставки
-                        return {
-                          ...existingBlock,
-                          position: index + 1,
-                      content: {
-                        ...existingBlock.content,
-                        attrs: {
-                          ...(existingBlock.content.attrs || {}),
-                          position: index + 1
-                        }
-                      }
-                        };
-                      }
-                      return existingBlock;
-                    });
-
-                    // Вставляем новый блок в правильную позицию
-                    updatedBlocks.splice(currentBlockIndex + 1, 0, {
-                      ...newBlock,
-                      position: currentBlockIndex + 1,
-                      content: {
-                        ...newBlock.content,
-                        attrs: {
-                          ...((newBlock.content as any).attrs || {}),
-                          position: currentBlockIndex + 1
-                        }
-                      }
-                    });
-
-                    // Обновляем состояние
-                    setBlocks(updatedBlocks);
-
-                    // Сохраняем на сервер
-                    const serverData = updatedBlocks.map(block => ({
-                      blockId: block.id,
-                      blockType: block.blockType,
-                      pageId: block.pageId,
-                      content: block.content
-                    }));
-
-                    // Асинхронное сохранение для оптимизации
-                    setTimeout(() => {
-                      saveBlocksToServer(pageId, serverData);
-                    }, 0);
-
-                    // Фокусируемся на новом блоке немедленно (убрали setTimeout для оптимизации)
-                    focusBlockWithRetry(newBlock.id, 'start');
-                  }
-                }}
-                onCreateBlockAtEnd={() => {
-                  const newBlock = createBlockAtEnd();
-                  if (newBlock) {
-                    // Создаем новый массив с иммутабельными обновлениями
-                    const updatedBlocks = blocks.map((existingBlock, index) => ({
-                      ...existingBlock,
-                      position: index,
-                      content: {
-                        ...existingBlock.content,
-                        attrs: {
-                          ...(existingBlock.content.attrs || {}),
-                          position: index
-                        }
-                      }
-                    }));
-
-                    // Добавляем новый блок в конец
-                    const finalBlocks = [...updatedBlocks, {
-                      ...newBlock,
-                      position: blocks.length,
-                      content: {
-                        ...newBlock.content,
-                        attrs: {
-                          ...((newBlock.content as any).attrs || {}),
-                          position: blocks.length
-                        }
-                      }
-                    }];
-
-                    // Обновляем состояние
-                    setBlocks(finalBlocks);
-
-                    // Сохраняем на сервер
-                    const serverData = finalBlocks.map(block => ({
-                      blockId: block.id,
-                      blockType: block.blockType,
-                      pageId: block.pageId,
-                      content: block.content
-                    }));
-
-                    // Асинхронное сохранение для оптимизации
-                    setTimeout(() => {
-                      saveBlocksToServer(pageId, serverData);
-                    }, 0);
-
-                    // Фокусируемся на новом блоке
-                    handleBlockCreated(newBlock);
-                  }
-                }}
-                onDeleteBlock={() => handleBlockDeleted(block.id)}
-                setBlockRef={(ref) => {
-                  // Логи отключены для упрощения отладки
-                  if (ref) {
-                    blockRefs.current.set(block.id, ref);
-                  } else {
-                    blockRefs.current.delete(block.id);
-                  }
-                }}
+                onFocus={blockCallbacks.onFocus}
+                onNavigateUp={blockCallbacks.onNavigateUp}
+                onNavigateDown={blockCallbacks.onNavigateDown}
+                onCreateBlockAfter={blockCallbacks.onCreateBlockAfter}
+                onCreateBlockAtEnd={blockCallbacks.onCreateBlockAtEnd}
+                onDeleteBlock={blockCallbacks.onDeleteBlock}
+                setBlockRef={blockCallbacks.setBlockRef}
               />
             </EnhancedBlockHandle>
                         ) : null}

@@ -30,6 +30,8 @@ interface TestLogEntry {
 class DndTestLogger {
   private logs: TestLogEntry[] = [];
   private isEnabled = true;
+  private lastLogTimes: Map<string, number> = new Map();
+  private logThrottleMs = 1000; // Минимальный интервал между одинаковыми логами
 
   /**
    * Логирует результат тестирования конкретной задачи
@@ -46,6 +48,18 @@ class DndTestLogger {
     };
 
     this.logs.push(entry);
+
+    // Создаем ключ для throttling на основе задачи и деталей
+    const logKey = `${task}-${result}-${details}`;
+    const now = Date.now();
+    const lastLogTime = this.lastLogTimes.get(logKey) || 0;
+    
+    // Для SUCCESS логов применяем throttling, для ошибок логируем всегда
+    if (result === TestResult.SUCCESS && (now - lastLogTime) < this.logThrottleMs) {
+      return; // Пропускаем повторный SUCCESS лог
+    }
+    
+    this.lastLogTimes.set(logKey, now);
 
     // Выводим в консоль с уникальным префиксом для фильтрации
     const prefix = `[DND_TEST_${task}]`;

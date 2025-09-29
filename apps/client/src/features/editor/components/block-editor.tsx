@@ -72,25 +72,45 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
   onDeleteBlock
 }, ref) => {
 
-  // Логи монтажа отключены для упрощения отладки
-  // console.log('[BlockEditor] 🚀 MOUNTING BlockEditor for block:', block.id, {
-  //   editable,
-  //   hasRef: !!ref,
-  //   blockType: block.blockType,
-  //   position: block.position
-  // });
+  // Логи монтажа включены для отладки готовности редакторов - с throttling
+  const now = Date.now();
+  if (!(window as any).lastBlockEditorMountLog || (now - (window as any).lastBlockEditorMountLog) > 5000) {
+    console.log('[BlockEditor] 🚀 MOUNTING BlockEditor for block:', block.id, {
+      editable,
+      hasRef: !!ref,
+      blockType: block.blockType,
+      position: block.position
+    });
+    (window as any).lastBlockEditorMountLog = now;
+  }
 
   const [currentUser] = useAtom(currentUserAtom);
   const ydoc = useMemo(() => new Y.Doc(), [block.id]);
   const collaborationURL = useCollaborationUrl();
 
-  // Отслеживание монтирования компонента - логи отключены
-  // useEffect(() => {
-  //   console.log('[BlockEditor] 🎯 MOUNTED BlockEditor for block:', block.id);
-  //   return () => {
-  //     console.log('[BlockEditor] 🗑️ UNMOUNTING BlockEditor for block:', block.id);
-  //   };
-  // }, [block.id]);
+  // Отслеживание монтирования компонента - логи включены для отладки с throttling
+  useEffect(() => {
+    const now = Date.now();
+    if (!(window as any).lastBlockEditorMountedLog || (now - (window as any).lastBlockEditorMountedLog) > 5000) {
+      console.log('[BlockEditor] 🎯 MOUNTED BlockEditor for block:', block.id);
+      (window as any).lastBlockEditorMountedLog = now;
+    }
+    return () => {
+      const now = Date.now();
+      if (!(window as any).lastBlockEditorUnmountLog || (now - (window as any).lastBlockEditorUnmountLog) > 5000) {
+        console.log('[BlockEditor] 🗑️ UNMOUNTING BlockEditor for block:', block.id);
+        (window as any).lastBlockEditorUnmountLog = now;
+      }
+    };
+  }, [block.id]);
+
+  // Отслеживание изменений ref
+  useEffect(() => {
+    console.log('[BlockEditor] 🔄 Ref changed for block:', block.id, {
+      hasRef: !!ref,
+      refType: typeof ref
+    });
+  }, [ref, block.id]);
 
   const documentName = syncPageOriginId
     ? `page.${syncPageOriginId}`
@@ -409,10 +429,7 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
         }
       }
 
-      // Принудительно вызываем ref callback после создания редактора
-      if (ref && typeof ref === 'function') {
-        ref({ editor, provider });
-      }
+      // useImperativeHandle автоматически обновит ref
     },
     onUpdate({ editor }) {
       if (editor.isEmpty) return;
@@ -456,17 +473,20 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
     },
   });
 
-  // useEffect для обновления ref при изменении editor/provider
-  useEffect(() => {
-    if (editor && provider && ref) {
-      // Вызываем функцию ref с объектом { editor, provider }
-      if (typeof ref === 'function') {
-        ref({ editor, provider });
-      } else if (ref && 'current' in ref) {
-        (ref as any).current = { editor, provider };
-      }
-    }
-  }, [editor, provider, ref, block.id]);
+  // Используем useImperativeHandle для правильной передачи ref
+  useImperativeHandle(ref, () => {
+    console.log('[BlockEditor] 🔄 useImperativeHandle called for block:', block.id, {
+      hasEditor: !!editor,
+      hasProvider: !!provider,
+      editorReady: editor?.isEditable,
+      providerStatus: provider?.status
+    });
+
+    return {
+      editor,
+      provider
+    };
+  }, [editor, provider, block.id]);
 
   useEffect(() => () => {
     if (provider) {

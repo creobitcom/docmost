@@ -390,47 +390,55 @@ export const useDndEvents = ({
         const sourceProvider = sourceBlockRef?.current?.provider || sourceBlockRef?.provider;
         const targetProvider = targetBlockRef?.current?.provider || targetBlockRef?.provider;
 
-        console.log(`[PageEditor] Checking editor readiness (attempt ${retryCount + 1}/${maxRetries}):`, {
-          sourceBlockId: detail.sourceBlockId,
-          targetBlockId: detail.targetBlockId,
-          sourceEditor: !!sourceEditor,
-          targetEditor: !!targetEditor,
-          sourceEditorReady: sourceEditor?.isEditable,
-          targetEditorReady: targetEditor?.isEditable,
-          sourceProviderStatus: sourceProvider?.status,
-          targetProviderStatus: targetProvider?.status,
-          availableEditors: Array.from(blockRefs.keys()),
-          blockRefsSize: blockRefs.size,
-          sourceRefType: typeof sourceBlockRef,
-          targetRefType: typeof targetBlockRef
-        });
-
-        // Детальная диагностика для source и target блоков
-        if (sourceBlockRef?.current) {
-          console.log(`[PageEditor] Source block ${detail.sourceBlockId} details:`, {
-            hasEditor: !!sourceBlockRef.current.editor,
-            editorIsEditable: sourceBlockRef.current.editor?.isEditable,
-            editorIsDestroyed: sourceBlockRef.current.editor?.isDestroyed,
-            hasProvider: !!sourceBlockRef.current.provider,
-            providerStatus: sourceBlockRef.current.provider?.status,
-            providerConnected: sourceBlockRef.current.provider?.isConnected
+        // Логируем только при проблемах или на последних попытках
+        if (retryCount >= maxRetries - 3 || !sourceEditor || !targetEditor) {
+          console.log(`[PageEditor] Checking editor readiness (attempt ${retryCount + 1}/${maxRetries}):`, {
+            sourceBlockId: detail.sourceBlockId,
+            targetBlockId: detail.targetBlockId,
+            sourceEditor: !!sourceEditor,
+            targetEditor: !!targetEditor,
+            sourceEditorReady: sourceEditor?.isEditable,
+            targetEditorReady: targetEditor?.isEditable,
+            sourceProviderStatus: sourceProvider?.status,
+            targetProviderStatus: targetProvider?.status,
+            availableEditors: Array.from(blockRefs.keys()),
+            blockRefsSize: blockRefs.size,
+            sourceRefType: typeof sourceBlockRef,
+            targetRefType: typeof targetBlockRef
           });
         }
 
-        if (targetBlockRef?.current) {
-          console.log(`[PageEditor] Target block ${detail.targetBlockId} details:`, {
-            hasEditor: !!targetBlockRef.current.editor,
-            editorIsEditable: targetBlockRef.current.editor?.isEditable,
-            editorIsDestroyed: targetBlockRef.current.editor?.isDestroyed,
-            hasProvider: !!targetBlockRef.current.provider,
-            providerStatus: targetBlockRef.current.provider?.status,
-            providerConnected: targetBlockRef.current.provider?.isConnected
-          });
+        // Детальная диагностика только при проблемах
+        if (retryCount >= maxRetries - 3 || !sourceEditor || !targetEditor) {
+          if (sourceBlockRef?.current) {
+            console.log(`[PageEditor] Source block ${detail.sourceBlockId} details:`, {
+              hasEditor: !!sourceBlockRef.current.editor,
+              editorIsEditable: sourceBlockRef.current.editor?.isEditable,
+              editorIsDestroyed: sourceBlockRef.current.editor?.isDestroyed,
+              hasProvider: !!sourceBlockRef.current.provider,
+              providerStatus: sourceBlockRef.current.provider?.status,
+              providerConnected: sourceBlockRef.current.provider?.isConnected
+            });
+          }
+
+          if (targetBlockRef?.current) {
+            console.log(`[PageEditor] Target block ${detail.targetBlockId} details:`, {
+              hasEditor: !!targetBlockRef.current.editor,
+              editorIsEditable: targetBlockRef.current.editor?.isEditable,
+              editorIsDestroyed: targetBlockRef.current.editor?.isDestroyed,
+              hasProvider: !!targetBlockRef.current.provider,
+              providerStatus: targetBlockRef.current.provider?.status,
+              providerConnected: targetBlockRef.current.provider?.isConnected
+            });
+          }
         }
 
         if (!sourceEditor || !targetEditor) {
           if (retryCount < maxRetries) {
-            console.log(`[PageEditor] Editors not ready, retrying... (${retryCount + 1}/${maxRetries})`);
+            // Логируем только на последних попытках
+            if (retryCount >= maxRetries - 3) {
+              console.log(`[PageEditor] Editors not ready, retrying... (${retryCount + 1}/${maxRetries})`);
+            }
 
             // Увеличиваем интервал с каждой попыткой для более стабильной работы
             const delay = Math.min(50 + retryCount * 10, 200); // От 50ms до 200ms

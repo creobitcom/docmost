@@ -9,6 +9,10 @@ interface BlockDropZoneProps {
   showOnHover?: boolean;
 }
 
+// Throttling для логов
+let lastBlockDropZoneLogTime = 0;
+const BLOCK_DROP_ZONE_LOG_THROTTLE_MS = 1000; // 1 секунда
+
 export const BlockDropZone: React.FC<BlockDropZoneProps> = ({
   blockId,
   position,
@@ -64,11 +68,16 @@ export const BlockDropZone: React.FC<BlockDropZoneProps> = ({
   }, [blockId, position]);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
-    console.log('🎯 [BlockDropZone] Drag over event received:', {
-      blockId,
-      position,
-      hasJsonData: event.dataTransfer.types.includes('application/json')
-    });
+    // Throttling для логов - логируем не чаще чем раз в секунду
+    const now = Date.now();
+    if (now - lastBlockDropZoneLogTime > BLOCK_DROP_ZONE_LOG_THROTTLE_MS) {
+      console.log('🎯 [BlockDropZone] Drag over event received:', {
+        blockId,
+        position,
+        hasJsonData: event.dataTransfer.types.includes('application/json')
+      });
+      lastBlockDropZoneLogTime = now;
+    }
 
     event.preventDefault();
     event.stopPropagation();

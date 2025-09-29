@@ -6,19 +6,22 @@ interface UseEditorDiagnosticsOptions {
   blockRefs: Map<string, any>;
   isReady: boolean;
   enableLogging?: boolean;
+  logOnlyOnDragEvents?: boolean;
 }
 
 export const useEditorDiagnostics = ({ 
   blocks, 
   blockRefs, 
   isReady, 
-  enableLogging = true 
+  enableLogging = true,
+  logOnlyOnDragEvents = false
 }: UseEditorDiagnosticsOptions) => {
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<string[]>([]);
 
-  // Автоматическая диагностика редакторов
-  const editorDiagnostics = useEditorDiagnosticsUtil(blocks, blockRefs, isReady, enableLogging);
+  // Автоматическая диагностика редакторов - логируем только если не включен режим "только при драге"
+  const shouldLogNow = enableLogging && !logOnlyOnDragEvents;
+  const editorDiagnostics = useEditorDiagnosticsUtil(blocks, blockRefs, isReady, shouldLogNow);
 
   useEffect(() => {
     if (editorDiagnostics && typeof editorDiagnostics === 'object') {
@@ -188,6 +191,52 @@ export const useEditorDiagnostics = ({
     }
   };
 
+  // Функция для логирования диагностики при драг-событиях
+  const logDiagnosticsOnDragEvent = (eventType: 'dragStart' | 'dragEnd') => {
+    if (!enableLogging) return;
+    
+    console.group(`🔍 EDITOR DIAGNOSTICS - ${eventType.toUpperCase()}`);
+    console.log(`📅 Время: ${new Date().toLocaleTimeString()}`);
+    console.log(`🎯 Событие: ${eventType}`);
+    
+    // Собираем свежую диагностику
+    const freshDiagnostics = useEditorDiagnosticsUtil(blocks, blockRefs, isReady, false);
+    
+    if (freshDiagnostics && typeof freshDiagnostics === 'object') {
+      console.log('📊 Общая статистика:', {
+        blocksCount: freshDiagnostics.diagnostics?.blocksCount || 0,
+        blockRefsCount: freshDiagnostics.diagnostics?.blockRefsCount || 0,
+        isReady: freshDiagnostics.diagnostics?.isReady || false,
+        missingRefsCount: freshDiagnostics.diagnostics?.missingRefs?.length || 0,
+        notReadyBlocksCount: freshDiagnostics.diagnostics?.notReadyBlocks?.length || 0
+      });
+      
+      if (freshDiagnostics.diagnostics?.missingRefs?.length > 0) {
+        console.warn('❌ Отсутствующие рефы:', freshDiagnostics.diagnostics.missingRefs);
+      }
+      
+      if (freshDiagnostics.diagnostics?.notReadyBlocks?.length > 0) {
+        console.warn('⏳ Неготовые блоки:', freshDiagnostics.diagnostics.notReadyBlocks);
+      }
+      
+      console.log('📋 Детальная информация по блокам:');
+      freshDiagnostics.diagnostics?.readinessStatus?.forEach((status: any) => {
+        const statusIcon = status.isReady ? '✅' : '❌';
+        console.log(`${statusIcon} ${status.blockId}:`, {
+          hasRef: status.hasRef,
+          hasCurrent: status.hasCurrent,
+          hasEditor: status.hasEditor,
+          hasProvider: status.hasProvider,
+          editorReady: status.editorReady,
+          providerStatus: status.providerStatus,
+          isReady: status.isReady
+        });
+      });
+    }
+    
+    console.groupEnd();
+  };
+
   return {
     diagnostics,
     recommendations,
@@ -195,7 +244,8 @@ export const useEditorDiagnostics = ({
     setupGlobalDebugFunctions,
     countElementsInBlock,
     getElementIds,
-    getContentStructure
+    getContentStructure,
+    logDiagnosticsOnDragEvent
   };
 };
 

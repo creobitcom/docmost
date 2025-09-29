@@ -18,6 +18,10 @@ interface EnhancedBlockHandleProps {
   children?: React.ReactNode;
 }
 
+// Throttling для логов
+let lastElementDragLogTime = 0;
+const ELEMENT_DRAG_LOG_THROTTLE_MS = 2000; // 2 секунды
+
 export const EnhancedBlockHandle: React.FC<EnhancedBlockHandleProps> = ({
   blockId,
   view,
@@ -200,7 +204,12 @@ export const EnhancedBlockHandle: React.FC<EnhancedBlockHandleProps> = ({
       const isElementContent = target.closest('li p, li div, li label');
 
       if (isElementHandle || isElement || isElementContent) {
-        console.log('⚠️ [EnhancedBlockHandle] Element drag detected, ignoring block dragover');
+        // Throttling для логов - логируем не чаще чем раз в 2 секунды
+        const now = Date.now();
+        if (now - lastElementDragLogTime > ELEMENT_DRAG_LOG_THROTTLE_MS) {
+          console.log('⚠️ [EnhancedBlockHandle] Element drag detected, ignoring block dragover');
+          lastElementDragLogTime = now;
+        }
         return; // Игнорируем element drag события
       }
 

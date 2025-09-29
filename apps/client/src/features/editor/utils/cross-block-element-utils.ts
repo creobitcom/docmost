@@ -81,6 +81,7 @@ export interface CrossBlockMoveOperation {
   targetBlockId: string;
   elementData: ElementData;
   targetPosition: 'before' | 'after' | 'inside';
+  beforeElementId?: string; // Added beforeElementId for precise positioning
   pageId?: string; // Added pageId for page-specific event handling
 }
 
