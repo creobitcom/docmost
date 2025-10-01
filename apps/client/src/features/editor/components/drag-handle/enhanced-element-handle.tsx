@@ -218,13 +218,72 @@ export const EnhancedElementHandle: React.FC<EnhancedElementHandleProps> = ({
               finalBeforeElementId = beforeElementId;
             }
 
+            // Извлекаем реальный контент элемента из исходного блока
+            let elementContent = null;
+            try {
+              // Находим исходный блок в DOM
+              const sourceBlockElement = document.querySelector(`[data-block-id="${sourceBlockId}"]`);
+              if (sourceBlockElement) {
+                // Находим элемент в исходном блоке
+                const sourceElement = sourceBlockElement.querySelector(`[data-element-id="${sourceElementId}"]`);
+                if (sourceElement) {
+                  // Извлекаем JSON контент из data-атрибута или из DOM
+                  const contentAttr = sourceElement.getAttribute('data-content');
+                  if (contentAttr) {
+                    elementContent = JSON.parse(contentAttr);
+                  } else {
+                    // Fallback: создаем базовую структуру listItem
+                    elementContent = {
+                      type: 'listItem',
+                      attrs: {
+                        elementId: sourceElementId,
+                        blockId: sourceBlockId
+                      },
+                      content: [
+                        {
+                          type: 'paragraph',
+                          content: [
+                            {
+                              type: 'text',
+                              text: 'Элемент списка'
+                            }
+                          ]
+                        }
+                      ]
+                    };
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('⚠️ [EnhancedElementHandle] Failed to extract element content:', error);
+              // Fallback: создаем базовую структуру listItem
+              elementContent = {
+                type: 'listItem',
+                attrs: {
+                  elementId: sourceElementId,
+                  blockId: sourceBlockId
+                },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [
+                      {
+                        type: 'text',
+                        text: 'Элемент списка'
+                      }
+                    ]
+                  }
+                ]
+              };
+            }
+
             const eventDetail = {
               sourceBlockId,
               targetBlockId,
               elementData: {
                 id: sourceElementId,
                 type: 'listItem',
-                content: null,
+                content: elementContent,
                 position: 0,
                 parentBlockId: sourceBlockId,
               },

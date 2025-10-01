@@ -189,7 +189,7 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
       }
 
       // 4. Проверяем, можно ли удалить этот блок (нельзя удалить последний блок)
-      if (blocks.length === 1) {
+      if (blocks.length <= 1) {
         console.warn('Cannot delete the last block on the page');
         setIsDeleting(false);
         return;
@@ -419,7 +419,14 @@ export const useBlockManagement = ({ pageId, editable }: UseBlockManagementOptio
     getPreviousBlock: (currentBlockId: string) => getPreviousBlock(blocks, currentBlockId),
     getFirstBlock: () => getFirstBlock(blocks),
     getLastBlock: () => getLastBlock(blocks),
-    createBlockBetween: (afterBlockId: string, beforeBlockId?: string) => createBlockBetween(pageId, blocks, afterBlockId, beforeBlockId),
+    createBlockBetween: (afterBlockId: string, beforeBlockId?: string) => {
+      console.log('[useBlockManagement] createBlockBetween called:', { afterBlockId, beforeBlockId, blocksCount: blocks.length });
+      if (blocks.length === 0) {
+        console.warn('[useBlockManagement] No blocks available, creating block at end');
+        return createBlockAtEnd(pageId, []);
+      }
+      return createBlockBetween(pageId, blocks, afterBlockId, beforeBlockId);
+    },
     createBlockAtEnd: () => createBlockAtEnd(pageId, blocks),
   };
 };

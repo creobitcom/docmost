@@ -354,7 +354,11 @@ export const BlockEditor = forwardRef<{ editor: any; provider: any }, BlockEdito
           onNavigateDown: onNavigateDown,
           onNavigateToFirst: onNavigateToFirst,
           onNavigateToLast: onNavigateToLast,
-          canDeleteBlock: (block: any, allBlocks: any[]) => allBlocks.length > 1,
+          canDeleteBlock: (block: any, allBlocks: any[]) => {
+            // Проверяем, что на странице есть другие блоки кроме текущего
+            const otherBlocks = allBlocks.filter(b => b.id !== block.id);
+            return otherBlocks.length > 0;
+          },
           allBlocks: allBlocks,
           currentBlock: block
         });

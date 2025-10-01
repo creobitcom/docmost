@@ -44,25 +44,24 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
       listNodeSize: listNode?.nodeSize
     });
 
-    // Удаляем весь список только если это единственный элемент в блоке списка
+    // При выходе из списка всегда удаляем элемент списка
     if (listNode && listNode.childCount === 1) {
-      // Если это единственный элемент в списке, превращаем блок в параграф
-      console.log('[ComprehensiveKeyboardHandler] Only item in list - converting to paragraph');
-
-      // Создаем пустой параграф
-      const paragraph = state.schema.nodes.paragraph.create();
-
-      // Заменяем весь список на параграф
-      tr.replaceWith(listPos, listPos + listNode.nodeSize, paragraph);
-
-      // Устанавливаем курсор в начало параграфа
-      const newPos = listPos + 1;
-      if (newPos <= tr.doc.content.size) {
-        tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
-      }
-
-      // Применяем все изменения одной транзакцией
+      // Если это единственный элемент в списке, удаляем весь список и создаем новый блок
+      console.log('[ComprehensiveKeyboardHandler] Only item in list - deleting list and creating new block');
+      
+      // Удаляем весь список
+      tr.delete(listPos, listPos + listNode.nodeSize);
+      
+      // Применяем изменения
       editor.view.dispatch(tr);
+      
+      // Создаем новый блок после удаления списка
+      if (options.onCreateBlockAfter) {
+        console.log('[ComprehensiveKeyboardHandler] Creating new block after list deletion');
+        setTimeout(() => {
+          options.onCreateBlockAfter();
+        }, 100);
+      }
     } else {
       // Удаляем только элемент списка (если в списке несколько элементов)
       console.log('[ComprehensiveKeyboardHandler] Deleting single list item (multiple items in list)');
@@ -87,10 +86,25 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
     }
 
     try {
-      // Создаем пустой параграф для нового элемента списка
-      const paragraph = state.schema.nodes.paragraph.create();
+      // Попробуем использовать встроенную команду TipTap для создания нового элемента списка
+      if (editor.commands.splitListItem && listItemType) {
+        console.log('[ComprehensiveKeyboardHandler] Using splitListItem command');
+        const success = editor.commands.splitListItem(listItemType);
+        if (success) {
+          console.log('[ComprehensiveKeyboardHandler] New list item created successfully with splitListItem');
+          return true;
+        }
+      }
+      
+      // Если команда не сработала, используем ручное создание
+      console.log('[ComprehensiveKeyboardHandler] Using manual list item creation');
+      
+      // Создаем параграф с минимальным содержимым для нового элемента списка
+      const paragraph = state.schema.nodes.paragraph.create({}, [
+        state.schema.text(' ')
+      ]);
 
-      // Создаем новый элемент списка с пустым параграфом
+      // Создаем новый элемент списка с параграфом
       const newListItem = listItemNode.type.create(null, paragraph);
 
       // Проверяем, что позиция для вставки корректна
@@ -110,6 +124,7 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
       }
 
       editor.view.dispatch(tr);
+      console.log('[ComprehensiveKeyboardHandler] New list item created successfully manually');
       return true;
     } catch (error) {
       console.error('[ComprehensiveKeyboardHandler] Error creating new list item:', error);
@@ -165,42 +180,118 @@ function handleEnterInList(editor: any, $from: any, listItemType: string, option
   }
 }
 
-function handleBackspaceInList(editor: any, $from: any, listItemType: string, options: ComprehensiveKeyboardHandlerOptions): boolean {
+function handleBackspaceInList(editor: any, $from: any, listItemType: string, options: ComprehensiveKeyboardHandlerOptions): 'converted' | 'deleted' | false {
   const { state } = editor;
 
   // Проверяем, находимся ли мы в начале элемента списка
   if ($from.parentOffset === 0) {
     const listItem = $from.node($from.depth - 1);
     if (listItem && (listItem.type.name === 'listItem' || listItem.type.name === 'taskItem')) {
-      const listPos = $from.before($from.depth - 1);
-      const listNode = state.doc.nodeAt(listPos);
+      try {
+        // Безопасно получаем позицию списка
+        let listPos = -1;
+        let listNode = null;
+        
+        // Ищем родительский список, начиная с текущего уровня
+        for (let i = $from.depth - 1; i >= 0; i--) {
+          const node = $from.node(i);
+          if (node.type.name === 'bulletList' || node.type.name === 'orderedList' || node.type.name === 'taskList') {
+            listPos = $from.start(i);
+            listNode = node;
+            break;
+          }
+        }
 
-       if (listNode && listNode.childCount === 1) {
-         console.log('[ComprehensiveKeyboardHandler] Only item in list - converting to paragraph');
+        if (listPos === -1 || !listNode) {
+          console.warn('[ComprehensiveKeyboardHandler] Could not find list position');
+          return false;
+        }
 
-         // Если это единственный элемент в списке, превращаем блок в параграф
-         const tr = state.tr;
-         const paragraph = state.schema.nodes.paragraph.create();
-         tr.replaceWith(listPos, listPos + listNode.nodeSize, paragraph);
+        // Определяем, является ли текущий элемент последним в списке
+        const currentItemIndex = $from.index($from.depth - 1);
+        const isLastItem = currentItemIndex === listNode.childCount - 1;
+        const isOnlyItem = listNode.childCount === 1;
 
-         // Устанавливаем курсор в начало параграфа
-         const newPos = listPos + 1;
-         if (newPos <= tr.doc.content.size) {
-           tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
-         }
+        console.log('[ComprehensiveKeyboardHandler] List item info:', {
+          currentItemIndex,
+          totalItems: listNode.childCount,
+          isLastItem,
+          isOnlyItem,
+          listPos,
+          listItemSize: listItem.nodeSize,
+          listItemType: listItem.type.name,
+          fromDepth: $from.depth,
+          fromParentOffset: $from.parentOffset,
+          fromPos: $from.pos
+        });
 
-         // Применяем все изменения одной транзакцией
-         editor.view.dispatch(tr);
+        if (isLastItem || isOnlyItem) {
+          // Если это последний элемент в списке, преобразуем в параграф
+          console.log('[ComprehensiveKeyboardHandler] Last item in list - converting to paragraph');
+          
+          const tr = state.tr;
+          const paragraph = state.schema.nodes.paragraph.create();
+          tr.replaceWith(listPos, listPos + listNode.nodeSize, paragraph);
 
-         return true;
-      } else {
-        // Если это не последний элемент, удаляем только текущий элемент списка
-        console.log('[ComprehensiveKeyboardHandler] Deleting single list item');
-        const tr = state.tr;
-        const listItemPos = $from.before($from.depth - 1);
-        tr.delete(listItemPos, listItemPos + listItem.nodeSize);
-        editor.view.dispatch(tr);
-        return true;
+          // Устанавливаем курсор в начало параграфа
+          const newPos = listPos + 1;
+          if (newPos <= tr.doc.content.size) {
+            tr.setSelection(Selection.near(tr.doc.resolve(newPos)));
+          }
+
+          // Применяем все изменения одной транзакцией
+          editor.view.dispatch(tr);
+          return 'converted';
+        } else {
+          // Если это не последний элемент, удаляем только текущий элемент списка
+          console.log('[ComprehensiveKeyboardHandler] Deleting single list item (not last)');
+          
+          // Попробуем использовать команды TipTap для удаления элемента списка
+          try {
+            // Получаем позицию элемента списка относительно списка
+            const listItemPos = $from.before($from.depth - 1);
+            const listItemEndPos = listItemPos + listItem.nodeSize;
+            
+            console.log('[ComprehensiveKeyboardHandler] Deleting list item at positions:', {
+              listItemPos,
+              listItemEndPos,
+              listItemSize: listItem.nodeSize,
+              listItemType: listItem.type.name,
+              fromBefore: $from.before($from.depth - 1),
+              fromStart: $from.start($from.depth - 1),
+              fromEnd: $from.end($from.depth - 1),
+              fromPos: $from.pos,
+              fromDepth: $from.depth
+            });
+            
+            // Попробуем использовать встроенную команду liftListItem для удаления элемента списка
+            if (editor.commands.liftListItem && listItemType === 'listItem') {
+              console.log('[ComprehensiveKeyboardHandler] Using liftListItem command');
+              const success = editor.commands.liftListItem(listItemType);
+              if (success) {
+                console.log('[ComprehensiveKeyboardHandler] List item lifted successfully');
+                return 'deleted';
+              }
+            }
+            
+            // Если команда не сработала, используем ручное удаление
+            console.log('[ComprehensiveKeyboardHandler] Using manual deletion');
+            const tr = state.tr;
+            tr.delete(listItemPos, listItemEndPos);
+            
+            // Применяем транзакцию
+            editor.view.dispatch(tr);
+            
+            console.log('[ComprehensiveKeyboardHandler] List item deleted successfully');
+            return 'deleted';
+          } catch (error) {
+            console.error('[ComprehensiveKeyboardHandler] Error deleting list item:', error);
+            return false;
+          }
+        }
+      } catch (error) {
+        console.error('[ComprehensiveKeyboardHandler] Error in handleBackspaceInList:', error);
+        return false;
       }
     }
   }
@@ -444,16 +535,25 @@ export const ComprehensiveKeyboardHandler = Extension.create<ComprehensiveKeyboa
         }
 
         if (inList) {
-          return handleBackspaceInList(editor, $from, listItemType, this.options);
+          const result = handleBackspaceInList(editor, $from, listItemType, this.options);
+          if (result === 'converted') {
+            console.log('[ComprehensiveKeyboardHandler] List item converted to paragraph, not deleting block');
+            return true; // Обработано, не продолжаем
+          } else if (result === 'deleted') {
+            console.log('[ComprehensiveKeyboardHandler] List item deleted, not deleting block');
+            return true; // Обработано, не продолжаем
+          }
+          // Если result === false, продолжаем обычную обработку
         }
 
         // ===== BACKSPACE В ПУСТЫХ ПАРАГРАФАХ =====
         if (parentType === 'paragraph' && $from.parent.content.size === 0) {
-          // Проверяем, можно ли удалить этот блок
+          // Проверяем, можно ли удалить этот блок (должны быть другие блоки на странице)
           if (this.options.canDeleteBlock && this.options.currentBlock && this.options.allBlocks) {
             const canDelete = this.options.canDeleteBlock(this.options.currentBlock, this.options.allBlocks);
 
             if (!canDelete) {
+              console.log('[ComprehensiveKeyboardHandler] Cannot delete block - no other blocks on page');
               console.warn('Cannot delete the last block on the page');
               return false; // Предотвращаем удаление
             }

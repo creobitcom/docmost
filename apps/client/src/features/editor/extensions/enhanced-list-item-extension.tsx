@@ -78,11 +78,16 @@ export const EnhancedListItem = Node.create({
         );
       };
 
+      // Сохраняем JSON контент элемента в data-атрибуте для кроссблочного перемещения
+      const nodeJSON = node.toJSON();
+      const contentJSON = JSON.stringify(nodeJSON);
+
       return (
         <li
           data-type="listItem"
           data-element-id={elementId}
           data-block-id={blockId}
+          data-content={contentJSON}
           className="enhanced-list-item"
         >
           <EnhancedElementHandle

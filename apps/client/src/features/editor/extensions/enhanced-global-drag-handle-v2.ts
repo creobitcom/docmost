@@ -370,13 +370,72 @@ export const EnhancedGlobalDragHandleV2 = Extension.create<EnhancedGlobalDragHan
                 }
 
                 if (sourceBlockId && elementId && targetBlockId) {
+                  // Извлекаем реальный контент элемента из исходного блока
+                  let elementContent = null;
+                  try {
+                    // Находим исходный блок в DOM
+                    const sourceBlockElement = document.querySelector(`[data-block-id="${sourceBlockId}"]`);
+                    if (sourceBlockElement) {
+                      // Находим элемент в исходном блоке
+                      const sourceElement = sourceBlockElement.querySelector(`[data-element-id="${elementId}"]`);
+                      if (sourceElement) {
+                        // Извлекаем JSON контент из data-атрибута или из DOM
+                        const contentAttr = sourceElement.getAttribute('data-content');
+                        if (contentAttr) {
+                          elementContent = JSON.parse(contentAttr);
+                        } else {
+                          // Fallback: создаем базовую структуру listItem
+                          elementContent = {
+                            type: 'listItem',
+                            attrs: {
+                              elementId: elementId,
+                              blockId: sourceBlockId
+                            },
+                            content: [
+                              {
+                                type: 'paragraph',
+                                content: [
+                                  {
+                                    type: 'text',
+                                    text: 'Элемент списка'
+                                  }
+                                ]
+                              }
+                            ]
+                          };
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.warn('⚠️ [EnhancedGlobalDragHandle] Failed to extract element content:', error);
+                    // Fallback: создаем базовую структуру listItem
+                    elementContent = {
+                      type: 'listItem',
+                      attrs: {
+                        elementId: elementId,
+                        blockId: sourceBlockId
+                      },
+                      content: [
+                        {
+                          type: 'paragraph',
+                          content: [
+                            {
+                              type: 'text',
+                              text: 'Элемент списка'
+                            }
+                          ]
+                        }
+                      ]
+                    };
+                  }
+
                   const detail = {
                     sourceBlockId,
                     targetBlockId,
                     elementData: {
                       id: elementId,
                       type: 'listItem',
-                      content: null,
+                      content: elementContent,
                       position: 0,
                       parentBlockId: sourceBlockId,
                     },

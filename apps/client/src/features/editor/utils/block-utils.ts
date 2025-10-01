@@ -18,7 +18,7 @@ const lastSavedBlocks = new Map<string, any[]>();
 
 export async function saveBlocksToServer(pageId: string, blocks: any[]) {
   console.log('💾 [saveBlocksToServer] Starting save for pageId:', pageId, 'blocks:', blocks.length);
-  
+
   // Валидация входных данных
   if (!pageId || !blocks || !Array.isArray(blocks)) {
     console.error('❌ [saveBlocksToServer] Invalid input data:', { pageId, blocks });
@@ -52,7 +52,7 @@ export async function saveBlocksToServer(pageId: string, blocks: any[]) {
   const timeout = setTimeout(async () => {
     console.log('🚀 [saveBlocksToServer] Executing save for pageId:', pageId);
     console.log('📝 [saveBlocksToServer] Cleaned blocks to save:', cleanedBlocks.length);
-    
+
     // Детальное логирование для отладки
     console.log('🔍 [saveBlocksToServer] DETAILED BLOCK DATA:');
     cleanedBlocks.forEach((block, index) => {
@@ -67,7 +67,7 @@ export async function saveBlocksToServer(pageId: string, blocks: any[]) {
         userPermission: block.userPermission
       });
     });
-    
+
     try {
       const response = await fetch(`/api/pages/blocks/${pageId}`, {
         method: 'POST',
@@ -80,7 +80,7 @@ export async function saveBlocksToServer(pageId: string, blocks: any[]) {
         const errorText = await response.text();
         console.error('❌ [saveBlocksToServer] Server error:', response.status, errorText);
         console.error('❌ [saveBlocksToServer] Request body:', JSON.stringify({ blocks: cleanedBlocks }, null, 2));
-        
+
         // Попытка повторного сохранения через 2 секунды
         setTimeout(() => {
           console.log('🔄 [saveBlocksToServer] Retrying save after error...');
@@ -89,14 +89,14 @@ export async function saveBlocksToServer(pageId: string, blocks: any[]) {
       } else {
         const responseData = await response.json();
         console.log('✅ [saveBlocksToServer] Success:', responseData);
-        
+
         // Обновляем кэш последних сохраненных блоков
         lastSavedBlocks.set(pageId, [...cleanedBlocks]);
       }
     } catch (error) {
       console.error('❌ [saveBlocksToServer] Network error:', error);
       console.error('❌ [saveBlocksToServer] Request body:', JSON.stringify({ blocks: cleanedBlocks }, null, 2));
-      
+
       // Попытка повторного сохранения через 3 секунды при сетевой ошибке
       setTimeout(() => {
         console.log('🔄 [saveBlocksToServer] Retrying save after network error...');
@@ -115,7 +115,7 @@ export async function saveBlocksToServer(pageId: string, blocks: any[]) {
 // Функция для запуска периодического сохранения
 export function startPeriodicSave(pageId: string, getBlocks: () => any[]) {
   console.log('🔄 [startPeriodicSave] Starting periodic save for pageId:', pageId);
-  
+
   // Останавливаем предыдущий интервал если есть
   if (periodicSaveIntervals.has(pageId)) {
     clearInterval(periodicSaveIntervals.get(pageId)!);
@@ -127,7 +127,7 @@ export function startPeriodicSave(pageId: string, getBlocks: () => any[]) {
     try {
       const currentBlocks = getBlocks();
       const lastSaved = lastSavedBlocks.get(pageId);
-      
+
       // Проверяем, изменились ли блоки
       console.log('🔍 [startPeriodicSave] Checking for changes...', {
         currentBlocksCount: currentBlocks.length,
@@ -137,7 +137,7 @@ export function startPeriodicSave(pageId: string, getBlocks: () => any[]) {
 
       // Проверяем каждое условие отдельно для детального логирования
       let hasChanges = false;
-      
+
       if (!lastSaved) {
         console.log('🔄 [startPeriodicSave] No last saved data, forcing save');
         hasChanges = true;
@@ -152,7 +152,7 @@ export function startPeriodicSave(pageId: string, getBlocks: () => any[]) {
         for (let index = 0; index < currentBlocks.length; index++) {
           const block = currentBlocks[index];
           const lastBlock = lastSaved[index];
-          
+
           console.log('🔍 [startPeriodicSave] Checking block:', {
             index,
             blockId: block.blockId,
@@ -160,7 +160,7 @@ export function startPeriodicSave(pageId: string, getBlocks: () => any[]) {
             currentContent: JSON.stringify(block.content).substring(0, 100) + '...',
             lastContent: lastBlock ? JSON.stringify(lastBlock.content).substring(0, 100) + '...' : 'null'
           });
-          
+
           if (!lastBlock) {
             console.log('🔄 [startPeriodicSave] Block changed: no last block');
             hasChanges = true;
@@ -172,7 +172,7 @@ export function startPeriodicSave(pageId: string, getBlocks: () => any[]) {
           } else {
             const currentContentStr = JSON.stringify(block.content);
             const lastContentStr = JSON.stringify(lastBlock.content);
-            
+
             if (currentContentStr !== lastContentStr) {
               console.log('🔄 [startPeriodicSave] Block changed: content changed', {
                 blockId: block.blockId,
@@ -203,7 +203,7 @@ export function startPeriodicSave(pageId: string, getBlocks: () => any[]) {
   }, 3000); // 3 секунды
 
   periodicSaveIntervals.set(pageId, interval);
-  
+
   // Принудительно сохраняем при первом запуске для установки базового состояния
   setTimeout(async () => {
     try {
@@ -216,14 +216,14 @@ export function startPeriodicSave(pageId: string, getBlocks: () => any[]) {
       console.error('❌ [startPeriodicSave] Error during initial save:', error);
     }
   }, 1000); // Сохраняем через 1 секунду после запуска
-  
+
   console.log('✅ [startPeriodicSave] Periodic save started for pageId:', pageId);
 }
 
 // Функция для остановки периодического сохранения
 export function stopPeriodicSave(pageId: string) {
   console.log('⏹️ [stopPeriodicSave] Stopping periodic save for pageId:', pageId);
-  
+
   if (periodicSaveIntervals.has(pageId)) {
     clearInterval(periodicSaveIntervals.get(pageId)!);
     periodicSaveIntervals.delete(pageId);
@@ -235,14 +235,14 @@ export function stopPeriodicSave(pageId: string) {
 // Функция для принудительного сохранения (для тестирования)
 export async function forceSaveBlocks(pageId: string, getBlocks: () => any[]) {
   console.log('🔄 [forceSaveBlocks] Force saving blocks for pageId:', pageId);
-  
+
   try {
     const currentBlocks = getBlocks();
     console.log('📝 [forceSaveBlocks] Blocks to save:', currentBlocks.length);
-    
+
     await saveBlocksToServer(pageId, currentBlocks);
     lastSavedBlocks.set(pageId, [...currentBlocks]);
-    
+
     console.log('✅ [forceSaveBlocks] Force save completed successfully');
     return true;
   } catch (error) {
@@ -269,15 +269,15 @@ export async function deleteBlock(pageId: string, blockId: string) {
 export async function fetchBlocks(pageId: string) {
   console.log('🔍 [fetchBlocks] Fetching blocks for pageId:', pageId);
   const res = await fetch(`/api/pages/${pageId}/blocks`, { credentials: "include" });
-  
+
   if (!res.ok) {
     console.error('❌ [fetchBlocks] Failed to fetch blocks:', res.status, res.statusText);
     throw new Error(`Failed to fetch blocks: ${res.status}`);
   }
-  
+
   const result = await res.json();
   console.log('📦 [fetchBlocks] Raw API response:', result);
-  
+
   // Универсальная обработка вложенности
   let blocks = Array.isArray(result?.data?.data)
     ? result.data.data
@@ -286,20 +286,20 @@ export async function fetchBlocks(pageId: string) {
     : Array.isArray(result)
     ? result
     : [];
-  
+
   // Сортируем блоки по позициям
   const sortedBlocks = blocks.sort((a, b) => {
     const posA = a.position ?? 0;
     const posB = b.position ?? 0;
     return posA - posB;
   });
-  
+
   console.log('✅ [fetchBlocks] Processed blocks:', {
     pageId,
     blocksCount: sortedBlocks.length,
     blocks: sortedBlocks.map(b => ({ id: b.id, blockType: b.blockType, position: b.position }))
   });
-  
+
   return sortedBlocks;
 }
 
@@ -392,8 +392,8 @@ export function createBlockBetween(pageId: string, blocks: any[], afterBlockId: 
 
   // Если предыдущий блок - это список, создаем параграф (не список)
   const isAfterListBlock = afterBlock.blockType && (
-    afterBlock.blockType.includes('List') || 
-    afterBlock.blockType.includes('list') || 
+    afterBlock.blockType.includes('List') ||
+    afterBlock.blockType.includes('list') ||
     afterBlock.blockType.includes('task')
   );
 
@@ -430,8 +430,8 @@ export function createBlockAtEnd(pageId: string, blocks: any[]) {
   if (blocks.length > 0) {
     const lastBlock = blocks[blocks.length - 1];
     const isLastBlockList = lastBlock.blockType && (
-      lastBlock.blockType.includes('List') || 
-      lastBlock.blockType.includes('list') || 
+      lastBlock.blockType.includes('List') ||
+      lastBlock.blockType.includes('list') ||
       lastBlock.blockType.includes('task')
     );
 
